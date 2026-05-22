@@ -8,6 +8,11 @@
 build/
 *.lock
 
+# Generated Dart files
+*.freezed.dart
+*.g.dart
+*.drift.dart
+
 # IDE
 .idea/
 .vscode/
