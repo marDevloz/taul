@@ -1,0 +1,18 @@
+# Local AI runtime state
+.atl/
+
+# Flutter
+.dart_tool/
+.dart/
+.packages
+build/
+*.lock
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
