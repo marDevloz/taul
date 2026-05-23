@@ -192,5 +192,22 @@ void main() {
       final results = await repository.search('zzzznotfound');
       expect(results, isEmpty);
     });
+
+    test('should_match_prefix_partial_word', () async {
+      final entry = Entry(
+        id: 'search-4',
+        type: EntryType.note,
+        title: 'Flutter notes',
+        content: 'Some content about Flutter',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await repository.create(entry);
+      // "Flu" should match "Flutter" before user finishes typing
+      final results = await repository.search('Flu');
+      expect(results.length, 1);
+      expect(results.first.id, 'search-4');
+    });
   });
 }
