@@ -2,16 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
-class TaulSearchBar extends ConsumerStatefulWidget {
+class TaulSearchBar extends StatefulWidget {
   const TaulSearchBar({super.key});
 
   @override
-  ConsumerState<TaulSearchBar> createState() => _TaulSearchBarState();
+  State<TaulSearchBar> createState() => _TaulSearchBarState();
 }
 
-class _TaulSearchBarState extends ConsumerState<TaulSearchBar> {
+class _TaulSearchBarState extends State<TaulSearchBar> {
   final _controller = TextEditingController();
   bool _isOpen = false;
+
+  ProviderContainer get _container => ProviderScope.containerOf(context);
 
   @override
   void dispose() {
@@ -23,7 +25,7 @@ class _TaulSearchBarState extends ConsumerState<TaulSearchBar> {
 
   void _close() {
     _controller.clear();
-    ref.read(entrySearchProvider.notifier).state = '';
+    _container.read(entrySearchProvider.notifier).state = '';
     setState(() => _isOpen = false);
   }
 
@@ -57,7 +59,7 @@ class _TaulSearchBarState extends ConsumerState<TaulSearchBar> {
       controller: _controller,
       autofocus: true,
       onChanged: (value) =>
-          ref.read(entrySearchProvider.notifier).state = value,
+          _container.read(entrySearchProvider.notifier).state = value,
       decoration: InputDecoration(
         hintText: 'Buscar en Taúl...',
         prefixIcon: const Icon(Icons.search, size: 20),
