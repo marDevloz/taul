@@ -15,23 +15,69 @@ class FilterChipsRow extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
-          _buildChip(context, ref, null, 'Todas', selectedType == null),
+          _buildChip(
+            context: context,
+            ref: ref,
+            type: null,
+            icon: Icons.all_inclusive,
+            label: 'Todas',
+            selected: selectedType == null,
+          ),
           const SizedBox(width: 6),
-          _buildChip(context, ref, EntryType.glossary, '📖', selectedType == EntryType.glossary),
+          _buildChip(
+            context: context,
+            ref: ref,
+            type: EntryType.glossary,
+            icon: Icons.book,
+            label: 'Glosario',
+            selected: selectedType == EntryType.glossary,
+          ),
           const SizedBox(width: 6),
-          _buildChip(context, ref, EntryType.note, '📝', selectedType == EntryType.note),
+          _buildChip(
+            context: context,
+            ref: ref,
+            type: EntryType.note,
+            icon: Icons.description,
+            label: 'Nota',
+            selected: selectedType == EntryType.note,
+          ),
           const SizedBox(width: 6),
-          _buildChip(context, ref, EntryType.idea, '💡', selectedType == EntryType.idea),
+          _buildChip(
+            context: context,
+            ref: ref,
+            type: EntryType.idea,
+            icon: Icons.lightbulb,
+            label: 'Idea',
+            selected: selectedType == EntryType.idea,
+          ),
+          const SizedBox(width: 6),
+          _buildChip(
+            context: context,
+            ref: ref,
+            type: EntryType.credential,
+            icon: Icons.lock,
+            label: 'Credencial',
+            selected: selectedType == EntryType.credential,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildChip(BuildContext context, WidgetRef ref, EntryType? type, String label, bool selected) {
+  Widget _buildChip({
+    required BuildContext context,
+    required WidgetRef ref,
+    required EntryType? type,
+    required IconData icon,
+    required String label,
+    required bool selected,
+  }) {
     return FilterChip(
+      avatar: Icon(icon, size: 18),
       label: Text(label),
       selected: selected,
       onSelected: (_) => ref.read(selectedTypeFilterProvider.notifier).state = type,
+      showCheckmark: false,
     );
   }
 }

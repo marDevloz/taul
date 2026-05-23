@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:taul/domain/entities/entry.dart';
-import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/screens/credential_form_sheet.dart';
 import 'package:taul/ui/screens/entry_detail_view.dart';
 import 'package:taul/ui/screens/quick_add_sheet.dart';
 import 'package:taul/ui/widgets/entry_card.dart';
@@ -60,7 +59,7 @@ class HomeView extends ConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showQuickAdd(context),
+        onPressed: () => _showNewEntryOptions(context),
         child: const Icon(Icons.add),
       ),
     );
@@ -72,11 +71,56 @@ class HomeView extends ConsumerWidget {
     );
   }
 
+  void _showNewEntryOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit_note),
+                title: const Text('Nota, idea o glosario'),
+                subtitle: const Text('Texto libre — detecta el tipo automáticamente'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showQuickAdd(context);
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.lock),
+                title: const Text('Credencial'),
+                subtitle: const Text('Servicio, usuario y contraseña'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showCredentialForm(context);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showQuickAdd(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const QuickAddSheet(),
+      builder: (_) => QuickAddSheet(
+        onCredentialRequested: () => _showCredentialForm(context),
+      ),
+    );
+  }
+
+  void _showCredentialForm(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const CredentialFormSheet(),
     );
   }
 }

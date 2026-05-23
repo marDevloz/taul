@@ -12,6 +12,22 @@ void main() {
   late MockEntryRepository repository;
   late CreateEntry useCase;
 
+  setUpAll(() {
+    registerFallbackValue(
+      Entry(
+        id: 'fallback',
+        type: EntryType.note,
+        title: 'fallback',
+        content: '',
+        metadata: {},
+        tags: [],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        version: 1,
+      ),
+    );
+  });
+
   setUp(() {
     repository = MockEntryRepository();
     useCase = CreateEntry(repository: repository);
@@ -54,14 +70,28 @@ void main() {
       expect(result.type, EntryType.idea);
     });
 
-    test('should_infer_glossary_type_when_content_contains_at', () async {
+    test('should_infer_glossary_type_when_content_contains_colon', () async {
       when(() => repository.create(any())).thenAnswer(
         (i) => Future.value(i.positionalArguments[0] as Entry),
       );
 
-      final result = await useCase.call(title: 'Term', content: 'definition @context');
+      final result = await useCase.call(title: 'Term', content: 'Término: definición');
 
       expect(result.type, EntryType.glossary);
+    });
+
+    test('should_use_explicit_type_when_provided', () async {
+      when(() => repository.create(any())).thenAnswer(
+        (i) => Future.value(i.positionalArguments[0] as Entry),
+      );
+
+      final result = await useCase.call(
+        title: 'Title',
+        content: '! would be idea but we force note',
+        type: EntryType.note,
+      );
+
+      expect(result.type, EntryType.note);
     });
   });
 }

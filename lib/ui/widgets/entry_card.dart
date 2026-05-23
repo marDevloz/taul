@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:taul/domain/entities/entry.dart';
+import 'package:taul/domain/entities/entry_type.dart';
 
 class EntryCard extends StatelessWidget {
   final Entry entry;
@@ -8,18 +9,12 @@ class EntryCard extends StatelessWidget {
   const EntryCard({super.key, required this.entry, this.onTap});
 
   IconData get _typeIcon {
-    switch (entry.type) {
-      case var e when e.label == 'GLOSARIO':
-        return Icons.book;
-      case var e when e.label == 'NOTA':
-        return Icons.description;
-      case var e when e.label == 'IDEA':
-        return Icons.lightbulb;
-      case var e when e.label == 'CREDENCIAL':
-        return Icons.lock;
-      default:
-        return Icons.article;
-    }
+    return switch (entry.type) {
+      EntryType.glossary => Icons.book,
+      EntryType.note => Icons.description,
+      EntryType.idea => Icons.lightbulb,
+      EntryType.credential => Icons.lock,
+    };
   }
 
   @override
