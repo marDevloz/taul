@@ -1,4 +1,3 @@
-import 'package:taul/core/errors/failures.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/repositories/i_entry_repository.dart';
 

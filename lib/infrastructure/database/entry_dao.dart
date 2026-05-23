@@ -9,7 +9,7 @@ import 'app_database.dart' as db;
 class EntryDao {
   final db.AppDatabase _database;
 
-  EntryDao(this._database);
+  const EntryDao(this._database);
 
   Future<Entry> insert(Entry entry) async {
     await _database.into(_database.entries).insert(_toCompanion(entry));
@@ -59,7 +59,11 @@ class EntryDao {
 
   Future<List<Entry>> search(String query, {int limit = 100}) async {
     final sanitized = query.replaceAll('"', '""');
-    final ftsQuery = '"$sanitized"';
+    final tokens = sanitized.trim().split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+    if (tokens.isEmpty) return [];
+
+    // Prefix match so "git" matches "github", "gitlab", etc.
+    final ftsQuery = tokens.map((t) => '$t*').join(' ');
 
     try {
       final rows = await _database.customSelect(

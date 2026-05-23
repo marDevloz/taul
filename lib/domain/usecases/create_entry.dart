@@ -1,5 +1,6 @@
 import 'package:taul/core/errors/failures.dart';
 import 'package:taul/domain/entities/entry.dart';
+import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/domain/repositories/i_entry_repository.dart';
 import 'package:uuid/uuid.dart';
 
@@ -16,6 +17,7 @@ class CreateEntry {
   Future<Entry> call({
     required String title,
     required String content,
+    EntryType? type,
     String? topicKey,
     String? secret,
     List<String> tags = const [],
@@ -28,7 +30,7 @@ class CreateEntry {
     final now = DateTime.now();
     final entry = Entry(
       id: _uuid.v4(),
-      type: _inferType(title, content),
+      type: type ?? _inferType(title, content),
       title: title.trim(),
       content: content.trim(),
       tags: tags,
@@ -44,7 +46,8 @@ class CreateEntry {
 
   EntryType _inferType(String title, String content) {
     if (content.startsWith('!')) return EntryType.idea;
-    if (content.contains('@')) return EntryType.glossary;
+    if (content.contains(':')) return EntryType.glossary;
+    if (content.startsWith('+')) return EntryType.credential;
     return EntryType.note;
   }
 }
