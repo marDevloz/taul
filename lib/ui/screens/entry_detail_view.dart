@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/screens/credential_form_sheet.dart';
 
 class EntryDetailView extends ConsumerWidget {
   final String entryId;
@@ -52,93 +53,96 @@ class EntryDetailView extends ConsumerWidget {
   void _showNoteEdit(BuildContext context, WidgetRef ref, Entry entry) {
     final titleCtrl = TextEditingController(text: entry.title);
     final contentCtrl = TextEditingController(text: entry.content);
+    final tagsCtrl = TextEditingController(text: entry.tags.join(', '));
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Editar entrada'),
-        content: Column(
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 24,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
+            Row(
+              children: [
+                const Icon(Icons.edit_note, size: 20),
+                const SizedBox(width: 8),
+                Text('Editar entrada', style: Theme.of(ctx).textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: titleCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Título',
+                border: OutlineInputBorder(),
+              ),
+            ),
             const SizedBox(height: 12),
-            TextField(controller: contentCtrl, decoration: const InputDecoration(labelText: 'Contenido'), maxLines: 5),
+            TextField(
+              controller: contentCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Contenido',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 5,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: tagsCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Tags (opcional)',
+                hintText: 'separados por coma: dev, personal',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () async {
+                    final tags = tagsCtrl.text
+                        .split(',')
+                        .map((t) => t.trim())
+                        .where((t) => t.isNotEmpty)
+                        .toList();
+                    await ref.read(updateEntryProvider).call(
+                      entry,
+                      title: titleCtrl.text,
+                      content: contentCtrl.text,
+                      tags: tags,
+                    );
+                    ref.invalidate(entryDetailProvider(entryId));
+                    ref.invalidate(entryListProvider);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                  child: const Text('Guardar'),
+                ),
+              ],
+            ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await ref.read(updateEntryProvider).call(
-                entry,
-                title: titleCtrl.text,
-                content: contentCtrl.text,
-              );
-              ref.invalidate(entryDetailProvider(entryId));
-              ref.invalidate(entryListProvider);
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
       ),
     );
   }
 
   void _showCredentialEdit(BuildContext context, WidgetRef ref, Entry entry) {
-    final serviceCtrl = TextEditingController(text: entry.title);
-    final usernameCtrl = TextEditingController(text: entry.metadata['username'] ?? '');
-    final passwordCtrl = TextEditingController(text: entry.secret ?? '');
-    final urlCtrl = TextEditingController(text: entry.metadata['url'] ?? '');
-    final tagsCtrl = TextEditingController(text: entry.tags.join(', '));
-
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Editar credencial'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: serviceCtrl, decoration: const InputDecoration(labelText: 'Servicio')),
-              const SizedBox(height: 12),
-              TextField(controller: usernameCtrl, decoration: const InputDecoration(labelText: 'Usuario')),
-              const SizedBox(height: 12),
-              TextField(controller: passwordCtrl, decoration: const InputDecoration(labelText: 'Contraseña')),
-              const SizedBox(height: 12),
-              TextField(controller: urlCtrl, decoration: const InputDecoration(labelText: 'URL')),
-              const SizedBox(height: 12),
-              TextField(controller: tagsCtrl, decoration: const InputDecoration(labelText: 'Tags')),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final tags = tagsCtrl.text
-                  .split(',')
-                  .map((t) => t.trim())
-                  .where((t) => t.isNotEmpty)
-                  .toList();
-              await ref.read(updateEntryProvider).call(
-                entry,
-                title: serviceCtrl.text,
-                secret: passwordCtrl.text.isNotEmpty ? passwordCtrl.text : null,
-                tags: tags,
-                metadata: {
-                  if (usernameCtrl.text.trim().isNotEmpty) 'username': usernameCtrl.text.trim(),
-                  if (urlCtrl.text.trim().isNotEmpty) 'url': urlCtrl.text.trim(),
-                },
-              );
-              ref.invalidate(entryDetailProvider(entryId));
-              ref.invalidate(entryListProvider);
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
+      isScrollControlled: true,
+      builder: (_) => CredentialFormSheet(entry: entry),
     );
   }
 

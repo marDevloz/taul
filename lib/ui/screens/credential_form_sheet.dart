@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
 class CredentialFormSheet extends ConsumerStatefulWidget {
-  const CredentialFormSheet({super.key});
+  final Entry? entry;
+
+  const CredentialFormSheet({super.key, this.entry});
 
   @override
   ConsumerState<CredentialFormSheet> createState() => _CredentialFormSheetState();
@@ -19,6 +22,21 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
   final _tagsCtrl = TextEditingController();
   bool _isSaving = false;
   bool _showPassword = false;
+
+  bool get _isEditing => widget.entry != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final entry = widget.entry;
+    if (entry != null) {
+      _serviceCtrl.text = entry.title;
+      _usernameCtrl.text = entry.metadata['username'] ?? '';
+      _passwordCtrl.text = entry.secret ?? '';
+      _urlCtrl.text = entry.metadata['url'] ?? '';
+      _tagsCtrl.text = entry.tags.join(', ');
+    }
+  }
 
   @override
   void dispose() {
@@ -46,17 +64,32 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
         .toList();
 
     try {
-      await ref.read(createEntryProvider).call(
-        title: service,
-        content: username.isNotEmpty ? 'Usuario: $username' : service,
-        type: EntryType.credential,
-        secret: password.isNotEmpty ? password : null,
-        tags: tags,
-        metadata: {
-          if (username.isNotEmpty) 'username': username,
-          if (url.isNotEmpty) 'url': url,
-        },
-      );
+      if (_isEditing) {
+        final entry = widget.entry!;
+        await ref.read(updateEntryProvider).call(
+          entry,
+          title: service,
+          secret: password.isNotEmpty ? password : null,
+          tags: tags,
+          metadata: {
+            if (username.isNotEmpty) 'username': username,
+            if (url.isNotEmpty) 'url': url,
+          },
+        );
+        ref.invalidate(entryDetailProvider(entry.id));
+      } else {
+        await ref.read(createEntryProvider).call(
+          title: service,
+          content: username.isNotEmpty ? 'Usuario: $username' : service,
+          type: EntryType.credential,
+          secret: password.isNotEmpty ? password : null,
+          tags: tags,
+          metadata: {
+            if (username.isNotEmpty) 'username': username,
+            if (url.isNotEmpty) 'url': url,
+          },
+        );
+      }
       ref.invalidate(entryListProvider);
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -84,17 +117,17 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header
             Row(
               children: [
                 const Icon(Icons.lock, size: 20),
                 const SizedBox(width: 8),
-                Text('Nueva credencial', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  _isEditing ? 'Editar credencial' : 'Nueva credencial',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ],
             ),
             const SizedBox(height: 20),
-
-            // Servicio
             TextFormField(
               controller: _serviceCtrl,
               autofocus: true,
@@ -107,8 +140,6 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
               validator: (v) => (v == null || v.trim().isEmpty) ? 'El servicio es obligatorio' : null,
             ),
             const SizedBox(height: 12),
-
-            // Usuario
             TextFormField(
               controller: _usernameCtrl,
               decoration: const InputDecoration(
@@ -119,8 +150,6 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
               ),
             ),
             const SizedBox(height: 12),
-
-            // Contraseña
             TextFormField(
               controller: _passwordCtrl,
               obscureText: !_showPassword,
@@ -135,8 +164,6 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
               ),
             ),
             const SizedBox(height: 12),
-
-            // URL (opcional)
             TextFormField(
               controller: _urlCtrl,
               keyboardType: TextInputType.url,
@@ -148,8 +175,6 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
               ),
             ),
             const SizedBox(height: 12),
-
-            // Tags (opcional)
             TextFormField(
               controller: _tagsCtrl,
               decoration: const InputDecoration(
@@ -160,14 +185,12 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Save button
             FilledButton.icon(
               onPressed: _isSaving ? null : _save,
               icon: _isSaving
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.save),
-              label: Text(_isSaving ? 'Guardando...' : 'Guardar'),
+              label: Text(_isSaving ? 'Guardando...' : (_isEditing ? 'Actualizar' : 'Guardar')),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
