@@ -78,6 +78,7 @@ class EntryDetailView extends ConsumerWidget {
       isScrollControlled: true,
       builder: (ctx) {
         var selectedType = entry.type;
+        var isSaving = false;
 
         return StatefulBuilder(
           builder: (context, setLocalState) => Padding(
@@ -174,29 +175,41 @@ class EntryDetailView extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: () => Navigator.pop(ctx),
+                      onPressed: isSaving ? null : () => Navigator.pop(ctx),
                       child: const Text('Cancelar'),
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
-                      onPressed: () async {
-                        final tags = tagsCtrl.text
-                            .split(',')
-                            .map((t) => t.trim())
-                            .where((t) => t.isNotEmpty)
-                            .toList();
-                        await ref.read(updateEntryProvider).call(
-                          entry,
-                          title: titleCtrl.text,
-                          content: contentCtrl.text,
-                          tags: tags,
-                          type: selectedType,
-                        );
-                        ref.invalidate(entryDetailProvider(entryId));
-                        ref.invalidate(entryListProvider);
-                        if (ctx.mounted) Navigator.pop(ctx);
-                      },
-                      child: const Text('Guardar'),
+                      onPressed: isSaving
+                          ? null
+                          : () async {
+                              setLocalState(() => isSaving = true);
+                              try {
+                                final tags = tagsCtrl.text
+                                    .split(',')
+                                    .map((t) => t.trim())
+                                    .where((t) => t.isNotEmpty)
+                                    .toList();
+                                await ref.read(updateEntryProvider).call(
+                                  entry,
+                                  title: titleCtrl.text,
+                                  content: contentCtrl.text,
+                                  tags: tags,
+                                  type: selectedType,
+                                );
+                                ref.invalidate(entryDetailProvider(entryId));
+                                ref.invalidate(entryListProvider);
+                                if (ctx.mounted) Navigator.pop(ctx);
+                              } catch (e) {
+                                setLocalState(() => isSaving = false);
+                                if (ctx.mounted) {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    SnackBar(content: Text('Error al guardar: $e')),
+                                  );
+                                }
+                              }
+                            },
+                      child: Text(isSaving ? 'Guardando...' : 'Guardar'),
                     ),
                   ],
                 ),
