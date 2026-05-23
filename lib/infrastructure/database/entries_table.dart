@@ -9,6 +9,10 @@ class Entries extends Table {
   TextColumn get tags => text()();
   TextColumn? get topicKey => text().nullable()();
   TextColumn? get secret => text().nullable()();
+  BoolColumn get requiresAuth => boolean().withDefault(const Constant(false))();
+  TextColumn? get encryptedSecret => text().nullable()();
+  TextColumn? get cipherNonce => text().nullable()();
+  TextColumn? get cipherTag => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
   IntColumn get version => integer().withDefault(const Constant(1))();
