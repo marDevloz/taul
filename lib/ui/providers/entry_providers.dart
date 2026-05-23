@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:taul/core/errors/failures.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/domain/repositories/i_entry_repository.dart';
@@ -9,16 +8,18 @@ import 'package:taul/domain/usecases/get_entry.dart';
 import 'package:taul/domain/usecases/list_entries.dart';
 import 'package:taul/domain/usecases/search_entries.dart';
 import 'package:taul/domain/usecases/update_entry.dart';
-import 'package:taul/infrastructure/database/app_database.dart';
+import 'package:taul/infrastructure/database/app_database.dart' as db;
+import 'package:taul/infrastructure/database/entry_dao.dart';
 import 'package:taul/infrastructure/database/entry_repository_impl.dart';
 
 // --- Infrastructure providers ---
 
-final databaseProvider = Provider<AppDatabase>((ref) => AppDatabase());
+final databaseProvider = Provider<db.AppDatabase>((ref) => db.AppDatabase());
+
+final daoProvider = Provider<EntryDao>((ref) => EntryDao(ref.watch(databaseProvider)));
 
 final entryRepositoryProvider = Provider<IEntryRepository>((ref) {
-  final db = ref.watch(databaseProvider);
-  return EntryRepositoryImpl(db: db);
+  return EntryRepositoryImpl(dao: ref.watch(daoProvider));
 });
 
 // --- Use case providers ---

@@ -6,6 +6,7 @@ part 'entry.g.dart';
 
 @freezed
 class Entry with _$Entry {
+  const Entry._();
   const factory Entry({
     required String id,
     required EntryType type,
