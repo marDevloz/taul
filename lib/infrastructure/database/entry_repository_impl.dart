@@ -2,19 +2,19 @@ import 'package:taul/core/errors/failures.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/domain/repositories/i_entry_repository.dart';
-import 'app_database.dart';
+import 'package:taul/infrastructure/database/entry_dao.dart';
 
 class EntryRepositoryImpl implements IEntryRepository {
-  final AppDatabase _db;
+  final EntryDao _dao;
 
-  EntryRepositoryImpl({required AppDatabase db}) : _db = db;
+  EntryRepositoryImpl({required EntryDao dao}) : _dao = dao;
 
   @override
-  Future<Entry> create(Entry entry) => _db.insertEntry(entry);
+  Future<Entry> create(Entry entry) => _dao.insert(entry);
 
   @override
   Future<Entry> getById(String id) async {
-    final entry = await _db.getEntry(id);
+    final entry = await _dao.get(id);
     if (entry == null) {
       throw EntryNotFoundFailure(message: 'Entry $id not found');
     }
@@ -27,24 +27,24 @@ class EntryRepositoryImpl implements IEntryRepository {
     String? topicKey,
     bool includeDeleted = false,
   }) {
-    return _db.listEntries(type: type?.label, includeDeleted: includeDeleted);
+    return _dao.list(type: type?.label, includeDeleted: includeDeleted);
   }
 
   @override
   Future<List<Entry>> search(String query, {int limit = 100}) {
-    return _db.searchEntries(query, limit: limit);
+    return _dao.search(query, limit: limit);
   }
 
   @override
-  Future<Entry> update(Entry entry) => _db.updateEntry(entry);
+  Future<Entry> update(Entry entry) => _dao.update(entry);
 
   @override
   Future<void> softDelete(String id) async {
     final entry = await getById(id);
     final updated = entry.copyWith(deletedAt: DateTime.now(), updatedAt: DateTime.now());
-    await _db.updateEntry(updated);
+    await _dao.update(updated);
   }
 
   @override
-  Future<void> hardDelete(String id) => _db.deleteEntry(id);
+  Future<void> hardDelete(String id) => _dao.delete(id);
 }
