@@ -65,33 +65,33 @@ class EntryDao {
     // Prefix match so "git" matches "github", "gitlab", etc.
     final ftsQuery = tokens.map((t) => '$t*').join(' ');
 
-    try {
-      final rows = await _database.customSelect(
-        'SELECT e.* FROM entries e '
-        'INNER JOIN entries_fts fts ON e.id = fts.id '
-        'WHERE entries_fts MATCH ? '
-        'AND e.deleted_at IS NULL '
-        'ORDER BY rank '
-        'LIMIT ?',
-        variables: [Variable.withString(ftsQuery), Variable.withInt(limit)],
-      ).get();
+    final rows = await _database.customSelect(
+      'SELECT e.* FROM entries e '
+      'INNER JOIN entries_fts ON e.id = entries_fts.id '
+      'WHERE entries_fts MATCH ? '
+      'AND e.deleted_at IS NULL '
+      'ORDER BY bm25(entries_fts) '
+      'LIMIT ?',
+      variables: [Variable.withString(ftsQuery), Variable.withInt(limit)],
+    ).get();
 
-      return rows.map((row) {
-        final data = Map<String, dynamic>.from(row.data);
-        return _fromMap(data);
-      }).toList();
-    } catch (_) {
-      return [];
-    }
+    return rows.map((row) {
+      final data = Map<String, dynamic>.from(row.data);
+      return _fromMap(data);
+    }).toList();
   }
 
   Future<void> _syncFts(Entry entry) async {
     if (entry.deletedAt != null) return;
 
     try {
+      await _database.customStatement(
+        'DELETE FROM entries_fts WHERE id = ?',
+        [entry.id],
+      );
+
       await _database.customInsert(
-        'INSERT OR REPLACE INTO entries_fts (id, title, content, tags) '
-        'VALUES (?, ?, ?, ?)',
+        'INSERT INTO entries_fts (id, title, content, tags) VALUES (?, ?, ?, ?)',
         variables: [
           Variable.withString(entry.id),
           Variable.withString(entry.title),
@@ -112,6 +112,10 @@ class EntryDao {
       tags: Value(jsonEncode(entry.tags)),
       topicKey: Value(entry.topicKey),
       secret: Value(entry.secret),
+      requiresAuth: Value(entry.requiresAuth),
+      encryptedSecret: Value(entry.encryptedSecret),
+      cipherNonce: Value(entry.cipherNonce),
+      cipherTag: Value(entry.cipherTag),
       createdAt: Value(entry.createdAt),
       updatedAt: Value(entry.updatedAt),
       version: Value(entry.version),
@@ -129,6 +133,10 @@ class EntryDao {
       'tags': row.tags,
       'topicKey': row.topicKey,
       'secret': row.secret,
+      'requiresAuth': row.requiresAuth,
+      'encryptedSecret': row.encryptedSecret,
+      'cipherNonce': row.cipherNonce,
+      'cipherTag': row.cipherTag,
       'createdAt': row.createdAt.toIso8601String(),
       'updatedAt': row.updatedAt.toIso8601String(),
       'version': row.version,
@@ -161,6 +169,13 @@ class EntryDao {
     return _dateTimeOrNull(data, camelKey, snakeKey)!;
   }
 
+  bool _bool(Map<String, dynamic> data, String camelKey, String snakeKey) {
+    final raw = data[camelKey] ?? data[snakeKey];
+    if (raw is bool) return raw;
+    if (raw is int) return raw != 0;
+    return false;
+  }
+
   Entry _fromMap(Map<String, dynamic> data) {
     final tagsRaw = _val<String>(data, 'tags', 'tags');
     final metadataRaw = _val<String>(data, 'metadata', 'metadata');
@@ -176,6 +191,10 @@ class EntryDao {
       tags: tagsRaw != null ? List<String>.from(jsonDecode(tagsRaw) as List) : [],
       topicKey: _val<String>(data, 'topicKey', 'topic_key'),
       secret: _val<String>(data, 'secret', 'secret'),
+      requiresAuth: _bool(data, 'requiresAuth', 'requires_auth'),
+      encryptedSecret: _val<String>(data, 'encryptedSecret', 'encrypted_secret'),
+      cipherNonce: _val<String>(data, 'cipherNonce', 'cipher_nonce'),
+      cipherTag: _val<String>(data, 'cipherTag', 'cipher_tag'),
       createdAt: _dateTime(data, 'createdAt', 'created_at'),
       updatedAt: _dateTime(data, 'updatedAt', 'updated_at'),
       version: _val<int>(data, 'version', 'version') ?? 1,

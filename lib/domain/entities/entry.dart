@@ -16,6 +16,10 @@ class Entry with _$Entry {
     @Default([]) List<String> tags,
     String? topicKey,
     String? secret,
+    @Default(false) bool requiresAuth,
+    String? encryptedSecret,
+    String? cipherNonce,
+    String? cipherTag,
     required DateTime createdAt,
     required DateTime updatedAt,
     @Default(1) int version,
@@ -25,4 +29,5 @@ class Entry with _$Entry {
   factory Entry.fromJson(Map<String, dynamic> json) => _$EntryFromJson(json);
 
   bool get isDeleted => deletedAt != null;
+  bool get isProtected => requiresAuth;
 }
