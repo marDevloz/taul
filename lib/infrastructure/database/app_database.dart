@@ -6,10 +6,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:taul/core/constants.dart';
 
 import 'entries_table.dart';
+import 'master_password_config_table.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Entries])
+@DriftDatabase(tables: [Entries, MasterPasswordConfig])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -17,13 +18,22 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting() : super(NativeDatabase.memory());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
           await m.createAll();
           await _createFtsTable();
+        },
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(entries, entries.requiresAuth);
+            await m.addColumn(entries, entries.encryptedSecret);
+            await m.addColumn(entries, entries.cipherNonce);
+            await m.addColumn(entries, entries.cipherTag);
+            await m.createTable(masterPasswordConfig);
+          }
         },
         beforeOpen: (_) async {
           // Crear la tabla FTS5 siempre que se abre la DB,

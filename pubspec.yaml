@@ -22,6 +22,7 @@ dependencies:
   sqlite3_flutter_libs: ^0.5.28
   path_provider: ^2.1.5
   sqlite3: ^2.7.4
+  cryptography: ^2.7.0
 
   # Code generation
   freezed_annotation: ^2.4.4
