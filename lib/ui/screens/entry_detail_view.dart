@@ -50,6 +50,24 @@ class EntryDetailView extends ConsumerWidget {
     }
   }
 
+  IconData _iconForType(EntryType type) {
+    return switch (type) {
+      EntryType.note => Icons.description,
+      EntryType.idea => Icons.lightbulb,
+      EntryType.glossary => Icons.book,
+      EntryType.credential => Icons.lock,
+    };
+  }
+
+  String _labelForType(EntryType type) {
+    return switch (type) {
+      EntryType.note => 'Nota',
+      EntryType.idea => 'Idea',
+      EntryType.glossary => 'Glosario',
+      EntryType.credential => 'Credencial',
+    };
+  }
+
   void _showNoteEdit(BuildContext context, WidgetRef ref, Entry entry) {
     final titleCtrl = TextEditingController(text: entry.title);
     final contentCtrl = TextEditingController(text: entry.content);
@@ -58,83 +76,135 @@ class EntryDetailView extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 24,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
+      builder: (ctx) {
+        var selectedType = entry.type;
+
+        return StatefulBuilder(
+          builder: (context, setLocalState) => Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 24,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.edit_note, size: 20),
-                const SizedBox(width: 8),
-                Text('Editar entrada', style: Theme.of(ctx).textTheme.titleMedium),
+                // Header
+                Row(
+                  children: [
+                    const Icon(Icons.edit_note, size: 20),
+                    const SizedBox(width: 8),
+                    Text('Editar entrada', style: Theme.of(ctx).textTheme.titleMedium),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Title
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Título',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Content
+                TextField(
+                  controller: contentCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Contenido',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 5,
+                ),
+                const SizedBox(height: 12),
+
+                // Tags
+                TextField(
+                  controller: tagsCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Tags (opcional)',
+                    hintText: 'separados por coma: dev, personal',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Type selector
+                Row(
+                  children: [
+                    Text('Tipo:', style: Theme.of(ctx).textTheme.bodySmall),
+                    const SizedBox(width: 8),
+                    PopupMenuButton<EntryType>(
+                      onSelected: (t) => setLocalState(() => selectedType = t),
+                      child: Chip(
+                        avatar: Icon(_iconForType(selectedType), size: 16),
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(_labelForType(selectedType), style: const TextStyle(fontSize: 12)),
+                            const SizedBox(width: 4),
+                            Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey.shade600),
+                          ],
+                        ),
+                      ),
+                      itemBuilder: (_) => EntryType.values.where((t) => t != EntryType.credential).map(
+                        (t) => PopupMenuItem(
+                          value: t,
+                          child: ListTile(
+                            dense: true,
+                            leading: Icon(_iconForType(t), size: 18),
+                            title: Text(_labelForType(t), style: const TextStyle(fontSize: 13)),
+                            trailing: selectedType == t
+                                ? Icon(Icons.check, size: 16, color: Theme.of(ctx).colorScheme.primary)
+                                : null,
+                          ),
+                        ),
+                      ).toList(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Actions
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancelar'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: () async {
+                        final tags = tagsCtrl.text
+                            .split(',')
+                            .map((t) => t.trim())
+                            .where((t) => t.isNotEmpty)
+                            .toList();
+                        await ref.read(updateEntryProvider).call(
+                          entry,
+                          title: titleCtrl.text,
+                          content: contentCtrl.text,
+                          tags: tags,
+                          type: selectedType,
+                        );
+                        ref.invalidate(entryDetailProvider(entryId));
+                        ref.invalidate(entryListProvider);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      },
+                      child: const Text('Guardar'),
+                    ),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: titleCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Título',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: contentCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Contenido',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 5,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: tagsCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Tags (opcional)',
-                hintText: 'separados por coma: dev, personal',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancelar'),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: () async {
-                    final tags = tagsCtrl.text
-                        .split(',')
-                        .map((t) => t.trim())
-                        .where((t) => t.isNotEmpty)
-                        .toList();
-                    await ref.read(updateEntryProvider).call(
-                      entry,
-                      title: titleCtrl.text,
-                      content: contentCtrl.text,
-                      tags: tags,
-                    );
-                    ref.invalidate(entryDetailProvider(entryId));
-                    ref.invalidate(entryListProvider);
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  },
-                  child: const Text('Guardar'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
