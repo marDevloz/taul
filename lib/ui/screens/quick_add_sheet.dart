@@ -15,6 +15,7 @@ class QuickAddSheet extends ConsumerStatefulWidget {
 class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   final _controller = TextEditingController();
   EntryType? _detectedType;
+  EntryType? _manualType;
   bool _isSaving = false;
 
   static const _typeHints = {
@@ -23,10 +24,19 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     EntryType.glossary: 'Término: definición',
   };
 
+  /// Tipo efectivo: si el usuario eligió uno manual, ese; si no, el auto-detectado.
+  EntryType get _effectiveType => _manualType ?? _detectedType ?? EntryType.note;
+
+  bool get _isManual => _manualType != null;
+
   void _selectHint(String text) {
     _controller.text = text;
     _controller.selection = TextSelection.collapsed(offset: text.length);
     _onTextChanged(text);
+  }
+
+  void _setType(EntryType? type) {
+    setState(() => _manualType = type);
   }
 
   @override
@@ -53,11 +63,11 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
 
     setState(() => _isSaving = true);
 
-    final detectedType = _detectedType ?? EntryType.note;
+    final type = _effectiveType;
     String title;
     String content;
 
-    switch (detectedType) {
+    switch (type) {
       case EntryType.idea:
         title = text.substring(1).trim();
         content = title;
@@ -79,7 +89,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
       await ref.read(createEntryProvider).call(
         title: title,
         content: content,
-        type: detectedType,
+        type: type,
       );
       ref.invalidate(entryListProvider);
       if (mounted) Navigator.pop(context);
@@ -113,11 +123,53 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
             children: [
               Text('Nueva entrada', style: Theme.of(context).textTheme.titleMedium),
               const Spacer(),
-              if (detectedType != null)
-                Chip(
-                  avatar: Icon(_iconForType(detectedType), size: 16),
-                  label: Text(_labelForType(detectedType), style: const TextStyle(fontSize: 12)),
+              // Selector de tipo — tocalo para cambiar si la detección no fue la esperada
+              PopupMenuButton<EntryType>(
+                onSelected: _setType,
+                tooltip: 'Cambiar tipo',
+                child: Chip(
+                  avatar: Icon(_iconForType(_effectiveType), size: 16),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_labelForType(_effectiveType), style: const TextStyle(fontSize: 12)),
+                      const SizedBox(width: 4),
+                      Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey.shade600),
+                    ],
+                  ),
+                  backgroundColor: _isManual
+                      ? Theme.of(context).colorScheme.primaryContainer
+                      : null,
                 ),
+                itemBuilder: (_) => [
+                  ...EntryType.values.where((t) => t != EntryType.credential).map(
+                    (t) => PopupMenuItem(
+                      value: t,
+                      child: ListTile(
+                        dense: true,
+                        leading: Icon(_iconForType(t), size: 18),
+                        title: Text(_labelForType(t), style: const TextStyle(fontSize: 13)),
+                        trailing: _effectiveType == t
+                            ? Icon(Icons.check, size: 16, color: Theme.of(context).colorScheme.primary)
+                            : null,
+                      ),
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  PopupMenuItem(
+                    value: null,
+                    child: ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.sync, size: 18),
+                      title: const Text('Auto', style: TextStyle(fontSize: 13)),
+                      subtitle: const Text('detectar automáticamente', style: TextStyle(fontSize: 11)),
+                      trailing: !_isManual
+                          ? Icon(Icons.check, size: 16, color: Theme.of(context).colorScheme.primary)
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 8),
