@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:go_router/go_router.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
 import 'package:taul/ui/screens/entry_detail_view.dart';
 import 'package:taul/ui/screens/quick_add_sheet.dart';
@@ -29,6 +30,10 @@ class HomeView extends ConsumerWidget {
                 const SnackBar(content: Text('Sync coming in Phase 3')),
               );
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => context.go('/settings'),
           ),
         ],
       ),
