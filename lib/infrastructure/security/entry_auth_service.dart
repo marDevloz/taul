@@ -16,6 +16,16 @@ class EncryptionPayload {
   final String tagHex;
 }
 
+class BackupCodeResult {
+  const BackupCodeResult({
+    required this.plainCodes,
+    required this.codeHashes,
+  });
+
+  final List<String> plainCodes;
+  final List<String> codeHashes;
+}
+
 class EntryAuthService {
   EntryAuthService({
     AesGcm? cipher,
@@ -101,6 +111,79 @@ class EntryAuthService {
   Uint8List generateSalt() => _randomBytes(16);
   String bytesToHex(List<int> bytes) => _toHex(bytes);
   Uint8List hexToBytes(String hex) => _fromHex(hex);
+
+  /// Generates a random 32-byte storage key (DEK).
+  Uint8List generateStorageKey() => _randomBytes(32);
+
+  /// Encrypts the DEK with the KEK using AES-256-GCM.
+  /// Returns the EncryptionPayload containing ciphertext, nonce, and tag.
+  Future<EncryptionPayload> wrapStorageKey({
+    required Uint8List dek,
+    required Uint8List kek,
+  }) async {
+    final nonce = _randomBytes(12);
+    final secretKey = SecretKey(kek);
+    final secretBox = await _cipher.encrypt(
+      dek,
+      secretKey: secretKey,
+      nonce: nonce,
+    );
+
+    return EncryptionPayload(
+      ciphertextHex: _toHex(secretBox.cipherText),
+      nonceHex: _toHex(secretBox.nonce),
+      tagHex: _toHex(secretBox.mac.bytes),
+    );
+  }
+
+  /// Decrypts a wrapped DEK using the KEK.
+  /// Returns the original DEK bytes.
+  Future<Uint8List> unwrapStorageKey({
+    required EncryptionPayload payload,
+    required Uint8List kek,
+  }) async {
+    final secretBox = SecretBox(
+      _fromHex(payload.ciphertextHex),
+      nonce: _fromHex(payload.nonceHex),
+      mac: Mac(_fromHex(payload.tagHex)),
+    );
+
+    final clearBytes = await _cipher.decrypt(
+      secretBox,
+      secretKey: SecretKey(kek),
+    );
+    return Uint8List.fromList(clearBytes);
+  }
+
+  /// Generates backup codes, each individually salted and hashed with Argon2id.
+  ///
+  /// Returns a [BackupCodeResult] containing:
+  /// - [plainCodes]: the plain backup codes in XXXX-XXXX format (shown once)
+  /// - [codeHashes]: stored hashes as `salt_hex:hash_hex` for each code
+  Future<BackupCodeResult> generateBackupCodes({int count = 10}) async {
+    final plainCodes = <String>[];
+    final codeHashes = <String>[];
+
+    for (var i = 0; i < count; i++) {
+      final code = _generateBackupCode();
+      final salt = _randomBytes(8);
+      final hash = await hashMasterPassword(password: code, salt: salt);
+      codeHashes.add('${_toHex(salt)}:$hash');
+      plainCodes.add(code);
+    }
+
+    return BackupCodeResult(plainCodes: plainCodes, codeHashes: codeHashes);
+  }
+
+  String _generateBackupCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final buffer = StringBuffer();
+    for (var i = 0; i < 8; i++) {
+      if (i == 4) buffer.write('-');
+      buffer.write(chars[_random.nextInt(chars.length)]);
+    }
+    return buffer.toString();
+  }
 
   Uint8List _randomBytes(int length) {
     final bytes = Uint8List(length);
