@@ -22,3 +22,17 @@ Taúl es una aplicación local y minimalista diseñada para almacenar informaci�
 - **SQLite FTS5** — búsqueda instantánea
 - **AES-256-GCM + Argon2id** — cifrado
 - **go_router** — navegación
+
+## Features
+
+### Master Password Protection
+
+Credentials can be protected with a master password:
+
+- **Transparent encryption**: once unlocked, encrypt/decrypt happens
+  silently using a cached Data Encryption Key (DEK).
+- **Offline recovery**: 10 single-use backup codes (Argon2id-hashed)
+  allow self-recovery without network.
+- **KEK/DEK wrapping**: changing your master password is instant — no
+  entry re-encryption needed.
+- See [SECURITY.md](SECURITY.md) for detailed architecture.
