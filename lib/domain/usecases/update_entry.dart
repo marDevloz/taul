@@ -5,7 +5,7 @@ import 'package:taul/domain/repositories/i_entry_repository.dart';
 class UpdateEntry {
   final IEntryRepository _repository;
 
-  UpdateEntry({required IEntryRepository repository}) : _repository = repository;
+  const UpdateEntry({required IEntryRepository repository}) : _repository = repository;
 
   Future<Entry> call(
     Entry existing, {
@@ -14,6 +14,11 @@ class UpdateEntry {
     List<String>? tags,
     Map<String, String>? metadata,
     String? secret,
+    bool? requiresAuth,
+    String? encryptedSecret,
+    String? cipherNonce,
+    String? cipherTag,
+    bool clearProtection = false,
     EntryType? type,
   }) async {
     final updated = existing.copyWith(
@@ -22,6 +27,10 @@ class UpdateEntry {
       tags: tags ?? existing.tags,
       metadata: metadata ?? existing.metadata,
       secret: secret,
+      requiresAuth: clearProtection ? false : (requiresAuth ?? existing.requiresAuth),
+      encryptedSecret: clearProtection ? null : (encryptedSecret ?? existing.encryptedSecret),
+      cipherNonce: clearProtection ? null : (cipherNonce ?? existing.cipherNonce),
+      cipherTag: clearProtection ? null : (cipherTag ?? existing.cipherTag),
       type: type ?? existing.type,
       updatedAt: DateTime.now(),
       version: existing.version + 1,

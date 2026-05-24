@@ -8,7 +8,7 @@ class CreateEntry {
   final IEntryRepository _repository;
   final Uuid _uuid;
 
-  CreateEntry({
+  const CreateEntry({
     required IEntryRepository repository,
     Uuid? uuid,
   })  : _repository = repository,
@@ -20,6 +20,10 @@ class CreateEntry {
     EntryType? type,
     String? topicKey,
     String? secret,
+    bool requiresAuth = false,
+    String? encryptedSecret,
+    String? cipherNonce,
+    String? cipherTag,
     List<String> tags = const [],
     Map<String, String> metadata = const {},
   }) async {
@@ -36,6 +40,10 @@ class CreateEntry {
       tags: tags,
       topicKey: topicKey,
       secret: secret,
+      requiresAuth: requiresAuth,
+      encryptedSecret: encryptedSecret,
+      cipherNonce: cipherNonce,
+      cipherTag: cipherTag,
       metadata: metadata,
       createdAt: now,
       updatedAt: now,

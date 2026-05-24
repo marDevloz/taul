@@ -11,12 +11,17 @@ import 'package:taul/domain/usecases/update_entry.dart';
 import 'package:taul/infrastructure/database/app_database.dart' as db;
 import 'package:taul/infrastructure/database/entry_dao.dart';
 import 'package:taul/infrastructure/database/entry_repository_impl.dart';
+import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:taul/infrastructure/security/master_password_store.dart';
 
 // --- Infrastructure providers ---
 
 final databaseProvider = Provider<db.AppDatabase>((ref) => db.AppDatabase());
 
 final daoProvider = Provider<EntryDao>((ref) => EntryDao(ref.watch(databaseProvider)));
+final entryAuthServiceProvider = Provider<EntryAuthService>((ref) => EntryAuthService());
+final masterPasswordStoreProvider =
+    Provider<MasterPasswordStore>((ref) => MasterPasswordStore(ref.watch(databaseProvider)));
 
 final entryRepositoryProvider = Provider<IEntryRepository>((ref) {
   return EntryRepositoryImpl(dao: ref.watch(daoProvider));
