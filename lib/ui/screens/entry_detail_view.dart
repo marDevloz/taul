@@ -1,4 +1,5 @@
 ﻿import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
@@ -8,6 +9,34 @@ import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
+import 'package:taul/ui/widgets/master_password_recovery_dialog.dart';
+
+/// Result of the master password reveal dialog.
+///
+/// One of:
+/// - [password]: user entered a master password
+/// - [recoveryCompleted]: user completed recovery via backup codes
+/// - [cancelled]: user dismissed the dialog
+class _RevealDialogResult {
+  final String? password;
+  final bool recoveryCompleted;
+  final bool cancelled;
+
+  _RevealDialogResult._({
+    this.password,
+    this.recoveryCompleted = false,
+    this.cancelled = false,
+  });
+
+  factory _RevealDialogResult.password(String pw) =>
+      _RevealDialogResult._(password: pw);
+
+  factory _RevealDialogResult.recovery() =>
+      _RevealDialogResult._(recoveryCompleted: true);
+
+  factory _RevealDialogResult.cancelled() =>
+      _RevealDialogResult._(cancelled: true);
+}
 
 class EntryDetailView extends ConsumerWidget {
   final String entryId;
@@ -390,89 +419,289 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
 
     final auth = ref.read(entryAuthServiceProvider);
     final masterKeyNotifier = ref.read(masterPasswordProvider.notifier);
-    var key = masterKeyNotifier.cachedKey;
+    Uint8List? key = masterKeyNotifier.cachedKey;
 
     if (key == null) {
-      final password = await _askForPassword();
-      if (password == null || !mounted) return;
+      final result = await _showMasterPasswordDialog(entry: entry);
+      if (result == null || result.cancelled || !mounted) return;
 
-      final store = ref.read(masterPasswordStoreProvider);
-      final config = await store.read();
-      if (config == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Master password no configurada')),
-          );
+      if (result.recoveryCompleted) {
+        // Recovery succeeded — the dialog cached the new DEK.
+        key = masterKeyNotifier.cachedKey;
+        if (key == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Recovery completed but the key could not be loaded. '
+                  'Please try revealing the secret again.',
+                ),
+              ),
+            );
+          }
+          return;
         }
-        return;
-      }
-
-      final salt = auth.hexToBytes(config.saltHex);
-      final isValid = await auth.verifyMasterPassword(
-        password: password,
-        salt: salt,
-        expectedHashHex: config.hashHex,
-      );
-      if (!isValid) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Master password inválida')),
-          );
+      } else {
+        // User entered a master password.
+        final password = result.password!;
+        final store = ref.read(masterPasswordStoreProvider);
+        final config = await store.readFull();
+        if (config == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Master password not configured. Set it up from Settings.',
+                ),
+              ),
+            );
+          }
+          return;
         }
-        return;
-      }
 
-      final derivedKey = await auth.deriveMasterKey(password: password, salt: salt);
-      masterKeyNotifier.setMasterPassword(derivedKey);
-      key = derivedKey;
+        final salt = auth.hexToBytes(config.saltHex);
+        final isValid = await auth.verifyMasterPassword(
+          password: password,
+          salt: salt,
+          expectedHashHex: config.hashHex,
+        );
+
+        if (!isValid) {
+          // Wrong password — show recovery option.
+          final recoveryChosen = await _showRecoveryOption();
+          if (!recoveryChosen || !mounted) return;
+
+          final recovered = await _openRecoveryDialog();
+          if (!recovered || !mounted) return;
+
+          // After recovery, key should be cached.
+          key = masterKeyNotifier.cachedKey;
+          if (key == null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Recovery completed but the key could not be loaded.',
+                  ),
+                ),
+              );
+            }
+            return;
+          }
+        } else {
+          // Valid password: unwrap DEK from encrypted storage key.
+          if (config.encryptedStorageKeyHex != null &&
+              config.encryptedStorageKeyHex!.isNotEmpty) {
+            final kek = await auth.deriveMasterKey(
+              password: password,
+              salt: salt,
+            );
+            key = await auth.unwrapStorageKey(
+              payload: EncryptionPayload(
+                ciphertextHex: config.encryptedStorageKeyHex!,
+                nonceHex: config.encryptedStorageKeyNonceHex ?? '',
+                tagHex: config.encryptedStorageKeyTagHex ?? '',
+              ),
+              kek: kek,
+            );
+          } else {
+            // Pre-migration: derive key directly from password.
+            key = await auth.deriveMasterKey(
+              password: password,
+              salt: salt,
+            );
+          }
+          masterKeyNotifier.setMasterPassword(key);
+        }
+      }
     }
 
-    final plaintext = await auth.decryptSecret(
-      payload: EncryptionPayload(
-        ciphertextHex: entry.encryptedSecret!,
-        nonceHex: entry.cipherNonce!,
-        tagHex: entry.cipherTag!,
-      ),
-      masterKey: key,
-    );
+    try {
+      final plaintext = await auth.decryptSecret(
+        payload: EncryptionPayload(
+          ciphertextHex: entry.encryptedSecret!,
+          nonceHex: entry.cipherNonce!,
+          tagHex: entry.cipherTag!,
+        ),
+        masterKey: key,
+      );
 
-    if (!mounted) return;
-    setState(() {
-      _revealedSecret = plaintext;
-      _showPassword = false;
-    });
-
-    _hideTimer?.cancel();
-    _hideTimer = Timer(const Duration(seconds: 30), () {
       if (!mounted) return;
-      setState(() => _revealedSecret = null);
-    });
+      setState(() {
+        _revealedSecret = plaintext;
+        _showPassword = false;
+      });
+
+      _hideTimer?.cancel();
+      _hideTimer = Timer(const Duration(seconds: 30), () {
+        if (!mounted) return;
+        setState(() => _revealedSecret = null);
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to decrypt: ${e.toString()}')),
+        );
+      }
+    }
   }
 
-  Future<String?> _askForPassword() async {
+  /// Shows the master password reveal dialog with hint and recovery link.
+  ///
+  /// The dialog includes:
+  /// - Password field
+  /// - "Show hint" toggle (if a hint exists)
+  /// - "Forgot password?" link → opens [MasterPasswordRecoveryDialog]
+  ///
+  /// Returns the result indicating what action the user took.
+  Future<_RevealDialogResult?> _showMasterPasswordDialog({
+    required Entry entry,
+  }) async {
+    final hint = await ref.read(masterPasswordHintProvider.future);
     final ctrl = TextEditingController();
-    final result = await showDialog<String>(
+    var showHint = false;
+
+    final result = await showDialog<_RevealDialogResult>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocalState) => AlertDialog(
+          title: const Text('Master Password'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: ctrl,
+                obscureText: true,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Enter your master password',
+                ),
+              ),
+              if (hint != null) ...[
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  icon: Icon(
+                    showHint ? Icons.visibility_off : Icons.visibility,
+                    size: 16,
+                  ),
+                  label: Text(showHint ? 'Hide hint' : 'Show hint'),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () =>
+                      setLocalState(() => showHint = !showHint),
+                ),
+                if (showHint) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.amber.shade200),
+                    ),
+                    child: Text(
+                      'Hint: $hint',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ],
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: () async {
+                  // Open recovery dialog on top of this one.
+                  final recoveryResult = await Navigator.push<RecoveryResult>(
+                    ctx,
+                    MaterialPageRoute(
+                      builder: (_) => const MasterPasswordRecoveryDialog(),
+                      fullscreenDialog: true,
+                    ),
+                  );
+                  // If recovery succeeded, close THIS dialog too.
+                  if (recoveryResult != null && recoveryResult.success) {
+                    if (ctx.mounted) {
+                      Navigator.pop(
+                        ctx,
+                        _RevealDialogResult.recovery(),
+                      );
+                    }
+                  }
+                },
+                child: const Text(
+                  'Forgot your master password?',
+                  style: TextStyle(fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(ctx, _RevealDialogResult.cancelled()),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final text = ctrl.text;
+                if (text.trim().isEmpty) return;
+                Navigator.pop(
+                  ctx,
+                  _RevealDialogResult.password(text),
+                );
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    ctrl.dispose();
+    return result;
+  }
+
+  /// Shows an option to try recovery after a wrong password.
+  /// Returns true if the user wants to start recovery.
+  Future<bool> _showRecoveryOption() async {
+    final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Master password'),
-        content: TextField(
-          controller: ctrl,
-          obscureText: true,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Ingresá tu master password'),
+        title: const Text('Wrong Password'),
+        content: const Text(
+          'The master password you entered is incorrect. '
+          'You can try again or use a backup code to recover access.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Try Again'),
+          ),
           FilledButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text),
-            child: const Text('Aceptar'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Use Backup Code'),
           ),
         ],
       ),
     );
-    ctrl.dispose();
-    if (result == null || result.trim().isEmpty) return null;
-    return result;
+    return result ?? false;
+  }
+
+  /// Opens the [MasterPasswordRecoveryDialog] and returns true if recovery
+  /// was completed successfully.
+  Future<bool> _openRecoveryDialog() async {
+    final result = await Navigator.push<RecoveryResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const MasterPasswordRecoveryDialog(),
+        fullscreenDialog: true,
+      ),
+    );
+    return result?.success ?? false;
   }
 
   Widget _fieldCard({
