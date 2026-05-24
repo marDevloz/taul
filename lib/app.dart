@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:taul/ui/screens/home_view.dart';
 import 'package:taul/ui/screens/entry_detail_view.dart';
+import 'package:taul/ui/screens/settings_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -17,6 +18,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/entry/:id',
         name: 'entry',
         builder: (_, state) => EntryDetailView(entryId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        builder: (_, __) => const SettingsScreen(),
       ),
     ],
   );
