@@ -34,7 +34,7 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
     if (entry != null) {
       _serviceCtrl.text = entry.title;
       _usernameCtrl.text = entry.metadata['username'] ?? '';
-      _passwordCtrl.text = entry.secret ?? '';
+      _passwordCtrl.text = entry.requiresAuth ? '' : (entry.secret ?? '');
       _urlCtrl.text = entry.metadata['url'] ?? '';
       _tagsCtrl.text = entry.tags.join(', ');
       _protectEntry = entry.requiresAuth;
@@ -67,15 +67,24 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
         .toList();
 
     try {
+      final passwordChanged =
+          !_isEditing || !widget.entry!.requiresAuth || password.isNotEmpty;
+      final effectivePassword = passwordChanged ? password : '';
+
       final controller = CredentialProtectionController(
         authService: ref.read(entryAuthServiceProvider),
         passwordStore: ref.read(masterPasswordStoreProvider),
+        masterPasswordNotifier: ref.read(masterPasswordProvider.notifier),
       );
       final protection = await controller.resolveProtection(
         context: context,
         protectEntry: _protectEntry,
         isEditingProtectedEntry: _isEditing && widget.entry!.requiresAuth,
-        password: password,
+        password: effectivePassword,
+        passwordChanged: passwordChanged,
+        existingEncryptedSecret: widget.entry?.encryptedSecret,
+        existingCipherNonce: widget.entry?.cipherNonce,
+        existingCipherTag: widget.entry?.cipherTag,
       );
 
       if (protection == null) {
@@ -183,6 +192,7 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
               obscureText: !_showPassword,
               decoration: InputDecoration(
                 labelText: 'Contraseña',
+                hintText: _isEditing && widget.entry!.requiresAuth ? '••••••••' : null,
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.key, size: 20),
                 suffixIcon: IconButton(

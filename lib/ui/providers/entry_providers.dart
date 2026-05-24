@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
@@ -13,6 +15,22 @@ import 'package:taul/infrastructure/database/entry_dao.dart';
 import 'package:taul/infrastructure/database/entry_repository_impl.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
+
+// --- Master password key cache (volatile, in-memory) ---
+
+class MasterPasswordNotifier extends StateNotifier<Uint8List?> {
+  MasterPasswordNotifier() : super(null);
+
+  Uint8List? get cachedKey => state;
+  void setMasterPassword(Uint8List key) => state = key;
+  void clearMasterPassword() => state = null;
+  bool get isSet => state != null;
+}
+
+final masterPasswordProvider =
+    StateNotifierProvider<MasterPasswordNotifier, Uint8List?>((ref) {
+  return MasterPasswordNotifier();
+});
 
 // --- Infrastructure providers ---
 
