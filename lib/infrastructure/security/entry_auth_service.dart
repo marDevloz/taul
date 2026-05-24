@@ -99,6 +99,8 @@ class EntryAuthService {
   }
 
   Uint8List generateSalt() => _randomBytes(16);
+  String bytesToHex(List<int> bytes) => _toHex(bytes);
+  Uint8List hexToBytes(String hex) => _fromHex(hex);
 
   Uint8List _randomBytes(int length) {
     final bytes = Uint8List(length);

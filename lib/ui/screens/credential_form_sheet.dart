@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/screens/credential_protection_controller.dart';
 
 class CredentialFormSheet extends ConsumerStatefulWidget {
   final Entry? entry;
@@ -22,6 +23,7 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
   final _tagsCtrl = TextEditingController();
   bool _isSaving = false;
   bool _showPassword = false;
+  bool _protectEntry = false;
 
   bool get _isEditing => widget.entry != null;
 
@@ -35,6 +37,7 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
       _passwordCtrl.text = entry.secret ?? '';
       _urlCtrl.text = entry.metadata['url'] ?? '';
       _tagsCtrl.text = entry.tags.join(', ');
+      _protectEntry = entry.requiresAuth;
     }
   }
 
@@ -64,12 +67,33 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
         .toList();
 
     try {
+      final controller = CredentialProtectionController(
+        authService: ref.read(entryAuthServiceProvider),
+        passwordStore: ref.read(masterPasswordStoreProvider),
+      );
+      final protection = await controller.resolveProtection(
+        context: context,
+        protectEntry: _protectEntry,
+        isEditingProtectedEntry: _isEditing && widget.entry!.requiresAuth,
+        password: password,
+      );
+
+      if (protection == null) {
+        setState(() => _isSaving = false);
+        return;
+      }
+
       if (_isEditing) {
         final entry = widget.entry!;
         await ref.read(updateEntryProvider).call(
           entry,
           title: service,
-          secret: password.isNotEmpty ? password : null,
+          secret: protection.secret,
+          requiresAuth: protection.requiresAuth,
+          encryptedSecret: protection.encryptedSecret,
+          cipherNonce: protection.cipherNonce,
+          cipherTag: protection.cipherTag,
+          clearProtection: protection.clearProtection,
           tags: tags,
           metadata: {
             if (username.isNotEmpty) 'username': username,
@@ -82,7 +106,11 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
           title: service,
           content: username.isNotEmpty ? 'Usuario: $username' : service,
           type: EntryType.credential,
-          secret: password.isNotEmpty ? password : null,
+          secret: protection.secret,
+          requiresAuth: protection.requiresAuth,
+          encryptedSecret: protection.encryptedSecret,
+          cipherNonce: protection.cipherNonce,
+          cipherTag: protection.cipherTag,
           tags: tags,
           metadata: {
             if (username.isNotEmpty) 'username': username,
@@ -162,6 +190,14 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
                   onPressed: () => setState(() => _showPassword = !_showPassword),
                 ),
               ),
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              value: _protectEntry,
+              onChanged: (value) => setState(() => _protectEntry = value),
+              title: const Text('Proteger con master password'),
+              subtitle: const Text('Cifra este secreto con AES-256-GCM'),
+              contentPadding: EdgeInsets.zero,
             ),
             const SizedBox(height: 12),
             TextFormField(
