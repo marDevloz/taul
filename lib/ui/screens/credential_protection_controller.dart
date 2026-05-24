@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
+import 'package:taul/ui/providers/entry_providers.dart';
 
 class ProtectionResult {
   const ProtectionResult({
@@ -23,20 +24,27 @@ class ProtectionResult {
 }
 
 class CredentialProtectionController {
-  const CredentialProtectionController({
+  CredentialProtectionController({
     required EntryAuthService authService,
     required MasterPasswordStore passwordStore,
+    MasterPasswordNotifier? masterPasswordNotifier,
   })  : _authService = authService,
-        _passwordStore = passwordStore;
+        _passwordStore = passwordStore,
+        _masterPasswordNotifier = masterPasswordNotifier;
 
   final EntryAuthService _authService;
   final MasterPasswordStore _passwordStore;
+  final MasterPasswordNotifier? _masterPasswordNotifier;
 
   Future<ProtectionResult?> resolveProtection({
     required BuildContext context,
     required bool protectEntry,
     required bool isEditingProtectedEntry,
     required String password,
+    bool passwordChanged = true,
+    String? existingEncryptedSecret,
+    String? existingCipherNonce,
+    String? existingCipherTag,
   }) async {
     var finalSecret = password.isNotEmpty ? password : null;
     var clearProtection = false;
@@ -57,8 +65,32 @@ class CredentialProtectionController {
       encryptedSecret = payload.ciphertextHex;
       cipherNonce = payload.nonceHex;
       cipherTag = payload.tagHex;
+    } else if (protectEntry && !passwordChanged && isEditingProtectedEntry) {
+      requiresAuth = true;
+      encryptedSecret = existingEncryptedSecret;
+      cipherNonce = existingCipherNonce;
+      cipherTag = existingCipherTag;
+      finalSecret = null;
     } else if (!protectEntry && isEditingProtectedEntry) {
       clearProtection = true;
+      if (password.isNotEmpty) {
+        finalSecret = password;
+      } else {
+        final masterKey = await _getOrSetupMasterKey(context);
+        if (masterKey == null) return null;
+        if (existingEncryptedSecret != null &&
+            existingCipherNonce != null &&
+            existingCipherTag != null) {
+          finalSecret = await _authService.decryptSecret(
+            payload: EncryptionPayload(
+              ciphertextHex: existingEncryptedSecret,
+              nonceHex: existingCipherNonce,
+              tagHex: existingCipherTag,
+            ),
+            masterKey: masterKey,
+          );
+        }
+      }
     }
 
     return ProtectionResult(
@@ -72,6 +104,9 @@ class CredentialProtectionController {
   }
 
   Future<Uint8List?> _getOrSetupMasterKey(BuildContext context) async {
+    final cached = _masterPasswordNotifier?.cachedKey;
+    if (cached != null) return cached;
+
     final current = await _passwordStore.read();
     if (current == null) {
       final password = await _askForNewMasterPassword(context);
@@ -79,7 +114,9 @@ class CredentialProtectionController {
       final salt = _authService.generateSalt();
       final hash = await _authService.hashMasterPassword(password: password, salt: salt);
       await _passwordStore.save(hashHex: hash, saltHex: _authService.bytesToHex(salt));
-      return _authService.deriveMasterKey(password: password, salt: salt);
+      final key = await _authService.deriveMasterKey(password: password, salt: salt);
+      _masterPasswordNotifier?.setMasterPassword(key);
+      return key;
     }
 
     final password = await _askForPassword(context);
@@ -96,7 +133,9 @@ class CredentialProtectionController {
       );
       return null;
     }
-    return _authService.deriveMasterKey(password: password, salt: salt);
+    final key = await _authService.deriveMasterKey(password: password, salt: salt);
+    _masterPasswordNotifier?.setMasterPassword(key);
+    return key;
   }
 
   Future<String?> _askForPassword(BuildContext context) async {

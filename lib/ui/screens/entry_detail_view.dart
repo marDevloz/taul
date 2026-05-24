@@ -1,5 +1,4 @@
 ﻿import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
@@ -7,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
-import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
 
@@ -390,35 +388,45 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
       return;
     }
 
-    final password = await _askForPassword();
-    if (password == null || !mounted) return;
+    final auth = ref.read(entryAuthServiceProvider);
+    final masterKeyNotifier = ref.read(masterPasswordProvider.notifier);
+    var key = masterKeyNotifier.cachedKey;
 
-    final auth = EntryAuthService();
-    final store = MasterPasswordStore(ref.read(databaseProvider));
-    final config = await store.read();
-    if (config == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Master password no configurada')),
-      );
-      return;
-    }
+    if (key == null) {
+      final password = await _askForPassword();
+      if (password == null || !mounted) return;
 
-    final salt = auth.hexToBytes(config.saltHex);
-    final isValid = await auth.verifyMasterPassword(
-      password: password,
-      salt: salt,
-      expectedHashHex: config.hashHex,
-    );
-    if (!isValid) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Master password inválida')),
-        );
+      final store = ref.read(masterPasswordStoreProvider);
+      final config = await store.read();
+      if (config == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Master password no configurada')),
+          );
+        }
+        return;
       }
-      return;
+
+      final salt = auth.hexToBytes(config.saltHex);
+      final isValid = await auth.verifyMasterPassword(
+        password: password,
+        salt: salt,
+        expectedHashHex: config.hashHex,
+      );
+      if (!isValid) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Master password inválida')),
+          );
+        }
+        return;
+      }
+
+      final derivedKey = await auth.deriveMasterKey(password: password, salt: salt);
+      masterKeyNotifier.setMasterPassword(derivedKey);
+      key = derivedKey;
     }
 
-    final key = await auth.deriveMasterKey(password: password, salt: salt);
     final plaintext = await auth.decryptSecret(
       payload: EncryptionPayload(
         ciphertextHex: entry.encryptedSecret!,
