@@ -18,7 +18,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting() : super(NativeDatabase.memory());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -33,6 +33,28 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(entries, entries.cipherNonce);
             await m.addColumn(entries, entries.cipherTag);
             await m.createTable(masterPasswordConfig);
+          }
+          if (from < 3) {
+            await m.addColumn(
+              masterPasswordConfig,
+              masterPasswordConfig.passwordHint,
+            );
+            await m.addColumn(
+              masterPasswordConfig,
+              masterPasswordConfig.backupCodeHashes,
+            );
+            await m.addColumn(
+              masterPasswordConfig,
+              masterPasswordConfig.encryptedStorageKey,
+            );
+            await m.addColumn(
+              masterPasswordConfig,
+              masterPasswordConfig.encryptedStorageKeyNonce,
+            );
+            await m.addColumn(
+              masterPasswordConfig,
+              masterPasswordConfig.encryptedStorageKeyTag,
+            );
           }
         },
         beforeOpen: (_) async {
