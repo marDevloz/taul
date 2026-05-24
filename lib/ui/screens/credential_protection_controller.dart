@@ -1,6 +1,7 @@
-import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
@@ -35,6 +36,48 @@ class CredentialProtectionController {
   final EntryAuthService _authService;
   final MasterPasswordStore _passwordStore;
   final MasterPasswordNotifier? _masterPasswordNotifier;
+
+  /// Checks whether the master password is fully configured
+  /// (i.e., an encrypted storage key exists in the DB).
+  Future<bool> isConfigured() async {
+    final config = await _passwordStore.readFull();
+    return config != null &&
+        config.encryptedStorageKeyHex != null &&
+        config.encryptedStorageKeyHex!.isNotEmpty;
+  }
+
+  /// Returns the stored password hint, or null if not set.
+  Future<String?> getHint() => _passwordStore.readHint();
+
+  /// Returns how many backup codes remain (0 if none or not configured).
+  Future<int> getRemainingCodeCount() async {
+    final hashes = await _passwordStore.readBackupCodeHashes();
+    return hashes?.length ?? 0;
+  }
+
+  /// Ensures MP is configured: if not, shows the full setup dialog flow
+  /// with password confirmation, optional hint, and backup codes.
+  ///
+  /// Returns true if MP is already configured or setup completed successfully.
+  /// Returns false if the user cancelled.
+  Future<bool> ensureConfigured(BuildContext context) async {
+    if (await isConfigured()) return true;
+    if (!context.mounted) return false;
+    final key = await _getOrSetupMasterKey(context);
+    return key != null;
+  }
+
+  /// Ensures MP protection is available for encryption.
+  /// If MP is configured and DEK is cached, returns true silently.
+  /// If MP is configured but DEK expired, prompts for password.
+  /// If MP is not configured, triggers full setup.
+  ///
+  /// Returns true if protection is ready, false if user cancelled.
+  Future<bool> ensureProtectionConfigured(BuildContext context) async {
+    if (!context.mounted) return false;
+    final key = await _getOrSetupMasterKey(context);
+    return key != null;
+  }
 
   Future<ProtectionResult?> resolveProtection({
     required BuildContext context,
@@ -107,35 +150,114 @@ class CredentialProtectionController {
     final cached = _masterPasswordNotifier?.cachedKey;
     if (cached != null) return cached;
 
-    final current = await _passwordStore.read();
-    if (current == null) {
-      final password = await _askForNewMasterPassword(context);
+    final config = await _passwordStore.readFull();
+
+    // ─── Case 1: MP is configured with KEK/DEK wrapping ─────────────────
+    if (config != null &&
+        config.encryptedStorageKeyHex != null &&
+        config.encryptedStorageKeyHex!.isNotEmpty) {
+      if (!context.mounted) return null;
+      final password = await _askForPassword(context);
       if (password == null) return null;
-      final salt = _authService.generateSalt();
-      final hash = await _authService.hashMasterPassword(password: password, salt: salt);
-      await _passwordStore.save(hashHex: hash, saltHex: _authService.bytesToHex(salt));
+
+      final salt = _authService.hexToBytes(config.saltHex);
+      final isValid = await _authService.verifyMasterPassword(
+        password: password,
+        salt: salt,
+        expectedHashHex: config.hashHex,
+      );
+      if (!isValid) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Master password inválida')),
+          );
+        }
+        return null;
+      }
+
+      // Derive KEK and unwrap DEK
+      final kek = await _authService.deriveMasterKey(password: password, salt: salt);
+      final dek = await _authService.unwrapStorageKey(
+        payload: EncryptionPayload(
+          ciphertextHex: config.encryptedStorageKeyHex!,
+          nonceHex: config.encryptedStorageKeyNonceHex ?? '',
+          tagHex: config.encryptedStorageKeyTagHex ?? '',
+        ),
+        kek: kek,
+      );
+      _masterPasswordNotifier?.setMasterPassword(dek);
+      return dek;
+    }
+
+    // ─── Case 2: Config exists but no KEK/DEK (pre-migration) ──────────
+    if (config != null) {
+      if (!context.mounted) return null;
+      final password = await _askForPassword(context);
+      if (password == null) return null;
+
+      final salt = _authService.hexToBytes(config.saltHex);
+      final isValid = await _authService.verifyMasterPassword(
+        password: password,
+        salt: salt,
+        expectedHashHex: config.hashHex,
+      );
+      if (!isValid) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Master password inválida')),
+          );
+        }
+        return null;
+      }
       final key = await _authService.deriveMasterKey(password: password, salt: salt);
       _masterPasswordNotifier?.setMasterPassword(key);
       return key;
     }
 
-    final password = await _askForPassword(context);
-    if (password == null) return null;
-    final salt = _authService.hexToBytes(current.saltHex);
-    final isValid = await _authService.verifyMasterPassword(
-      password: password,
+    // ─── Case 3: No config → full setup dialog ─────────────────────────
+    if (!context.mounted) return null;
+    final setupResult = await _showFullSetupDialog(context);
+    if (setupResult == null) return null;
+
+    final setupPassword = setupResult.password;
+    final setupHint = setupResult.hint;
+    final dek = _authService.generateStorageKey();
+    final salt = _authService.generateSalt();
+    final hash = await _authService.hashMasterPassword(
+      password: setupPassword,
       salt: salt,
-      expectedHashHex: current.hashHex,
     );
-    if (!isValid && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Master password inválida')),
+    final kek = await _authService.deriveMasterKey(
+      password: setupPassword,
+      salt: salt,
+    );
+    final wrapped = await _authService.wrapStorageKey(dek: dek, kek: kek);
+
+    // Generate backup codes
+    final codesResult = await _authService.generateBackupCodes();
+    final codesJson = jsonEncode(codesResult.codeHashes);
+
+    // Show generated codes to user
+    if (context.mounted) {
+      final codesSaved = await _showBackupCodesDialog(
+        context,
+        codesResult.plainCodes,
       );
-      return null;
+      if (!codesSaved) return null;
     }
-    final key = await _authService.deriveMasterKey(password: password, salt: salt);
-    _masterPasswordNotifier?.setMasterPassword(key);
-    return key;
+
+    await _passwordStore.saveFull(
+      hashHex: hash,
+      saltHex: _authService.bytesToHex(salt),
+      hint: setupHint,
+      backupCodeHashesJson: codesJson,
+      encryptedStorageKeyHex: wrapped.ciphertextHex,
+      encryptedStorageKeyNonceHex: wrapped.nonceHex,
+      encryptedStorageKeyTagHex: wrapped.tagHex,
+    );
+
+    _masterPasswordNotifier?.setMasterPassword(dek);
+    return dek;
   }
 
   Future<String?> _askForPassword(BuildContext context) async {
@@ -164,11 +286,16 @@ class CredentialProtectionController {
     return value;
   }
 
-  Future<String?> _askForNewMasterPassword(BuildContext context) async {
+  /// Full setup dialog: password + confirm + optional hint.
+  /// Returns `(password, hint)` or null if cancelled.
+  Future<({String password, String? hint})?> _showFullSetupDialog(
+    BuildContext context,
+  ) async {
     final passwordCtrl = TextEditingController();
     final confirmCtrl = TextEditingController();
+    final hintCtrl = TextEditingController();
     String? error;
-    final result = await showDialog<String>(
+    final result = await showDialog<({String password, String? hint})>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
@@ -176,6 +303,7 @@ class CredentialProtectionController {
           title: const Text('Configurar master password'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextField(
                 controller: passwordCtrl,
@@ -188,6 +316,17 @@ class CredentialProtectionController {
                 obscureText: true,
                 decoration: const InputDecoration(labelText: 'Confirmar password'),
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: hintCtrl,
+                maxLength: 200,
+                decoration: const InputDecoration(
+                  labelText: 'Pista (opcional)',
+                  hintText: 'Ej: nombre de mi primera mascota',
+                  helperText: 'Tu hint se guarda en texto plano',
+                  helperMaxLines: 2,
+                ),
+              ),
               if (error != null) ...[
                 const SizedBox(height: 8),
                 Text(error!, style: const TextStyle(color: Colors.red)),
@@ -195,7 +334,10 @@ class CredentialProtectionController {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
             FilledButton(
               onPressed: () {
                 final pwd = passwordCtrl.text;
@@ -208,9 +350,13 @@ class CredentialProtectionController {
                   setLocalState(() => error = 'Las contraseñas no coinciden');
                   return;
                 }
-                Navigator.pop(ctx, pwd);
+                final hint = hintCtrl.text.trim();
+                Navigator.pop(
+                  ctx,
+                  (password: pwd, hint: hint.isNotEmpty ? hint : null),
+                );
               },
-              child: const Text('Guardar'),
+              child: const Text('Siguiente'),
             ),
           ],
         ),
@@ -218,6 +364,125 @@ class CredentialProtectionController {
     );
     passwordCtrl.dispose();
     confirmCtrl.dispose();
+    hintCtrl.dispose();
     return result;
+  }
+
+  /// Shows the generated backup codes and requires user confirmation.
+  /// Returns true if the user confirmed saving them, false if cancelled.
+  Future<bool> _showBackupCodesDialog(
+    BuildContext context,
+    List<String> codes,
+  ) async {
+    var confirmed = false;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocalState) => AlertDialog(
+          title: const Text('Códigos de recuperación'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Guardá estos códigos en un lugar seguro. '
+                'Si perdés tu master password, son tu ÚNICA forma de recuperar el acceso.',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < codes.length; i++) ...[
+                      if (i > 0 && i % 5 == 0) const SizedBox(height: 4),
+                      Text(
+                        '${(i + 1).toString().padLeft(2, '0')}. ${codes[i]}',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  TextButton.icon(
+                    icon: const Icon(Icons.copy, size: 16),
+                    label: const Text('Copiar todos'),
+                    onPressed: () {
+                      final allCodes = codes.join('\n');
+                      Clipboard.setData(ClipboardData(text: allCodes));
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(
+                            content: Text('Códigos copiados al portapapeles'),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    icon: const Icon(Icons.save_alt, size: 16),
+                    label: const Text('Guardar como texto'),
+                    onPressed: () {
+                      final allCodes = codes.join('\n');
+                      Clipboard.setData(ClipboardData(text: allCodes));
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Códigos copiados — pegálos en un archivo de texto seguro',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Checkbox(
+                    value: confirmed,
+                    onChanged: (v) =>
+                        setLocalState(() => confirmed = v ?? false),
+                  ),
+                  const Expanded(
+                    child: Text(
+                      'Guardé mis códigos en un lugar seguro',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: confirmed ? () => Navigator.pop(ctx, true) : null,
+              child: const Text('Confirmar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    return result ?? false;
   }
 }

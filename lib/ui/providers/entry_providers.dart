@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/domain/repositories/i_entry_repository.dart';
+import 'package:taul/domain/services/master_password_recovery_service.dart';
 import 'package:taul/domain/usecases/create_entry.dart';
 import 'package:taul/domain/usecases/delete_entry.dart';
 import 'package:taul/domain/usecases/get_entry.dart';
@@ -92,6 +93,48 @@ final filteredEntriesProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
   final entries = ref.watch(entryListProvider).valueOrNull ?? [];
   if (type == null) return entries;
   return entries.where((e) => e.type == type).toList();
+});
+
+// --- Full config provider for reactive UI ---
+
+/// Provides the full master password config for reactive UI updates.
+final masterPasswordConfigProvider =
+    FutureProvider<MasterPasswordFullConfig?>((ref) {
+  return ref.watch(masterPasswordStoreProvider).readFull();
+});
+
+/// Counts entries with `requiresAuth = true` for the delete-MP warning.
+final protectedEntryCountProvider = FutureProvider<int>((ref) async {
+  final db = ref.watch(databaseProvider);
+  final rows = await db.customSelect(
+    'SELECT COUNT(*) as cnt FROM entries WHERE requires_auth = 1 AND deleted_at IS NULL',
+  ).get();
+  return (rows.first.data['cnt'] as int?) ?? 0;
+});
+
+// --- Master password recovery providers ---
+
+/// Provides the domain service for MP setup, change, and recovery operations.
+final recoveryServiceProvider = Provider<MasterPasswordRecoveryService>((ref) {
+  return MasterPasswordRecoveryService(
+    authService: ref.watch(entryAuthServiceProvider),
+  );
+});
+
+/// Reads the optional password hint from the DB (reactive via config provider).
+final masterPasswordHintProvider = FutureProvider<String?>((ref) {
+  ref.watch(masterPasswordConfigProvider); // dependency for invalidation cascade
+  return ref.watch(masterPasswordStoreProvider).readHint();
+});
+
+/// Checks whether a master password is configured (has encrypted storage key).
+final masterPasswordStatusProvider = FutureProvider<bool>((ref) {
+  ref.watch(masterPasswordConfigProvider); // dependency for invalidation cascade
+  return ref.watch(masterPasswordStoreProvider).readFull().then((config) {
+    return config != null &&
+        config.encryptedStorageKeyHex != null &&
+        config.encryptedStorageKeyHex!.isNotEmpty;
+  });
 });
 
 // --- Individual entry ---
