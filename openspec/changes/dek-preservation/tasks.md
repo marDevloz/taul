@@ -36,9 +36,9 @@ Chain strategy: feature-branch-chain
 
 ## Phase 2: Crypto + Domain (PR 2)
 
-- [ ] 2.1 `unwrapDekFromBackupCode(code, hashes, data)` in `RecoveryService`
-- [ ] 2.2 `generateBackupCodesWithDekWraps(dek, count)` helper (EntryAuthService or controller)
-- [ ] 2.3 Tests: unwrap valid/tampered code, real-crypto round-trip
+- [x] 2.1 `unwrapDekFromBackupCode(code, hashes, data)` in `RecoveryService`
+- [x] 2.2 `generateBackupCodesWithDekWraps(dek, count)` helper in `EntryAuthService`
+- [x] 2.3 Tests: unwrap valid/tampered code, real-crypto round-trip
 
 ## Phase 3: Setup Flow (PR 3)
 

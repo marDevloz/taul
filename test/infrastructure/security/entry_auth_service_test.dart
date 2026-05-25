@@ -142,4 +142,139 @@ void main() {
       }
     });
   });
+
+  group('T-06: generateBackupCodesWithDekWraps', () {
+    test(
+      'should_produce_correct_number_of_entries',
+      () async {
+        final dek = auth.generateStorageKey();
+
+        final result = await auth.generateBackupCodesWithDekWraps(dek, count: 5);
+
+        expect(result.plainCodes.length, 5);
+        expect(result.entries.length, 5);
+      },
+      timeout: const Timeout(Duration(seconds: 60)),
+    );
+
+    test(
+      'should_produce_entries_with_all_fields_populated',
+      () async {
+        final dek = auth.generateStorageKey();
+
+        final result = await auth.generateBackupCodesWithDekWraps(dek, count: 3);
+
+        for (final entry in result.entries) {
+          expect(entry.saltHex, isNotEmpty);
+          expect(entry.hashHex, isNotEmpty);
+          expect(entry.dekCipherHex, isNotEmpty);
+          expect(entry.dekNonceHex, isNotEmpty);
+          expect(entry.dekTagHex, isNotEmpty);
+
+          // salt is 16 bytes = 32 hex chars
+          expect(entry.saltHex.length, 32);
+          // hash is 32 bytes = 64 hex chars
+          expect(entry.hashHex.length, 64);
+          // ciphertext is 32 bytes (same as DEK) = 64 hex chars
+          expect(entry.dekCipherHex.length, 64);
+          // nonce is 12 bytes = 24 hex chars
+          expect(entry.dekNonceHex.length, 24);
+          // tag is 16 bytes = 32 hex chars
+          expect(entry.dekTagHex.length, 32);
+        }
+      },
+      timeout: const Timeout(Duration(seconds: 60)),
+    );
+
+    test(
+      'each_code_can_unwrap_its_corresponding_dek',
+      () async {
+        final dek = auth.generateStorageKey();
+
+        final result = await auth.generateBackupCodesWithDekWraps(dek, count: 4);
+
+        // For each entry, derive backup-KEK and unwrap DEK
+        for (var i = 0; i < result.entries.length; i++) {
+          final entry = result.entries[i];
+          final code = result.plainCodes[i];
+          final salt = auth.hexToBytes(entry.saltHex);
+          final backupKek = await auth.deriveMasterKey(
+            password: code,
+            salt: salt,
+          );
+
+          final unwrapped = await auth.unwrapStorageKey(
+            payload: EncryptionPayload(
+              ciphertextHex: entry.dekCipherHex,
+              nonceHex: entry.dekNonceHex,
+              tagHex: entry.dekTagHex,
+            ),
+            kek: backupKek,
+          );
+
+          expect(unwrapped, equals(dek),
+              reason: 'DEK unwrap failed for code at index $i');
+        }
+      },
+      timeout: const Timeout(Duration(seconds: 120)),
+    );
+
+    test(
+      'wrong_code_cannot_unwrap_dek',
+      () async {
+        final dek = auth.generateStorageKey();
+
+        final result = await auth.generateBackupCodesWithDekWraps(dek, count: 3);
+
+        // Try to unwrap entry[0] with code[1] — wrong key
+        final wrongSalt = auth.hexToBytes(result.entries[0].saltHex);
+        final wrongKek = await auth.deriveMasterKey(
+          password: result.plainCodes[1],
+          salt: wrongSalt,
+        );
+
+        expect(
+          () => auth.unwrapStorageKey(
+            payload: EncryptionPayload(
+              ciphertextHex: result.entries[0].dekCipherHex,
+              nonceHex: result.entries[0].dekNonceHex,
+              tagHex: result.entries[0].dekTagHex,
+            ),
+            kek: wrongKek,
+          ),
+          throwsA(isA<Exception>()),
+        );
+      },
+      timeout: const Timeout(Duration(seconds: 60)),
+    );
+
+    test(
+      'hashHex_in_entry_matches_code_hash',
+      () async {
+        final dek = auth.generateStorageKey();
+
+        final result = await auth.generateBackupCodesWithDekWraps(dek, count: 3);
+
+        for (var i = 0; i < result.entries.length; i++) {
+          final expectedHash = result.codeHashes[i].split(':')[1];
+          expect(result.entries[i].hashHex, equals(expectedHash),
+              reason: 'hashHex at index $i should match code hash');
+        }
+      },
+      timeout: const Timeout(Duration(seconds: 60)),
+    );
+
+    test(
+      'default_count_is_10',
+      () async {
+        final dek = auth.generateStorageKey();
+
+        final result = await auth.generateBackupCodesWithDekWraps(dek);
+
+        expect(result.plainCodes.length, 10);
+        expect(result.entries.length, 10);
+      },
+      timeout: const Timeout(Duration(seconds: 120)),
+    );
+  });
 }
