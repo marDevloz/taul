@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -48,6 +50,54 @@ void main() {
 
   Future<void> openDialog(WidgetTester tester) async {
     await tester.tap(find.text('Open Recovery'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+  }
+
+  /// Shortcut: enter a valid backup code and tap Verify, then wait for
+  /// the async verification + consumption to complete.
+  Future<void> verifyCode(
+    WidgetTester tester,
+    String code,
+  ) async {
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Backup code'),
+      code,
+    );
+
+    await tester.tap(find.text('Verify'));
+    await tester.pump();
+
+    // Wait for Argon2id verification + DB consumption
+    await tester.runAsync(() async {
+      await Future.delayed(const Duration(seconds: 3));
+    });
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+  }
+
+  /// Shortcut: fill the new-password form and tap Set Password.
+  /// Returns after the async save completes.
+  Future<void> setNewPassword(
+    WidgetTester tester, {
+    String password = 'new-password-123',
+  }) async {
+    await tester.enterText(
+      find.widgetWithText(TextField, 'New master password'),
+      password,
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Confirm new password'),
+      password,
+    );
+
+    await tester.tap(find.text('Set Password'));
+    await tester.pump();
+
+    // Wait for crypto operations + DB write
+    await tester.runAsync(() async {
+      await Future.delayed(const Duration(seconds: 3));
+    });
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
   }
@@ -200,6 +250,148 @@ void main() {
       expect(
         find.text('No backup codes remaining. Recovery is not possible.'),
         findsOneWidget,
+      );
+    });
+
+    // ─────────────────────────────────────────────────────────────────
+    // PR 4: Recovery Flow — DEK preservation
+    // ─────────────────────────────────────────────────────────────────
+
+    group('PR4 recovery flow', () {
+      testWidgets(
+        'should_preserve_dek_when_backup_code_data_exists',
+        (tester) async {
+          // ── Arrage: create a config WITH backup_code_data ──
+          final originalDek = auth.generateStorageKey();
+          final codes = await auth.generateBackupCodesWithDekWraps(
+            originalDek,
+            count: 2,
+          );
+          final backupCodeDataJson = jsonEncode(
+            codes.entries.map((e) => e.toJson()).toList(),
+          );
+
+          await store.saveFull(
+            hashHex: 'old-hash',
+            saltHex: 'old-salt',
+            backupCodeHashesJson: jsonEncode(codes.codeHashes),
+            backupCodeDataJson: backupCodeDataJson,
+          );
+
+          // Verify data is stored
+          final dataBefore = await store.readBackupCodeData();
+          expect(dataBefore, isNotNull);
+          expect(dataBefore!.length, 2);
+
+          // ── Act: recovery flow ──
+          await tester.pumpWidget(createTestApp());
+          await openDialog(tester);
+          await verifyCode(tester, codes.plainCodes[0]);
+          await setNewPassword(tester);
+
+          // ── Assert: DEK preserved ──
+          // Dialog should have popped
+          expect(find.text('Recover Master Password'), findsNothing);
+
+          // Check Notifier cached the preserved DEK
+          final container = ProviderScope.containerOf(
+            tester.element(find.byType(MaterialApp)),
+          );
+          final cachedDek = container
+              .read(masterPasswordProvider.notifier)
+              .cachedKey;
+
+          expect(cachedDek, isNotNull);
+          expect(cachedDek, equals(originalDek));
+        },
+      );
+
+      testWidgets(
+        'should_generate_new_dek_when_backup_code_data_is_null',
+        (tester) async {
+          // ── Arrage: setup WITHOUT backup_code_data (legacy DB) ──
+          final codes = await auth.generateBackupCodes(count: 2);
+          await store.saveFull(
+            hashHex: 'old-hash',
+            saltHex: 'old-salt',
+            backupCodeHashesJson: jsonEncode(codes.codeHashes),
+          );
+
+          // Confirm no backup_code_data
+          final dataBefore = await store.readBackupCodeData();
+          expect(dataBefore, isNull);
+
+          // ── Act: recovery flow ──
+          await tester.pumpWidget(createTestApp());
+          await openDialog(tester);
+          await verifyCode(tester, codes.plainCodes[0]);
+          await setNewPassword(tester);
+
+          // ── Assert: new DEK generated, new backup data saved ──
+          expect(find.text('Recover Master Password'), findsNothing);
+
+          // New backup_code_data should exist (freshly generated)
+          final config = await store.readFull();
+          expect(config, isNotNull);
+          expect(config!.backupCodeData, isNotNull);
+          expect(config.backupCodeData, isNotEmpty);
+
+          // New hashes should be 10 (default count, not the original 2)
+          expect(config.backupCodeHashes, isNotNull);
+          expect(config.backupCodeHashes!.length, 10);
+        },
+      );
+
+      testWidgets(
+        'should_consume_hash_and_data_atomically',
+        (tester) async {
+          // ── Arrage ──
+          final originalDek = auth.generateStorageKey();
+          final codes = await auth.generateBackupCodesWithDekWraps(
+            originalDek,
+            count: 3,
+          );
+          final backupCodeDataJson = jsonEncode(
+            codes.entries.map((e) => e.toJson()).toList(),
+          );
+
+          await store.saveFull(
+            hashHex: 'old-hash',
+            saltHex: 'old-salt',
+            backupCodeHashesJson: jsonEncode(codes.codeHashes),
+            backupCodeDataJson: backupCodeDataJson,
+          );
+
+          // Verify we start with 3 of each
+          expect((await store.readBackupCodeHashes())!.length, 3);
+          expect((await store.readBackupCodeData())!.length, 3);
+
+          // ── Act ──
+          await tester.pumpWidget(createTestApp());
+          await openDialog(tester);
+          await verifyCode(tester, codes.plainCodes[1]); // consume index 1
+
+          // ── Assert: both arrays consumed by 1 ──
+          // We're on the new-password form now, so consumption has happened
+          expect(find.text('Set New Master Password'), findsOneWidget);
+
+          final hashesAfter = await store.readBackupCodeHashes();
+          final dataAfter = await store.readBackupCodeData();
+
+          expect(hashesAfter!.length, 2);
+          expect(dataAfter!.length, 2);
+
+          // Also verify the data entries still match hashes (index integrity)
+          // The consumed index 1 is removed, so remaining entries are at 0 and 2→1
+          expect(
+            hashesAfter[0].split(':')[1],
+            dataAfter[0].hashHex,
+          );
+          expect(
+            hashesAfter[1].split(':')[1],
+            dataAfter[1].hashHex,
+          );
+        },
       );
     });
   });

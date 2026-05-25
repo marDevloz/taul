@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
 /// Result of the recovery flow.
@@ -21,12 +24,15 @@ class RecoveryResult {
 /// ## Flow
 /// 1. User enters a backup code (XXXX-XXXX format)
 /// 2. Code is verified against stored Argon2id hashes
-/// 3. On match: code is consumed atomically from the DB
+/// 3. On match: the code and its DEK wrap are consumed atomically from the DB
 /// 4. User sets a new master password + optional hint
-/// 5. A new DEK is generated (existing entries encrypted with the old DEK
-///    become unreachable — see design deviation notes)
-/// 6. New DEK cached in [MasterPasswordNotifier]
-/// 7. Dialog pops with [RecoveryResult(success: true)]
+/// 5. The preserved DEK is unwrapped from the backup code entry (if
+///    `backup_code_data` is available) or a new DEK is generated (legacy
+///    fallback for DBs without backup_code_data)
+/// 6. The DEK is re-wrapped with a KEK derived from the new master password
+/// 7. New backup codes are generated, each wrapping the DEK, and saved
+/// 8. New DEK cached in [MasterPasswordNotifier]
+/// 9. Dialog pops with [RecoveryResult(success: true)]
 ///
 /// On failure (invalid code, DB error, cancel) returns
 /// [RecoveryResult(success: false)].
@@ -34,14 +40,6 @@ class RecoveryResult {
 /// ## Rate limiting
 /// 3 failed code attempts trigger a 60-second lockout (in-memory, per dialog
 /// instance). Resets if the dialog is closed and re-opened.
-///
-/// ## Design deviation: DEK preservation
-/// The current design cannot preserve the existing DEK during recovery because
-/// the DEK is stored encrypted with a KEK derived from the OLD master password.
-/// Without the old password, the DEK cannot be unwrapped. Recovery generates a
-/// NEW DEK, which means entries encrypted with the old DEK become unreachable.
-/// A future improvement could encrypt the DEK with each backup code during
-/// setup, enabling recovery without DEK loss.
 class MasterPasswordRecoveryDialog extends ConsumerStatefulWidget {
   const MasterPasswordRecoveryDialog({super.key});
 
@@ -62,6 +60,10 @@ class _MasterPasswordRecoveryDialogState
   final _newPwCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   final _hintCtrl = TextEditingController();
+
+  // ── Recovered DEK data (preserved from backup code entry) ──
+  String? _verifiedBackupCode;
+  BackupCodeEntry? _preservedEntry;
 
   // ── General state ──
   int _step = 0;
@@ -256,6 +258,30 @@ class _MasterPasswordRecoveryDialogState
 
   int _cachedRemainingCodes = -1;
 
+  /// Recovers the DEK from the preserved backup code entry, or generates a
+  /// new DEK if no entry was preserved (legacy fallback).
+  ///
+  /// When [_preservedEntry] is not null, derives the backup-KEK from the
+  /// verified code + entry salt and unwraps the DEK via AES-256-GCM.
+  Future<Uint8List> _recoverDek(EntryAuthService authService) async {
+    final entry = _preservedEntry;
+    if (entry != null && _verifiedBackupCode != null) {
+      final salt = authService.hexToBytes(entry.saltHex);
+      final backupKek = await authService.deriveMasterKey(
+        password: _verifiedBackupCode!,
+        salt: salt,
+      );
+      final payload = EncryptionPayload(
+        ciphertextHex: entry.dekCipherHex,
+        nonceHex: entry.dekNonceHex,
+        tagHex: entry.dekTagHex,
+      );
+      return authService.unwrapStorageKey(payload: payload, kek: backupKek);
+    }
+    // Legacy fallback: generate a new DEK
+    return authService.generateStorageKey();
+  }
+
   // ── Step 0 logic: verify backup code ──
 
   Future<void> _onVerifyCode() async {
@@ -304,11 +330,22 @@ class _MasterPasswordRecoveryDialogState
       return;
     }
 
-    // Code matched → consume it atomically within a DB transaction.
-    // If the DB write fails, the code hash is NOT removed — safe to retry.
-    final consumed = await store.consumeBackupCodeAtIndex(matchIndex);
+    // Code matched → read backup_code_data entry BEFORE consuming.
+    // We preserve the entry in memory so it can be used to unwrap the DEK
+    // later in _onSetNewPassword, after the code is consumed from the DB.
+    final backupCodeData = await store.readBackupCodeData();
+    _verifiedBackupCode = code;
+    _preservedEntry = (backupCodeData != null && matchIndex < backupCodeData.length)
+        ? backupCodeData[matchIndex]
+        : null;
+
+    // Atomically consume both the hash and the DEK wrap from the DB.
+    // If the DB write fails, neither is removed — safe to retry.
+    final consumed = await store.consumeBackupCodeAtIndexAndData(matchIndex);
     if (!consumed) {
       setState(() {
+        _verifiedBackupCode = null;
+        _preservedEntry = null;
         _error = 'An error occurred while processing the code. '
             'Please try again — the code has not been consumed.';
       });
@@ -352,12 +389,13 @@ class _MasterPasswordRecoveryDialogState
       final store = ref.read(masterPasswordStoreProvider);
       final notifier = ref.read(masterPasswordProvider.notifier);
 
-      // Generate a new DEK, salt, and KEK.
-      // NOTE: The old DEK (stored encrypted with the old KEK) cannot be
-      // recovered without knowing the old master password. A new DEK is
-      // generated, which means existing entries encrypted with the old DEK
-      // become unreachable. See class-level doc for details.
-      final dek = authService.generateStorageKey();
+      // ── Step 1: Recover DEK ──
+      // If backup_code_data was available (PR 4), unwrap the preserved DEK
+      // from the backup code entry. Otherwise generate a new DEK (legacy
+      // fallback for DBs without backup_code_data).
+      final dek = await _recoverDek(authService);
+
+      // ── Step 2: New password key derivation ──
       final salt = authService.generateSalt();
       final hash = await authService.hashMasterPassword(
         password: newPw,
@@ -369,15 +407,24 @@ class _MasterPasswordRecoveryDialogState
       );
       final wrapped = await authService.wrapStorageKey(dek: dek, kek: kek);
 
-      // Generate new backup codes to replace the consumed one
-      final codesResult = await authService.generateBackupCodes();
-      final codesJson = jsonEncode(codesResult.codeHashes);
+      // ── Step 3: New backup codes (each wrapping the DEK) ──
+      final codesWithWraps =
+          await authService.generateBackupCodesWithDekWraps(
+        dek,
+        count: 10,
+      );
+      final codesJson = jsonEncode(codesWithWraps.codeHashes);
+      final backupCodeDataJson = jsonEncode(
+        codesWithWraps.entries.map((e) => e.toJson()).toList(),
+      );
 
+      // ── Step 4: Atomically save everything ──
       await store.saveFull(
         hashHex: hash,
         saltHex: authService.bytesToHex(salt),
         hint: hint.isNotEmpty ? hint : null,
         backupCodeHashesJson: codesJson,
+        backupCodeDataJson: backupCodeDataJson,
         encryptedStorageKeyHex: wrapped.ciphertextHex,
         encryptedStorageKeyNonceHex: wrapped.nonceHex,
         encryptedStorageKeyTagHex: wrapped.tagHex,
