@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
@@ -36,7 +35,6 @@ class _MasterPasswordSetupDialogState
   int _step = 0;
   String? _error;
   bool _codesConfirmed = false;
-  BackupCodeResult? _generatedCodesResult;
   bool _saving = false;
 
   // Crypto material generated in _onNextFromPassword, consumed in _onConfirmSetup.

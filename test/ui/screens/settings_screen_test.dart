@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:taul/infrastructure/database/app_database.dart';
-import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/screens/settings_screen.dart';
