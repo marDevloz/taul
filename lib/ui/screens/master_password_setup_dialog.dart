@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
