@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:taul/infrastructure/security/master_password_store.dart';
 
 class EncryptionPayload {
   const EncryptionPayload({
@@ -173,6 +174,73 @@ class EntryAuthService {
     }
 
     return BackupCodeResult(plainCodes: plainCodes, codeHashes: codeHashes);
+  }
+
+  /// Generates backup codes and wraps the [dek] with each code's backup-KEK.
+  ///
+  /// For each generated code:
+  /// 1. Generates a unique 16-byte salt for the backup-KEK derivation
+  /// 2. Derives the backup-KEK via Argon2id(code, salt)
+  /// 3. AES-256-GCM wraps the DEK with that backup-KEK
+  /// 4. Creates a [BackupCodeEntry] with the salt, hash, and wrapped DEK
+  ///
+  /// Returns the plain codes and their corresponding [BackupCodeEntry] entries.
+  /// Performs a round-trip verification on the first entry before returning.
+  Future<({
+    List<String> plainCodes,
+    List<String> codeHashes,
+    List<BackupCodeEntry> entries,
+  })> generateBackupCodesWithDekWraps(
+    Uint8List dek, {
+    int count = 10,
+  }) async {
+    final codesResult = await generateBackupCodes(count: count);
+    final entries = <BackupCodeEntry>[];
+
+    for (var i = 0; i < codesResult.plainCodes.length; i++) {
+      final code = codesResult.plainCodes[i];
+      final codeHash = codesResult.codeHashes[i];
+      final salt = generateSalt(); // 16 bytes
+      final backupKek = await deriveMasterKey(password: code, salt: salt);
+      final wrapped = await wrapStorageKey(dek: dek, kek: backupKek);
+
+      // Extract hash hex from "salt_hex:hash_hex" format
+      final hashHex = codeHash.split(':')[1];
+
+      entries.add(BackupCodeEntry(
+        saltHex: bytesToHex(salt),
+        hashHex: hashHex,
+        dekCipherHex: wrapped.ciphertextHex,
+        dekNonceHex: wrapped.nonceHex,
+        dekTagHex: wrapped.tagHex,
+      ));
+    }
+
+    // Round-trip verify first entry before returning
+    final firstEntry = entries.first;
+    final firstCode = codesResult.plainCodes.first;
+    final firstSalt = hexToBytes(firstEntry.saltHex);
+    final firstKek = await deriveMasterKey(
+      password: firstCode,
+      salt: firstSalt,
+    );
+    final unwrapped = await unwrapStorageKey(
+      payload: EncryptionPayload(
+        ciphertextHex: firstEntry.dekCipherHex,
+        nonceHex: firstEntry.dekNonceHex,
+        tagHex: firstEntry.dekTagHex,
+      ),
+      kek: firstKek,
+    );
+
+    assert(bytesToHex(unwrapped) == bytesToHex(dek),
+        'Round-trip verification failed: unwrapped DEK does not match original');
+
+    return (
+      plainCodes: codesResult.plainCodes,
+      codeHashes: codesResult.codeHashes,
+      entries: entries,
+    );
   }
 
   String _generateBackupCode() {

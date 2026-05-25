@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:taul/domain/services/master_password_recovery_service.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:taul/infrastructure/security/master_password_store.dart';
 
 void main() {
   late EntryAuthService authService;
@@ -125,6 +126,134 @@ void main() {
         expect(hashes.length, originalLength);
         expect(hashes[1], 'b:2');
       });
+    });
+
+    group('unwrapDekFromBackupCode', () {
+      test(
+        'should_return_dek_and_index_for_valid_code',
+        () async {
+          final dek = authService.generateStorageKey();
+
+          final codesResult = await authService.generateBackupCodesWithDekWraps(
+            dek,
+            count: 3,
+          );
+
+          final result = await recoveryService.unwrapDekFromBackupCode(
+            code: codesResult.plainCodes[0],
+            codeHashes: codesResult.codeHashes,
+            backupCodeData: codesResult.entries,
+          );
+
+          expect(result.codeIndex, 0);
+          expect(result.dek, equals(dek));
+        },
+        timeout: const Timeout(Duration(seconds: 60)),
+      );
+
+      test(
+        'should_unwrap_at_correct_index_for_any_code',
+        () async {
+          final dek = authService.generateStorageKey();
+
+          final codesResult = await authService.generateBackupCodesWithDekWraps(
+            dek,
+            count: 5,
+          );
+
+          // Test every code produces the same DEK
+          for (var i = 0; i < codesResult.plainCodes.length; i++) {
+            final result = await recoveryService.unwrapDekFromBackupCode(
+              code: codesResult.plainCodes[i],
+              codeHashes: codesResult.codeHashes,
+              backupCodeData: codesResult.entries,
+            );
+
+            expect(result.codeIndex, i);
+            expect(result.dek, equals(dek));
+          }
+        },
+        timeout: const Timeout(Duration(seconds: 120)),
+      );
+
+      test(
+        'should_throw_ArgumentError_for_invalid_code',
+        () async {
+          final dek = authService.generateStorageKey();
+          final codesResult = await authService.generateBackupCodesWithDekWraps(
+            dek,
+            count: 2,
+          );
+
+          expect(
+            () => recoveryService.unwrapDekFromBackupCode(
+              code: 'INVALID-CODE',
+              codeHashes: codesResult.codeHashes,
+              backupCodeData: codesResult.entries,
+            ),
+            throwsA(isA<ArgumentError>()),
+          );
+        },
+        timeout: const Timeout(Duration(seconds: 30)),
+      );
+
+      test(
+        'should_throw_StateError_when_backup_code_data_is_shorter_than_index',
+        () async {
+          final dek = authService.generateStorageKey();
+
+          // Generate wraps for 2 codes
+          final codesResult = await authService.generateBackupCodesWithDekWraps(
+            dek,
+            count: 2,
+          );
+
+          // Pass only 1 entry but 2 codeHashes — code[1] matches at index 1
+          // which is >= 1 → StateError
+          expect(
+            () => recoveryService.unwrapDekFromBackupCode(
+              code: codesResult.plainCodes[1],
+              codeHashes: codesResult.codeHashes,
+              backupCodeData: codesResult.entries.sublist(0, 1),
+            ),
+            throwsA(isA<StateError>()),
+          );
+        },
+        timeout: const Timeout(Duration(seconds: 60)),
+      );
+
+      test(
+        'should_throw_when_tampered_ciphertext_cannot_be_decrypted',
+        () async {
+          final dek = authService.generateStorageKey();
+
+          final codesResult = await authService.generateBackupCodesWithDekWraps(
+            dek,
+            count: 2,
+          );
+
+          // Tamper the first entry's ciphertext
+          final tampered = BackupCodeEntry(
+            saltHex: codesResult.entries[0].saltHex,
+            hashHex: codesResult.entries[0].hashHex,
+            dekCipherHex: '00${codesResult.entries[0].dekCipherHex.substring(2)}',
+            dekNonceHex: codesResult.entries[0].dekNonceHex,
+            dekTagHex: codesResult.entries[0].dekTagHex,
+          );
+
+          final tamperedEntries = [tampered, codesResult.entries[1]];
+
+          expect(
+            () => recoveryService.unwrapDekFromBackupCode(
+              code: codesResult.plainCodes[0],
+              codeHashes: codesResult.codeHashes,
+              backupCodeData: tamperedEntries,
+            ),
+            throwsA(isA<Exception>()),
+          );
+        },
+        timeout: const Timeout(Duration(seconds: 60)),
+      );
     });
   });
 }
