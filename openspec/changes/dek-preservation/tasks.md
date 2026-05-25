@@ -62,10 +62,10 @@ Chain strategy: feature-branch-chain
 
 ## Phase 6: Integration Tests (PR 6)
 
-- [ ] 6.1 Setup → recovery preserves DEK (old entries decryptable)
-- [ ] 6.2 v3 compat: no column → new DEK generated
-- [ ] 6.3 Settings regen shows MP prompt (fake auth + store)
-- [ ] 6.4 Recovery dialog unwraps DEK with fake `backup_code_data`
+- [x] 6.1 Setup → recovery preserves DEK (old entries decryptable)
+- [x] 6.2 v3 compat: no column → new DEK generated
+- [x] 6.3 Settings regen shows MP prompt (fake auth + store) — pre-existing (PR 5)
+- [x] 6.4 Recovery dialog unwraps DEK with fake `backup_code_data` — pre-existing (PR 4)
 
 ## Implementation Order
 
