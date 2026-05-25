@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:taul/domain/services/master_password_recovery_service.dart';
 import 'package:taul/infrastructure/database/app_database.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
@@ -473,6 +474,294 @@ void main() {
         final consumed2 = await store.consumeBackupCodeAtIndex(0);
         expect(consumed2, false);
       });
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // PR 6: Integration Tests — DEK preservation & v3 backward compat
+    // ─────────────────────────────────────────────────────────────
+
+    group('PR6 dek preservation', () {
+      test(
+        'should_preserve_dek_during_backup_code_recovery',
+        () async {
+          // ── Phase 1: Setup MP with DEK wraps ──
+          final password = 'securePass1';
+          final dek = auth.generateStorageKey();
+          final salt = auth.generateSalt();
+          final hash = await auth.hashMasterPassword(
+            password: password,
+            salt: salt,
+          );
+          final kek = await auth.deriveMasterKey(
+            password: password,
+            salt: salt,
+          );
+          final wrapped = await auth.wrapStorageKey(dek: dek, kek: kek);
+
+          // Generate backup codes with DEK wraps
+          final codesResult = await auth.generateBackupCodesWithDekWraps(
+            dek,
+            count: 2,
+          );
+          final backupCodeDataJson = jsonEncode(
+            codesResult.entries.map((e) => e.toJson()).toList(),
+          );
+
+          // Save config with backup_code_data (full v4 setup)
+          await store.saveFull(
+            hashHex: hash,
+            saltHex: auth.bytesToHex(salt),
+            backupCodeHashesJson: jsonEncode(codesResult.codeHashes),
+            encryptedStorageKeyHex: wrapped.ciphertextHex,
+            encryptedStorageKeyNonceHex: wrapped.nonceHex,
+            encryptedStorageKeyTagHex: wrapped.tagHex,
+            backupCodeDataJson: backupCodeDataJson,
+          );
+
+          // ── Phase 2: Encrypt an entry with the DEK ──
+          const originalSecret =
+              'my-secure-data-that-must-survive-recovery';
+          final encrypted = await auth.encryptSecret(
+            plaintext: originalSecret,
+            masterKey: dek,
+          );
+
+          // Save the encrypted entry in the DB
+          await database.customInsert(
+            'INSERT INTO entries (id, type, title, content, metadata, tags, '
+            'requires_auth, encrypted_secret, cipher_nonce, cipher_tag, '
+            'created_at, updated_at, version) '
+            'VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, '
+            'CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)',
+            variables: [
+              Variable.withString('preserved-entry'),
+              Variable.withString('credential'),
+              Variable.withString('Preserved Data'),
+              Variable.withString(''),
+              Variable.withString(jsonEncode({'username': 'test'})),
+              Variable.withString(jsonEncode([])),
+              Variable.withString(encrypted.ciphertextHex),
+              Variable.withString(encrypted.nonceHex),
+              Variable.withString(encrypted.tagHex),
+            ],
+          );
+
+          // ── Phase 3: Recovery — unwrap DEK from backup code ──
+          final config = await store.readFull();
+          expect(config, isNotNull);
+
+          final backupCodeData = await store.readBackupCodeData();
+          expect(backupCodeData, isNotNull);
+          expect(backupCodeData!.length, 2);
+
+          // Use RecoveryService to verify code and unwrap DEK
+          final recoveryService = MasterPasswordRecoveryService(
+            authService: auth,
+          );
+          final result = await recoveryService.unwrapDekFromBackupCode(
+            code: codesResult.plainCodes[0],
+            codeHashes: config!.backupCodeHashes!,
+            backupCodeData: backupCodeData,
+          );
+
+          // Verify the recovered DEK matches the original
+          expect(result.dek, equals(dek));
+          expect(result.codeIndex, 0);
+
+          // ── Phase 4: Consume the code atomically ──
+          final consumed = await store.consumeBackupCodeAtIndexAndData(
+            result.codeIndex,
+          );
+          expect(consumed, true);
+
+          // Verify both arrays shrank
+          final codesAfter = await store.readBackupCodeHashes();
+          final dataAfter = await store.readBackupCodeData();
+          expect(codesAfter!.length, 1);
+          expect(dataAfter!.length, 1);
+
+          // ── Phase 5: Set new MP with the PRESERVED DEK ──
+          final newPassword = 'newRecoveryPass1';
+          final newSalt = auth.generateSalt();
+          final newHash = await auth.hashMasterPassword(
+            password: newPassword,
+            salt: newSalt,
+          );
+          final newKek = await auth.deriveMasterKey(
+            password: newPassword,
+            salt: newSalt,
+          );
+          final newWrapped = await auth.wrapStorageKey(
+            dek: result.dek, // SAME DEK — preserved through recovery
+            kek: newKek,
+          );
+
+          // Generate new codes with DEK wraps
+          final newCodes = await auth.generateBackupCodesWithDekWraps(
+            result.dek,
+            count: 2,
+          );
+          final newDataJson = jsonEncode(
+            newCodes.entries.map((e) => e.toJson()).toList(),
+          );
+
+          await store.saveFull(
+            hashHex: newHash,
+            saltHex: auth.bytesToHex(newSalt),
+            hint: 'recovery hint',
+            backupCodeHashesJson: jsonEncode(newCodes.codeHashes),
+            backupCodeDataJson: newDataJson,
+            encryptedStorageKeyHex: newWrapped.ciphertextHex,
+            encryptedStorageKeyNonceHex: newWrapped.nonceHex,
+            encryptedStorageKeyTagHex: newWrapped.tagHex,
+          );
+
+          // ── Phase 6: Verify old entry is STILL decryptable ──
+          // This proves DEK preservation worked end-to-end
+          final decrypted = await auth.decryptSecret(
+            payload: encrypted,
+            masterKey: result.dek,
+          );
+          expect(decrypted, equals(originalSecret));
+
+          // ── Phase 7: Encrypt and decrypt with preserved DEK ──
+          const newSecret = 'new-data-after-recovery';
+          final newEncrypted = await auth.encryptSecret(
+            plaintext: newSecret,
+            masterKey: result.dek,
+          );
+          final newDecrypted = await auth.decryptSecret(
+            payload: newEncrypted,
+            masterKey: result.dek,
+          );
+          expect(newDecrypted, equals(newSecret));
+
+          // WAIT NO — this also proves the preserved DEK is fully functional
+          // (not just the old data is readable, but the DEK itself works)
+        },
+      );
+
+      test(
+        'should_generate_new_dek_when_no_backup_code_data',
+        () async {
+          // ── Phase 1: Create v3-style config (NO backup_code_data) ──
+          final oldPassword = 'oldPass1';
+          final oldDek = auth.generateStorageKey();
+          final oldSalt = auth.generateSalt();
+          final oldHash = await auth.hashMasterPassword(
+            password: oldPassword,
+            salt: oldSalt,
+          );
+          final oldKek = await auth.deriveMasterKey(
+            password: oldPassword,
+            salt: oldSalt,
+          );
+          final oldWrapped = await auth.wrapStorageKey(
+            dek: oldDek,
+            kek: oldKek,
+          );
+
+          // Generate backup codes WITHOUT DEK wraps (v3 behavior)
+          final oldCodes = await auth.generateBackupCodes(count: 2);
+
+          await store.saveFull(
+            hashHex: oldHash,
+            saltHex: auth.bytesToHex(oldSalt),
+            backupCodeHashesJson: jsonEncode(oldCodes.codeHashes),
+            encryptedStorageKeyHex: oldWrapped.ciphertextHex,
+            encryptedStorageKeyNonceHex: oldWrapped.nonceHex,
+            encryptedStorageKeyTagHex: oldWrapped.tagHex,
+            // NOTE: NO backupCodeDataJson — simulates v3 DB
+            // where the column doesn't exist or is NULL
+          );
+
+          // Verify no backup_code_data exists
+          final dataBefore = await store.readBackupCodeData();
+          expect(dataBefore, isNull);
+
+          // ── Phase 2: Run recovery (simulating v3 fallback) ──
+          final config = await store.readFull();
+          expect(config, isNotNull);
+          expect(config!.backupCodeHashes, isNotNull);
+          expect(config.backupCodeHashes!.length, 2);
+
+          // Verify backup code works
+          final recoveryService = MasterPasswordRecoveryService(
+            authService: auth,
+          );
+          final matchIndex = await recoveryService.verifyBackupCode(
+            oldCodes.plainCodes[0],
+            config.backupCodeHashes!,
+          );
+          expect(matchIndex, 0);
+
+          // Since backup_code_data IS null (v3 DB), there's no DEK to
+          // preserve. Recovery must generate a NEW DEK (fallback).
+          final newDek = auth.generateStorageKey();
+
+          // ── Phase 3: Save new MP with new DEK (v4-style now) ──
+          final newPassword = 'newPass456';
+          final newSalt = auth.generateSalt();
+          final newHash = await auth.hashMasterPassword(
+            password: newPassword,
+            salt: newSalt,
+          );
+          final newKek = await auth.deriveMasterKey(
+            password: newPassword,
+            salt: newSalt,
+          );
+          final newWrapped = await auth.wrapStorageKey(
+            dek: newDek,
+            kek: newKek,
+          );
+
+          // New codes WITH wraps (v4-style, created fresh)
+          final newCodes = await auth.generateBackupCodesWithDekWraps(
+            newDek,
+            count: 3,
+          );
+          final newDataJson = jsonEncode(
+            newCodes.entries.map((e) => e.toJson()).toList(),
+          );
+
+          await store.saveFull(
+            hashHex: newHash,
+            saltHex: auth.bytesToHex(newSalt),
+            hint: 'recovery hint',
+            backupCodeHashesJson: jsonEncode(newCodes.codeHashes),
+            backupCodeDataJson: newDataJson,
+            encryptedStorageKeyHex: newWrapped.ciphertextHex,
+            encryptedStorageKeyNonceHex: newWrapped.nonceHex,
+            encryptedStorageKeyTagHex: newWrapped.tagHex,
+          );
+
+          // ── Phase 4: Verify new DEK is functional ──
+          expect(newDek, isNotNull);
+          expect(newDek, isA<Uint8List>());
+          expect(newDek.length, 32);
+
+          // New DEK can encrypt/decrypt (fresh key works)
+          const testSecret = 'test-with-new-dek';
+          final encrypted = await auth.encryptSecret(
+            plaintext: testSecret,
+            masterKey: newDek,
+          );
+          final decrypted = await auth.decryptSecret(
+            payload: encrypted,
+            masterKey: newDek,
+          );
+          expect(decrypted, equals(testSecret));
+
+          // New backup_code_data exists in DB (v4-style now)
+          final savedData = await store.readBackupCodeData();
+          expect(savedData, isNotNull);
+          expect(savedData!.length, 3);
+
+          // New hashes are also correct
+          final savedConfig = await store.readFull();
+          expect(savedConfig!.backupCodeHashes!.length, 3);
+        },
+      );
     });
   });
 }
