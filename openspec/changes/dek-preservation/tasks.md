@@ -48,11 +48,11 @@ Chain strategy: feature-branch-chain
 
 ## Phase 4: Recovery Flow (PR 4)
 
-- [ ] 4.1 Read `backup_code_data` before consuming code
-- [ ] 4.2 Call `consumeBackupCodeAtIndexAndData` after verify
-- [ ] 4.3 Derive backup-KEK → unwrap DEK → re-wrap with new KEK
-- [ ] 4.4 New codes → wrap DEK → `saveFull` with new data
-- [ ] 4.5 NULL `backup_code_data` → generate new DEK (fallback)
+- [x] 4.1 Read `backup_code_data` before consuming code
+- [x] 4.2 Call `consumeBackupCodeAtIndexAndData` after verify
+- [x] 4.3 Derive backup-KEK → unwrap DEK → re-wrap with new KEK
+- [x] 4.4 New codes → wrap DEK → `saveFull` with new data
+- [x] 4.5 NULL `backup_code_data` → generate new DEK (fallback)
 
 ## Phase 5: Code Regen (PR 5)
 
