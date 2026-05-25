@@ -6,6 +6,11 @@ import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
+/// Thrown when the user cancels the master password prompt dialog.
+class UserCancelledException implements Exception {
+  const UserCancelledException();
+}
+
 class ProtectionResult {
   const ProtectionResult({
     required this.secret,
@@ -36,6 +41,7 @@ class CredentialProtectionController {
   final EntryAuthService _authService;
   final MasterPasswordStore _passwordStore;
   final MasterPasswordNotifier? _masterPasswordNotifier;
+  Uint8List? _cachedDek;
 
   /// Checks whether the master password is fully configured
   /// (i.e., an encrypted storage key exists in the DB).
@@ -261,6 +267,66 @@ class CredentialProtectionController {
 
     _masterPasswordNotifier?.setMasterPassword(dek);
     return dek;
+  }
+
+  /// Prompts the user for their master password, verifies it, unwraps the DEK
+  /// from the stored encrypted storage key, and returns the DEK.
+  ///
+  /// The DEK is cached for subsequent calls so the user is only prompted once
+  /// per session (or until [clearCachedDek] is called).
+  ///
+  /// Throws [UserCancelledException] if the user cancels the password dialog.
+  /// Throws [Exception] if the password is wrong or the MP is not configured.
+  Future<Uint8List> requireMasterKey(BuildContext context) async {
+    if (_cachedDek != null) return _cachedDek!;
+
+    final cached = _masterPasswordNotifier?.cachedKey;
+    if (cached != null) {
+      _cachedDek = cached;
+      return cached;
+    }
+
+    final password = await _askForPassword(context);
+    if (password == null) throw const UserCancelledException();
+
+    final config = await _passwordStore.readFull();
+    if (config == null ||
+        config.encryptedStorageKeyHex == null ||
+        config.encryptedStorageKeyHex!.isEmpty) {
+      throw StateError('Master password not configured');
+    }
+
+    final salt = _authService.hexToBytes(config.saltHex);
+    final isValid = await _authService.verifyMasterPassword(
+      password: password,
+      salt: salt,
+      expectedHashHex: config.hashHex,
+    );
+    if (!isValid) {
+      throw Exception('Master password inválida');
+    }
+
+    final kek = await _authService.deriveMasterKey(
+      password: password,
+      salt: salt,
+    );
+    final dek = await _authService.unwrapStorageKey(
+      payload: EncryptionPayload(
+        ciphertextHex: config.encryptedStorageKeyHex!,
+        nonceHex: config.encryptedStorageKeyNonceHex ?? '',
+        tagHex: config.encryptedStorageKeyTagHex ?? '',
+      ),
+      kek: kek,
+    );
+
+    _cachedDek = dek;
+    return dek;
+  }
+
+  /// Clears the cached DEK. The next call to [requireMasterKey] will prompt
+  /// the user for their master password again.
+  void clearCachedDek() {
+    _cachedDek = null;
   }
 
   Future<String?> _askForPassword(BuildContext context) async {

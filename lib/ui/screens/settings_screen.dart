@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/screens/credential_protection_controller.dart';
 import 'package:taul/ui/screens/master_password_setup_dialog.dart';
 import 'package:taul/ui/widgets/delete_mp_dialog.dart';
 import 'package:taul/ui/widgets/hint_edit_dialog.dart';
@@ -234,19 +237,65 @@ class SettingsScreen extends ConsumerWidget {
 
     final authService = ref.read(entryAuthServiceProvider);
     final store = ref.read(masterPasswordStoreProvider);
+    final controller = ref.read(credentialProtectionControllerProvider);
 
-    final codesResult = await authService.generateBackupCodes();
-    await store.saveBackupCodeHashes(codesResult.codeHashes);
-    ref.invalidate(masterPasswordConfigProvider);
+    // Require master key — prompts user, unwraps DEK
+    final Uint8List dek;
+    try {
+      dek = await controller.requireMasterKey(context);
+    } on UserCancelledException {
+      return;
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Master password inválida')),
+        );
+      }
+      return;
+    }
 
     if (!context.mounted) return;
 
-    // Show new codes
-    final codesSaved = await _showCodesDialog(context, codesResult.plainCodes);
-    if (codesSaved && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Backup codes regenerated')),
+    try {
+      // Generate new codes with DEK wraps
+      final codesWithWraps =
+          await authService.generateBackupCodesWithDekWraps(dek);
+      final backupCodeDataJson = jsonEncode(
+        codesWithWraps.entries.map((e) => e.toJson()).toList(),
       );
+
+      // Preserve existing hash, salt, hint, and encrypted key
+      final config = await store.readFull();
+
+      await store.saveFull(
+        hashHex: config!.hashHex,
+        saltHex: config.saltHex,
+        hint: config.passwordHint,
+        backupCodeHashesJson: jsonEncode(codesWithWraps.codeHashes),
+        backupCodeDataJson: backupCodeDataJson,
+        encryptedStorageKeyHex: config.encryptedStorageKeyHex,
+        encryptedStorageKeyNonceHex: config.encryptedStorageKeyNonceHex,
+        encryptedStorageKeyTagHex: config.encryptedStorageKeyTagHex,
+      );
+
+      controller.clearCachedDek();
+      ref.invalidate(masterPasswordConfigProvider);
+
+      if (!context.mounted) return;
+
+      final codesSaved =
+          await _showCodesDialog(context, codesWithWraps.plainCodes);
+      if (codesSaved && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Backup codes regenerated')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error regenerating codes: $e')),
+        );
+      }
     }
   }
 
