@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
 /// A reusable dialog for both first-time master password setup and password change.
@@ -37,6 +38,15 @@ class _MasterPasswordSetupDialogState
   bool _codesConfirmed = false;
   BackupCodeResult? _generatedCodesResult;
   bool _saving = false;
+
+  // Crypto material generated in _onNextFromPassword, consumed in _onConfirmSetup.
+  // Stored here so codes displayed to the user match the DEK-wrapped entries saved.
+  Uint8List? _generatedDek;
+  String? _generatedHash;
+  String? _generatedSaltHex;
+  EncryptionPayload? _kekWrappedEncrypted;
+  ({List<String> plainCodes, List<String> codeHashes, List<BackupCodeEntry> entries})?
+      _codesWithWraps;
 
   @override
   void dispose() {
@@ -124,7 +134,7 @@ class _MasterPasswordSetupDialogState
   }
 
   Widget _buildCodesDisplay() {
-    final codes = _generatedCodesResult?.plainCodes ?? [];
+    final codes = _codesWithWraps?.plainCodes ?? [];
     return SingleChildScrollView(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -348,12 +358,22 @@ class _MasterPasswordSetupDialogState
       return;
     }
 
-    // Generate backup codes before moving to next step
+    // Generate DEK, salt, hash, KEK wrap, and backup codes with DEK wraps
+    // all at once so the codes shown to the user match what gets saved.
     final authService = ref.read(entryAuthServiceProvider);
-    final codesResult = await authService.generateBackupCodes();
+    final dek = authService.generateStorageKey();
+    final salt = authService.generateSalt();
+    final hash = await authService.hashMasterPassword(password: pwd, salt: salt);
+    final kek = await authService.deriveMasterKey(password: pwd, salt: salt);
+    final wrapped = await authService.wrapStorageKey(dek: dek, kek: kek);
+    final codesWithWraps = await authService.generateBackupCodesWithDekWraps(dek);
 
     setState(() {
-      _generatedCodesResult = codesResult;
+      _generatedDek = dek;
+      _generatedHash = hash;
+      _generatedSaltHex = authService.bytesToHex(salt);
+      _kekWrappedEncrypted = wrapped;
+      _codesWithWraps = codesWithWraps;
       _step = 1;
     });
   }
@@ -362,38 +382,27 @@ class _MasterPasswordSetupDialogState
     setState(() => _saving = true);
 
     try {
-      final authService = ref.read(entryAuthServiceProvider);
       final store = ref.read(masterPasswordStoreProvider);
       final notifier = ref.read(masterPasswordProvider.notifier);
 
-      final password = _newPwCtrl.text;
       final hint = _hintCtrl.text.trim();
-      final codesJson = jsonEncode(_generatedCodesResult!.codeHashes);
-
-      // Generate DEK, salt, hash, and wrap
-      final dek = authService.generateStorageKey();
-      final salt = authService.generateSalt();
-      final hash = await authService.hashMasterPassword(
-        password: password,
-        salt: salt,
+      final codesJson = jsonEncode(_codesWithWraps!.codeHashes);
+      final backupCodeDataJson = jsonEncode(
+        _codesWithWraps!.entries.map((e) => e.toJson()).toList(),
       );
-      final kek = await authService.deriveMasterKey(
-        password: password,
-        salt: salt,
-      );
-      final wrapped = await authService.wrapStorageKey(dek: dek, kek: kek);
 
       await store.saveFull(
-        hashHex: hash,
-        saltHex: authService.bytesToHex(salt),
+        hashHex: _generatedHash!,
+        saltHex: _generatedSaltHex!,
         hint: hint.isNotEmpty ? hint : null,
         backupCodeHashesJson: codesJson,
-        encryptedStorageKeyHex: wrapped.ciphertextHex,
-        encryptedStorageKeyNonceHex: wrapped.nonceHex,
-        encryptedStorageKeyTagHex: wrapped.tagHex,
+        encryptedStorageKeyHex: _kekWrappedEncrypted!.ciphertextHex,
+        encryptedStorageKeyNonceHex: _kekWrappedEncrypted!.nonceHex,
+        encryptedStorageKeyTagHex: _kekWrappedEncrypted!.tagHex,
+        backupCodeDataJson: backupCodeDataJson,
       );
 
-      notifier.setMasterPassword(dek);
+      notifier.setMasterPassword(_generatedDek!);
 
       if (context.mounted) {
         Navigator.pop(context, true);
@@ -512,7 +521,7 @@ class _MasterPasswordSetupDialogState
       );
       final newWrapped = await authService.wrapStorageKey(dek: dek, kek: newKek);
 
-      // Preserve existing backup codes
+      // Preserve existing backup codes and DEK wraps
       final existingCodes = config.backupCodeHashes;
       final codesJson =
           existingCodes != null ? jsonEncode(existingCodes) : null;
@@ -522,6 +531,7 @@ class _MasterPasswordSetupDialogState
         saltHex: authService.bytesToHex(newSalt),
         hint: hint.isNotEmpty ? hint : null,
         backupCodeHashesJson: codesJson,
+        backupCodeDataJson: config.backupCodeData,
         encryptedStorageKeyHex: newWrapped.ciphertextHex,
         encryptedStorageKeyNonceHex: newWrapped.nonceHex,
         encryptedStorageKeyTagHex: newWrapped.tagHex,

@@ -42,9 +42,9 @@ Chain strategy: feature-branch-chain
 
 ## Phase 3: Setup Flow (PR 3)
 
-- [ ] 3.1 Controller: iterate codes → backup-KEK per code → AES-256-GCM wrap DEK → build JSON
-- [ ] 3.2 Round-trip verify first entry before returning
-- [ ] 3.3 Dialog: pass `backupCodeDataJson` to `saveFull`
+- [x] 3.1 Controller: iterate codes → backup-KEK per code → AES-256-GCM wrap DEK → build JSON
+- [x] 3.2 Round-trip verify first entry before returning
+- [x] 3.3 Dialog: pass `backupCodeDataJson` to `saveFull`
 
 ## Phase 4: Recovery Flow (PR 4)
 

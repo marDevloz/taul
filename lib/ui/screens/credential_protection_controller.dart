@@ -233,15 +233,17 @@ class CredentialProtectionController {
     );
     final wrapped = await _authService.wrapStorageKey(dek: dek, kek: kek);
 
-    // Generate backup codes
-    final codesResult = await _authService.generateBackupCodes();
-    final codesJson = jsonEncode(codesResult.codeHashes);
+    // Generate backup codes with DEK wraps
+    final codesWithWraps = await _authService.generateBackupCodesWithDekWraps(dek);
+    final backupCodeDataJson = jsonEncode(
+      codesWithWraps.entries.map((e) => e.toJson()).toList(),
+    );
 
     // Show generated codes to user
     if (context.mounted) {
       final codesSaved = await _showBackupCodesDialog(
         context,
-        codesResult.plainCodes,
+        codesWithWraps.plainCodes,
       );
       if (!codesSaved) return null;
     }
@@ -250,10 +252,11 @@ class CredentialProtectionController {
       hashHex: hash,
       saltHex: _authService.bytesToHex(salt),
       hint: setupHint,
-      backupCodeHashesJson: codesJson,
+      backupCodeHashesJson: jsonEncode(codesWithWraps.codeHashes),
       encryptedStorageKeyHex: wrapped.ciphertextHex,
       encryptedStorageKeyNonceHex: wrapped.nonceHex,
       encryptedStorageKeyTagHex: wrapped.tagHex,
+      backupCodeDataJson: backupCodeDataJson,
     );
 
     _masterPasswordNotifier?.setMasterPassword(dek);

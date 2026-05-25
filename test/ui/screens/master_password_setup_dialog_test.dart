@@ -180,6 +180,62 @@ void main() {
         // Confirm button should exist after checkbox is checked
         expect(find.text('Confirm'), findsOneWidget);
       }, timeout: const Timeout(Duration(seconds: 30)));
+
+      testWidgets('should_store_backup_code_data_after_confirmation',
+          (tester) async {
+        await tester.pumpWidget(createTestApp(isChange: false));
+        await openDialog(tester);
+
+        // Fill valid password
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Master password'),
+          'validpass123',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Confirm password'),
+          'validpass123',
+        );
+
+        // Tap Next — this now generates DEK + codesWithWraps
+        await tester.tap(find.text('Next'));
+        await tester.pump();
+
+        await tester.runAsync(() async {
+          await Future.delayed(const Duration(milliseconds: 1000));
+        });
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+
+        // Should be on codes step
+        expect(find.text('Copy all'), findsOneWidget);
+
+        // Check confirmation and tap Confirm
+        await tester.tap(find.byType(Checkbox));
+        await tester.pump();
+        await tester.tap(find.text('Confirm'));
+        await tester.pump();
+
+        await tester.runAsync(() async {
+          await Future.delayed(const Duration(milliseconds: 1000));
+        });
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+
+        // Verify backup_code_data was stored in the DB
+        final storedData = await store.readBackupCodeData();
+        expect(storedData, isNotNull);
+        expect(storedData!.length, 10);
+        for (final entry in storedData) {
+          expect(entry.saltHex, isNotEmpty);
+          expect(entry.hashHex, isNotEmpty);
+          expect(entry.dekCipherHex, isNotEmpty);
+          expect(entry.dekNonceHex, isNotEmpty);
+          expect(entry.dekTagHex, isNotEmpty);
+        }
+
+        // Dialog should have popped
+        expect(find.text('Set Up Master Password'), findsNothing);
+      }, timeout: const Timeout(Duration(seconds: 60)));
     });
 
     group('change mode', () {
