@@ -532,6 +532,9 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
         _showPassword = false;
       });
 
+      // Clear cached key so next reveal prompts for password again.
+      masterKeyNotifier.clearMasterPassword();
+
       _hideTimer?.cancel();
       _hideTimer = Timer(const Duration(seconds: 30), () {
         if (!mounted) return;
