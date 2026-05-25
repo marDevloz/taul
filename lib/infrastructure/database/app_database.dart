@@ -17,8 +17,11 @@ class AppDatabase extends _$AppDatabase {
   /// Creates an in-memory database for testing.
   AppDatabase.forTesting() : super(NativeDatabase.memory());
 
+  /// Creates an instance with a custom executor (e.g., for migration tests).
+  AppDatabase.custom(super.executor);
+
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -54,6 +57,11 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(
               masterPasswordConfig,
               masterPasswordConfig.encryptedStorageKeyTag,
+            );
+          }
+          if (from < 4) {
+            await customInsert(
+              'ALTER TABLE master_password_config ADD COLUMN backup_code_data TEXT',
             );
           }
         },

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:taul/infrastructure/database/app_database.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
@@ -15,6 +16,220 @@ void main() {
 
   tearDown(() {
     database.close();
+  });
+
+  group('BackupCodeEntry', () {
+    test('should_round_trip_json', () {
+      const entry = BackupCodeEntry(
+        saltHex: 'a1b2c3d4e5f6a7b8c9d0e1f2',
+        hashHex: 'deadbeef0123456789abcdef',
+        dekCipherHex: 'ciphertexthex',
+        dekNonceHex: '1234567890ab',
+        dekTagHex: '1234567890abcdef',
+      );
+
+      final json = entry.toJson();
+      final parsed = BackupCodeEntry.fromJson(json);
+
+      expect(parsed.saltHex, entry.saltHex);
+      expect(parsed.hashHex, entry.hashHex);
+      expect(parsed.dekCipherHex, entry.dekCipherHex);
+      expect(parsed.dekNonceHex, entry.dekNonceHex);
+      expect(parsed.dekTagHex, entry.dekTagHex);
+    });
+
+    test('should_parse_from_snake_case_json', () {
+      final json = {
+        'salt': 'aabbccdd11223344',
+        'hash': '55667788',
+        'dek_cipher': 'cipher01',
+        'dek_nonce': 'nonce01',
+        'dek_tag': 'tag01',
+      };
+
+      final parsed = BackupCodeEntry.fromJson(json);
+
+      expect(parsed.saltHex, 'aabbccdd11223344');
+      expect(parsed.hashHex, '55667788');
+      expect(parsed.dekCipherHex, 'cipher01');
+      expect(parsed.dekNonceHex, 'nonce01');
+      expect(parsed.dekTagHex, 'tag01');
+    });
+
+    test('should_produce_snake_case_json_keys', () {
+      const entry = BackupCodeEntry(
+        saltHex: 'aaa',
+        hashHex: 'bbb',
+        dekCipherHex: 'ccc',
+        dekNonceHex: 'ddd',
+        dekTagHex: 'eee',
+      );
+
+      final json = entry.toJson();
+
+      expect(json['salt'], 'aaa');
+      expect(json['hash'], 'bbb');
+      expect(json['dek_cipher'], 'ccc');
+      expect(json['dek_nonce'], 'ddd');
+      expect(json['dek_tag'], 'eee');
+    });
+  });
+
+  group('MasterPasswordStore (v4 schema — backup_code_data)', () {
+    test('should_return_null_when_no_backup_code_data', () async {
+      await store.save(hashHex: 'hash', saltHex: 'salt');
+      final data = await store.readBackupCodeData();
+      expect(data, isNull);
+    });
+
+    test('should_consume_both_arrays_atomically_at_index', () async {
+      await store.save(hashHex: 'hash', saltHex: 'salt');
+      final hashes = ['h1', 'h2', 'h3'];
+      final entries = [
+        const BackupCodeEntry(
+          saltHex: 's1', hashHex: 'h1',
+          dekCipherHex: 'c1', dekNonceHex: 'n1', dekTagHex: 't1',
+        ),
+        const BackupCodeEntry(
+          saltHex: 's2', hashHex: 'h2',
+          dekCipherHex: 'c2', dekNonceHex: 'n2', dekTagHex: 't2',
+        ),
+        const BackupCodeEntry(
+          saltHex: 's3', hashHex: 'h3',
+          dekCipherHex: 'c3', dekNonceHex: 'n3', dekTagHex: 't3',
+        ),
+      ];
+
+      await store.saveBackupCodeHashes(hashes);
+      await database.customUpdate(
+        'UPDATE master_password_config SET backup_code_data = ? WHERE id = 1',
+        variables: [
+          Variable.withString(jsonEncode(entries.map((e) => e.toJson()).toList())),
+        ],
+      );
+
+      // Consume at index 1 (middle)
+      final consumed = await store.consumeBackupCodeAtIndexAndData(1);
+      expect(consumed, true);
+
+      // Both arrays should have shrunk
+      final remainingHashes = await store.readBackupCodeHashes();
+      expect(remainingHashes, isNotNull);
+      expect(remainingHashes!.length, 2);
+      expect(remainingHashes[0], 'h1');
+      expect(remainingHashes[1], 'h3');
+
+      final remainingData = await store.readBackupCodeData();
+      expect(remainingData, isNotNull);
+      expect(remainingData!.length, 2);
+      expect(remainingData[0].saltHex, 's1');
+      expect(remainingData[1].saltHex, 's3');
+    });
+
+    test('should_consume_both_arrays_when_backup_code_data_is_null', () async {
+      await store.save(hashHex: 'hash', saltHex: 'salt');
+      await store.saveBackupCodeHashes(['h1', 'h2']);
+
+      // backup_code_data is null — consume should still work (backward compat)
+      final consumed = await store.consumeBackupCodeAtIndexAndData(0);
+      expect(consumed, true);
+
+      final remaining = await store.readBackupCodeHashes();
+      expect(remaining, isNotNull);
+      expect(remaining!.length, 1);
+      expect(remaining[0], 'h2');
+    });
+
+    test('should_save_full_with_backup_code_data_json', () async {
+      final entries = [
+        const BackupCodeEntry(
+          saltHex: 's1', hashHex: 'h1',
+          dekCipherHex: 'c1', dekNonceHex: 'n1', dekTagHex: 't1',
+        ),
+      ];
+      await store.saveFull(
+        hashHex: 'hash',
+        saltHex: 'salt',
+        backupCodeHashesJson: jsonEncode(['h1']),
+        backupCodeDataJson: jsonEncode(entries.map((e) => e.toJson()).toList()),
+      );
+
+      final data = await store.readBackupCodeData();
+      expect(data, isNotNull);
+      expect(data!.length, 1);
+      expect(data[0].saltHex, 's1');
+
+      final hashes = await store.readBackupCodeHashes();
+      expect(hashes, isNotNull);
+      expect(hashes!.length, 1);
+      expect(hashes[0], 'h1');
+    });
+
+    test('should_save_full_with_null_backup_code_data', () async {
+      await store.saveFull(
+        hashHex: 'hash',
+        saltHex: 'salt',
+        backupCodeHashesJson: jsonEncode(['h1']),
+      );
+
+      final data = await store.readBackupCodeData();
+      expect(data, isNull);
+
+      final hashes = await store.readBackupCodeHashes();
+      expect(hashes, isNotNull);
+      expect(hashes!.length, 1);
+    });
+
+    test('should_read_backup_code_data_after_save', () async {
+      await store.save(hashHex: 'hash', saltHex: 'salt');
+      final entries = [
+        const BackupCodeEntry(
+          saltHex: 's1', hashHex: 'h1',
+          dekCipherHex: 'c1', dekNonceHex: 'n1', dekTagHex: 't1',
+        ),
+        const BackupCodeEntry(
+          saltHex: 's2', hashHex: 'h2',
+          dekCipherHex: 'c2', dekNonceHex: 'n2', dekTagHex: 't2',
+        ),
+      ];
+      final json = jsonEncode(entries.map((e) => e.toJson()).toList());
+
+      // Write directly via raw SQL since saveFull isn't modified yet
+      await database.customUpdate(
+        'UPDATE master_password_config SET backup_code_data = ? WHERE id = 1',
+        variables: [Variable.withString(json)],
+      );
+
+      final data = await store.readBackupCodeData();
+      expect(data, isNotNull);
+      expect(data!.length, 2);
+      expect(data[0].saltHex, 's1');
+      expect(data[1].saltHex, 's2');
+    });
+  });
+
+  group('Migration v3→v4', () {
+    test('schema_version_should_be_4', () {
+      expect(database.schemaVersion, 4);
+    });
+
+    test('should_have_backup_code_data_column_available', () async {
+      // Verify the column exists and can be written to
+      await store.save(hashHex: 'hash', saltHex: 'salt');
+      await database.customUpdate(
+        'UPDATE master_password_config SET backup_code_data = ? WHERE id = 1',
+        variables: [
+          Variable.withString(jsonEncode([{
+            'salt': 's1', 'hash': 'h1',
+            'dek_cipher': 'c1', 'dek_nonce': 'n1', 'dek_tag': 't1',
+          }])),
+        ],
+      );
+      final data = await store.readBackupCodeData();
+      expect(data, isNotNull);
+      expect(data!.length, 1);
+      expect(data[0].saltHex, 's1');
+    });
   });
 
   group('MasterPasswordStore (v3 schema)', () {

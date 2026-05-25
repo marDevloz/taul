@@ -6,6 +6,7 @@ class MasterPasswordConfig extends Table {
   TextColumn get saltHex => text()();
   TextColumn? get passwordHint => text().nullable()();
   TextColumn? get backupCodeHashes => text().nullable()();
+  TextColumn? get backupCodeData => text().nullable()();
   TextColumn? get encryptedStorageKey => text().nullable()();
   TextColumn? get encryptedStorageKeyNonce => text().nullable()();
   TextColumn? get encryptedStorageKeyTag => text().nullable()();
