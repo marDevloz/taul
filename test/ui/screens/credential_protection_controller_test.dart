@@ -169,6 +169,57 @@ void main() {
       });
     });
 
+    group('requireMasterKey', () {
+      test('should_return_cached_dek_from_notifier_without_prompt', () async {
+        final dek = Uint8List(32);
+        for (var i = 0; i < 32; i++) dek[i] = i;
+        notifier.setMasterPassword(dek);
+
+        await store.saveFull(
+          hashHex: 'hash',
+          saltHex: 'salt',
+          encryptedStorageKeyHex: 'keyhex',
+          encryptedStorageKeyNonceHex: 'noncehex',
+          encryptedStorageKeyTagHex: 'taghex',
+        );
+
+        // DEK cached in notifier → no context access needed
+        final mockContext = MockBuildContext();
+        when(() => mockContext.mounted).thenReturn(true);
+
+        final result = await controller.requireMasterKey(mockContext);
+        expect(result, dek);
+      });
+
+      test('should_return_cached_dek_from_previous_fetch_without_prompt',
+          () async {
+        final dek = Uint8List(32);
+        for (var i = 0; i < 32; i++) dek[i] = i;
+        notifier.setMasterPassword(dek);
+
+        await store.saveFull(
+          hashHex: 'hash',
+          saltHex: 'salt',
+          encryptedStorageKeyHex: 'keyhex',
+          encryptedStorageKeyNonceHex: 'noncehex',
+          encryptedStorageKeyTagHex: 'taghex',
+        );
+
+        final mockContext = MockBuildContext();
+        when(() => mockContext.mounted).thenReturn(true);
+
+        // First call caches the DEK internally
+        await controller.requireMasterKey(mockContext);
+
+        // Clear notifier cache to prove second call uses internal cache
+        notifier.clearMasterPassword();
+
+        // Second call should return DEK without accessing context
+        final result = await controller.requireMasterKey(mockContext);
+        expect(result, dek);
+      });
+    });
+
     group('backup_code_data round-trip via saveFull', () {
       test('should_store_and_retrieve_backup_code_data', () async {
         // Simulate what the controller does: generate DEK, wrap with backup codes

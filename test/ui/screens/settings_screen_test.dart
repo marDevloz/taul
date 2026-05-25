@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:taul/infrastructure/database/app_database.dart';
+import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/screens/settings_screen.dart';
+import '../../helpers/test_auth.dart';
 
 void main() {
   late AppDatabase database;
@@ -25,6 +27,7 @@ void main() {
     return ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(database),
+        entryAuthServiceProvider.overrideWithValue(createFakeAuthService()),
       ],
       child: const MaterialApp(home: SettingsScreen()),
     );
@@ -211,6 +214,7 @@ void main() {
         ProviderScope(
           overrides: [
             databaseProvider.overrideWithValue(database),
+            entryAuthServiceProvider.overrideWithValue(createFakeAuthService()),
           ],
           child: const MaterialApp(
             home: SettingsScreen(),
@@ -222,6 +226,69 @@ void main() {
       // The back button should exist
       final backButton = find.byIcon(Icons.arrow_back);
       expect(backButton, findsOneWidget);
+    });
+
+    testWidgets('should_show_mp_prompt_when_regenerating_codes',
+        (tester) async {
+      await store.saveFull(
+        hashHex: 'abc123',
+        saltHex: 'def456',
+        encryptedStorageKeyHex: 'ciphertexthex',
+        encryptedStorageKeyNonceHex: 'noncehex',
+        encryptedStorageKeyTagHex: 'taghex',
+      );
+
+      await tester.pumpWidget(createTestApp());
+      await tester.pump();
+
+      // Tap regenerar
+      await tester.tap(find.text('Regenerate Backup Codes'));
+      await tester.pump();
+
+      // Confirmation dialog
+      expect(find.text('Regenerate backup codes'), findsOneWidget);
+      expect(find.text('Regenerate'), findsOneWidget);
+
+      // Confirm
+      await tester.tap(find.text('Regenerate'));
+      await tester.pump();
+
+      // MP prompt should appear (title: 'Master password')
+      expect(find.text('Master password'), findsOneWidget);
+      expect(find.text('Cancelar'), findsOneWidget);
+      expect(find.text('Aceptar'), findsOneWidget);
+    });
+
+    testWidgets('should_handle_cancel_at_mp_prompt_when_regenerating',
+        (tester) async {
+      await store.saveFull(
+        hashHex: 'abc123',
+        saltHex: 'def456',
+        encryptedStorageKeyHex: 'ciphertexthex',
+        encryptedStorageKeyNonceHex: 'noncehex',
+        encryptedStorageKeyTagHex: 'taghex',
+      );
+
+      await tester.pumpWidget(createTestApp());
+      await tester.pump();
+
+      // Tap regenerar → confirm → get MP prompt
+      await tester.tap(find.text('Regenerate Backup Codes'));
+      await tester.pump();
+      await tester.tap(find.text('Regenerate'));
+      await tester.pump();
+
+      // Verify MP prompt is showing
+      expect(find.text('Master password'), findsOneWidget);
+
+      // Tap cancelar
+      await tester.tap(find.text('Cancelar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // MP prompt should be gone, back to settings
+      expect(find.text('Master password'), findsNothing);
+      expect(find.text('Regenerate Backup Codes'), findsOneWidget);
     });
   });
 }

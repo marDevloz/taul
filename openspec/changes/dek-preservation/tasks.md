@@ -56,9 +56,9 @@ Chain strategy: feature-branch-chain
 
 ## Phase 5: Code Regen (PR 5)
 
-- [ ] 5.1 `requireMasterKey(context)` → `Uint8List` in controller
-- [ ] 5.2 Settings: trigger `requireMasterKey` before regen
-- [ ] 5.3 New codes → wrap DEK → atomic save hashes + data
+- [x] 5.1 `requireMasterKey(context)` → `Uint8List` in controller
+- [x] 5.2 Settings: trigger `requireMasterKey` before regen
+- [x] 5.3 New codes → wrap DEK → atomic save hashes + data
 
 ## Phase 6: Integration Tests (PR 6)
 

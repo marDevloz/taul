@@ -16,6 +16,7 @@ import 'package:taul/infrastructure/database/entry_dao.dart';
 import 'package:taul/infrastructure/database/entry_repository_impl.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
+import 'package:taul/ui/screens/credential_protection_controller.dart';
 
 // --- Master password key cache (volatile, in-memory) ---
 
@@ -41,6 +42,15 @@ final daoProvider = Provider<EntryDao>((ref) => EntryDao(ref.watch(databaseProvi
 final entryAuthServiceProvider = Provider<EntryAuthService>((ref) => EntryAuthService());
 final masterPasswordStoreProvider =
     Provider<MasterPasswordStore>((ref) => MasterPasswordStore(ref.watch(databaseProvider)));
+
+final credentialProtectionControllerProvider =
+    Provider<CredentialProtectionController>((ref) {
+  return CredentialProtectionController(
+    authService: ref.watch(entryAuthServiceProvider),
+    passwordStore: ref.watch(masterPasswordStoreProvider),
+    masterPasswordNotifier: ref.watch(masterPasswordProvider.notifier),
+  );
+});
 
 final entryRepositoryProvider = Provider<IEntryRepository>((ref) {
   return EntryRepositoryImpl(dao: ref.watch(daoProvider));
