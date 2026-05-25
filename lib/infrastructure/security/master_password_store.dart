@@ -75,6 +75,7 @@ class MasterPasswordFullConfig {
     required this.saltHex,
     this.passwordHint,
     this.backupCodeHashes,
+    this.backupCodeData,
     this.encryptedStorageKeyHex,
     this.encryptedStorageKeyNonceHex,
     this.encryptedStorageKeyTagHex,
@@ -84,6 +85,7 @@ class MasterPasswordFullConfig {
   final String saltHex;
   final String? passwordHint;
   final List<String>? backupCodeHashes;
+  final String? backupCodeData;
   final String? encryptedStorageKeyHex;
   final String? encryptedStorageKeyNonceHex;
   final String? encryptedStorageKeyTagHex;
@@ -131,7 +133,7 @@ class MasterPasswordStore {
   Future<MasterPasswordFullConfig?> readFull() async {
     final rows = await _database.customSelect(
       'SELECT password_hash_argon2, salt_hex, password_hint, '
-      'backup_code_hashes, encrypted_storage_key, '
+      'backup_code_hashes, backup_code_data, encrypted_storage_key, '
       'encrypted_storage_key_nonce, encrypted_storage_key_tag '
       'FROM master_password_config WHERE id = 1 LIMIT 1',
     ).get();
@@ -148,11 +150,18 @@ class MasterPasswordStore {
       }
     }
 
+    String? backupCodeData;
+    final rawData = row['backup_code_data'] as String?;
+    if (rawData != null && rawData.isNotEmpty) {
+      backupCodeData = rawData;
+    }
+
     return MasterPasswordFullConfig(
       hashHex: row['password_hash_argon2'] as String,
       saltHex: row['salt_hex'] as String,
       passwordHint: row['password_hint'] as String?,
       backupCodeHashes: parsedCodes,
+      backupCodeData: backupCodeData,
       encryptedStorageKeyHex: row['encrypted_storage_key'] as String?,
       encryptedStorageKeyNonceHex: row['encrypted_storage_key_nonce'] as String?,
       encryptedStorageKeyTagHex: row['encrypted_storage_key_tag'] as String?,

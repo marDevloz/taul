@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/screens/credential_protection_controller.dart';
+import '../../helpers/test_auth.dart';
 
 class MockBuildContext extends Mock implements BuildContext {}
 
@@ -21,7 +23,7 @@ void main() {
   setUp(() {
     database = AppDatabase.forTesting();
     store = MasterPasswordStore(database);
-    auth = EntryAuthService();
+    auth = createFastAuthService();
     notifier = MasterPasswordNotifier();
     controller = CredentialProtectionController(
       authService: auth,
@@ -164,6 +166,40 @@ void main() {
 
         final result = await controller.ensureProtectionConfigured(mockContext);
         expect(result, true);
+      });
+    });
+
+    group('backup_code_data round-trip via saveFull', () {
+      test('should_store_and_retrieve_backup_code_data', () async {
+        // Simulate what the controller does: generate DEK, wrap with backup codes
+        final dek = auth.generateStorageKey();
+        final codesWithWraps = await auth.generateBackupCodesWithDekWraps(dek);
+        final backupCodeDataJson = jsonEncode(
+          codesWithWraps.entries.map((e) => e.toJson()).toList(),
+        );
+
+        await store.saveFull(
+          hashHex: 'hash',
+          saltHex: 'salt',
+          backupCodeHashesJson: jsonEncode(codesWithWraps.codeHashes),
+          backupCodeDataJson: backupCodeDataJson,
+          encryptedStorageKeyHex: 'keyhex',
+          encryptedStorageKeyNonceHex: 'noncehex',
+          encryptedStorageKeyTagHex: 'taghex',
+        );
+
+        // Verify via readFull — config.backupCodeData is the raw JSON
+        final config = await store.readFull();
+        expect(config, isNotNull);
+        expect(config!.backupCodeData, isNotNull);
+        expect(config.backupCodeData, backupCodeDataJson);
+
+        // Verify via readBackupCodeData — parsed entries
+        final parsed = await store.readBackupCodeData();
+        expect(parsed, isNotNull);
+        expect(parsed!.length, codesWithWraps.entries.length);
+        expect(parsed[0].saltHex, codesWithWraps.entries[0].saltHex);
+        expect(parsed[0].dekCipherHex, codesWithWraps.entries[0].dekCipherHex);
       });
     });
   });
