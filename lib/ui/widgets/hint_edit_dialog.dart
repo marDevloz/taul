@@ -31,26 +31,26 @@ class _HintEditDialogState extends State<HintEditDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Edit Hint'),
+      title: const Text('Editar Pista'),
       content: TextField(
         controller: _controller,
         maxLength: 200,
         autofocus: true,
         decoration: const InputDecoration(
-          labelText: 'Password hint',
-          hintText: 'e.g. name of my first pet',
-          helperText: 'Your hint is stored as plain text',
+          labelText: 'Pista de contraseña',
+          hintText: 'ej: nombre de mi primera mascota',
+          helperText: 'Tu pista se guarda como texto plano',
           helperMaxLines: 2,
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: const Text('Cancelar'),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, _controller.text.trim()),
-          child: const Text('Save'),
+          child: const Text('Guardar'),
         ),
       ],
     );

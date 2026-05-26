@@ -101,7 +101,7 @@ class _MasterPasswordRecoveryDialogState
       canPop: !_saving,
       child: AlertDialog(
         title: Text(
-          _step == 0 ? 'Recover Master Password' : 'Set New Master Password',
+          _step == 0 ? 'Recuperar Contraseña Maestra' : 'Configurar Nueva Contraseña Maestra',
         ),
         content: _buildContent(),
         actions: _buildActions(),
@@ -128,14 +128,14 @@ class _MasterPasswordRecoveryDialogState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Enter one of your backup codes to reset your master password.',
+          'Ingresá uno de tus códigos de respaldo para restablecer tu contraseña maestra.',
           style: TextStyle(fontSize: 14),
         ),
         const SizedBox(height: 4),
         Text(
           remaining >= 0
-              ? '$remaining backup code${remaining == 1 ? '' : 's'} remaining.'
-              : 'No backup codes stored.',
+              ? '$remaining código(s) de respaldo restante(s).'
+              : 'No hay códigos de respaldo guardados.',
           style: const TextStyle(fontSize: 12, color: Colors.grey),
         ),
         const SizedBox(height: 12),
@@ -144,8 +144,8 @@ class _MasterPasswordRecoveryDialogState
           autofocus: true,
           textCapitalization: TextCapitalization.characters,
           decoration: const InputDecoration(
-            labelText: 'Backup code',
-            hintText: 'e.g. ABCD-1234',
+            labelText: 'Código de respaldo',
+            hintText: 'ej: ABCD-1234',
             prefixIcon: Icon(Icons.vpn_key_outlined),
           ),
         ),
@@ -156,8 +156,8 @@ class _MasterPasswordRecoveryDialogState
         if (_lockoutActive) ...[
           const SizedBox(height: 8),
           const Text(
-            'Too many failed attempts. Please wait 60 seconds before trying '
-            'again.',
+            'Demasiados intentos fallidos. Esperá 60 segundos antes de '
+            'intentar de nuevo.',
             style: TextStyle(color: Colors.orange, fontSize: 13),
           ),
         ],
@@ -171,7 +171,7 @@ class _MasterPasswordRecoveryDialogState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Code verified. Create your new master password.',
+          'Código verificado. Creá tu nueva contraseña maestra.',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -184,23 +184,23 @@ class _MasterPasswordRecoveryDialogState
           obscureText: true,
           autofocus: true,
           decoration: const InputDecoration(
-            labelText: 'New master password',
-            helperText: 'Minimum 8 characters',
+            labelText: 'Nueva contraseña maestra',
+            helperText: 'Mínimo 8 caracteres',
           ),
         ),
         const SizedBox(height: 8),
         TextField(
           controller: _confirmCtrl,
           obscureText: true,
-          decoration: const InputDecoration(labelText: 'Confirm new password'),
+          decoration: const InputDecoration(labelText: 'Confirmar nueva contraseña'),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _hintCtrl,
           maxLength: 200,
           decoration: const InputDecoration(
-            labelText: 'Hint (optional)',
-            helperText: 'Your hint is stored as plain text',
+            labelText: 'Pista (opcional)',
+            helperText: 'Tu pista se guarda como texto plano',
             helperMaxLines: 2,
           ),
         ),
@@ -224,11 +224,11 @@ class _MasterPasswordRecoveryDialogState
             context,
             const RecoveryResult(success: false),
           ),
-          child: const Text('Cancel'),
+          child: const Text('Cancelar'),
         ),
         FilledButton(
           onPressed: _lockoutActive ? null : _onVerifyCode,
-          child: const Text('Verify'),
+          child: const Text('Verificar'),
         ),
       ];
     }
@@ -239,11 +239,11 @@ class _MasterPasswordRecoveryDialogState
           context,
           const RecoveryResult(success: false),
         ),
-        child: const Text('Cancel'),
+        child: const Text('Cancelar'),
       ),
       FilledButton(
         onPressed: _onSetNewPassword,
-        child: const Text('Set Password'),
+        child: const Text('Establecer Contraseña'),
       ),
     ];
   }
@@ -287,7 +287,7 @@ class _MasterPasswordRecoveryDialogState
   Future<void> _onVerifyCode() async {
     final code = _codeCtrl.text.trim().toUpperCase();
     if (code.isEmpty) {
-      setState(() => _error = 'Enter a backup code');
+      setState(() => _error = 'Ingresá un código de respaldo');
       return;
     }
 
@@ -299,7 +299,7 @@ class _MasterPasswordRecoveryDialogState
     if (hashes == null || hashes.isEmpty) {
       setState(() {
         _cachedRemainingCodes = 0;
-        _error = 'No backup codes remaining. Recovery is not possible.';
+        _error = 'No quedan códigos de respaldo. No es posible recuperar.';
       });
       return;
     }
@@ -318,13 +318,12 @@ class _MasterPasswordRecoveryDialogState
           _lockoutTimer = Timer(const Duration(seconds: 60), () {
             if (mounted) setState(() => _lockoutActive = false);
           });
-          _error = 'Too many failed attempts. '
-              'Please wait 60 seconds before trying again.';
+          _error = 'Demasiados intentos fallidos. '
+              'Esperá 60 segundos antes de intentar de nuevo.';
         } else {
           final remainingTries = hashes.length;
-          final codeWord = remainingTries == 1 ? 'code' : 'codes';
-          _error = 'Invalid code. '
-              '$remainingTries backup $codeWord remaining.';
+          _error = 'Código inválido. '
+              '$remainingTries código(s) de respaldo restante(s).';
         }
       });
       return;
@@ -346,8 +345,8 @@ class _MasterPasswordRecoveryDialogState
       setState(() {
         _verifiedBackupCode = null;
         _preservedEntry = null;
-        _error = 'An error occurred while processing the code. '
-            'Please try again — the code has not been consumed.';
+        _error = 'Ocurrió un error al procesar el código. '
+            'Intentá de nuevo — el código no se consumió.';
       });
       return;
     }
@@ -374,11 +373,11 @@ class _MasterPasswordRecoveryDialogState
     final hint = _hintCtrl.text.trim();
 
     if (newPw.length < 8) {
-      setState(() => _error = 'Minimum 8 characters');
+      setState(() => _error = 'Mínimo 8 caracteres');
       return;
     }
     if (newPw != confirm) {
-      setState(() => _error = 'Passwords do not match');
+      setState(() => _error = 'Las contraseñas no coinciden');
       return;
     }
 
@@ -438,7 +437,7 @@ class _MasterPasswordRecoveryDialogState
     } catch (e) {
       setState(() {
         _saving = false;
-        _error = 'Error saving: $e';
+        _error = 'Error al guardar: $e';
       });
     }
   }

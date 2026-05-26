@@ -20,7 +20,7 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('Configuración'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/'),
@@ -47,21 +47,21 @@ class SettingsScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
         // ── Master Password Section ──
-        _sectionHeader('Master Password'),
+        _sectionHeader('Contraseña Maestra'),
         _statusTile(context, ref, config, isConfigured),
 
         if (isConfigured) ...[
           if (config.passwordHint != null && config.passwordHint!.isNotEmpty)
             ListTile(
               leading: const Icon(Icons.lightbulb_outline),
-              title: const Text('Hint'),
+              title: const Text('Pista'),
               subtitle: Text(config.passwordHint!),
             ),
           ListTile(
             leading: const Icon(Icons.vpn_key),
-            title: const Text('Remaining backup codes'),
+            title: const Text('Códigos de respaldo restantes'),
             subtitle: Text(
-              '${config.backupCodeHashes?.length ?? 0} codes available',
+              '${config.backupCodeHashes?.length ?? 0} códigos disponibles',
             ),
           ),
           const Divider(),
@@ -69,28 +69,28 @@ class SettingsScreen extends ConsumerWidget {
           _actionTile(
             context,
             icon: Icons.lock_outline,
-            title: 'Change Master Password',
+            title: 'Cambiar Contraseña Maestra',
             onTap: () => _changeMasterPassword(context, ref),
           ),
           _actionTile(
             context,
             icon: Icons.edit,
-            title: 'Edit Hint',
+            title: 'Editar Pista',
             onTap: () => _editHint(context, ref, config.passwordHint),
           ),
           _actionTile(
             context,
             icon: Icons.refresh,
-            title: 'Regenerate Backup Codes',
+            title: 'Regenerar Códigos de Respaldo',
             onTap: () => _regenerateCodes(context, ref),
           ),
           const Divider(),
           // Danger Zone
-          _sectionHeader('Danger Zone'),
+          _sectionHeader('Zona de Peligro'),
           _actionTile(
             context,
             icon: Icons.delete_forever,
-            title: 'Delete Master Password',
+            title: 'Eliminar Contraseña Maestra',
             textColor: Colors.red,
             onTap: () => _deleteMasterPassword(context, ref),
           ),
@@ -100,7 +100,7 @@ class SettingsScreen extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: FilledButton.icon(
               icon: const Icon(Icons.lock),
-              label: const Text('Set Up Master Password'),
+              label: const Text('Configurar Contraseña Maestra'),
               onPressed: () => _setupMasterPassword(context, ref),
             ),
           ),
@@ -135,11 +135,11 @@ class SettingsScreen extends ConsumerWidget {
         isConfigured ? Icons.check_circle : Icons.cancel,
         color: isConfigured ? Colors.green : Colors.grey,
       ),
-      title: Text(isConfigured ? 'Configured' : 'Not configured'),
+      title: Text(isConfigured ? 'Configurada' : 'No configurada'),
       subtitle: Text(
         isConfigured
-            ? 'Master password is active'
-            : 'No master password has been set up',
+            ? 'La contraseña maestra está activa'
+            : 'No se configuró una contraseña maestra',
       ),
     );
   }
@@ -170,7 +170,7 @@ class SettingsScreen extends ConsumerWidget {
     if (result == true && context.mounted) {
       ref.invalidate(masterPasswordConfigProvider);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Master password created successfully')),
+        const SnackBar(content: Text('Contraseña maestra creada con éxito')),
       );
     }
   }
@@ -184,7 +184,7 @@ class SettingsScreen extends ConsumerWidget {
     if (result == true && context.mounted) {
       ref.invalidate(masterPasswordConfigProvider);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Master password changed successfully')),
+        const SnackBar(content: Text('Contraseña maestra cambiada con éxito')),
       );
     }
   }
@@ -205,7 +205,7 @@ class SettingsScreen extends ConsumerWidget {
       ref.invalidate(masterPasswordConfigProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Hint saved')),
+          const SnackBar(content: Text('Pista guardada')),
         );
       }
     }
@@ -215,19 +215,19 @@ class SettingsScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Regenerate backup codes'),
+        title: const Text('Regenerar códigos de respaldo'),
         content: const Text(
-          'This will invalidate all existing backup codes. '
-          'New codes will be generated. Continue?',
+          'Esto va a invalidar todos los códigos de respaldo existentes. '
+          'Se van a generar códigos nuevos. ¿Continuamos?',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: const Text('Cancelar'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Regenerate'),
+            child: const Text('Regenerar'),
           ),
         ],
       ),
@@ -248,7 +248,7 @@ class SettingsScreen extends ConsumerWidget {
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Master password inválida')),
+          const SnackBar(content: Text('Contraseña maestra inválida')),
         );
       }
       return;
@@ -287,13 +287,13 @@ class SettingsScreen extends ConsumerWidget {
           await _showCodesDialog(context, codesWithWraps.plainCodes);
       if (codesSaved && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Backup codes regenerated')),
+          const SnackBar(content: Text('Códigos de respaldo regenerados')),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error regenerating codes: $e')),
+          SnackBar(content: Text('Error al regenerar códigos: $e')),
         );
       }
     }
@@ -306,14 +306,14 @@ class SettingsScreen extends ConsumerWidget {
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocalState) => AlertDialog(
-          title: const Text('New backup codes'),
+          title: const Text('Nuevos códigos de respaldo'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Save these codes in a secure place. '
-                'They are your ONLY way to recover access if you forget your master password.',
+                'Guardá estos códigos en un lugar seguro. '
+                'Son tu ÚNICA forma de recuperar el acceso si olvidás tu contraseña maestra.',
                 style: TextStyle(fontSize: 13),
               ),
               const SizedBox(height: 12),
@@ -345,12 +345,12 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   TextButton.icon(
                     icon: const Icon(Icons.copy, size: 16),
-                    label: const Text('Copy all'),
+                    label: const Text('Copiar todo'),
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: codes.join('\n')));
                       if (ctx.mounted) {
                         ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(content: Text('Codes copied to clipboard')),
+                          const SnackBar(content: Text('Códigos copiados al portapapeles')),
                         );
                       }
                     },
@@ -366,7 +366,7 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   const Expanded(
                     child: Text(
-                      'I saved my codes in a secure place',
+                      'Guardé mis códigos en un lugar seguro',
                       style: TextStyle(fontSize: 13),
                     ),
                   ),
@@ -377,11 +377,11 @@ class SettingsScreen extends ConsumerWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
+              child: const Text('Cancelar'),
             ),
             FilledButton(
               onPressed: confirmed ? () => Navigator.pop(ctx, true) : null,
-              child: const Text('Confirm'),
+              child: const Text('Confirmar'),
             ),
           ],
         ),
@@ -410,7 +410,7 @@ class SettingsScreen extends ConsumerWidget {
       ref.invalidate(masterPasswordConfigProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Master password deleted')),
+          const SnackBar(content: Text('Contraseña maestra eliminada')),
         );
       }
     }

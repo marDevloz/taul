@@ -47,7 +47,7 @@ class HomeView extends ConsumerWidget {
             child: entriesAsync.when(
               data: (entries) => entries.isEmpty
                   ? const Center(
-                      child: Text('No entries yet. Tap + to create one.'),
+                      child: Text('Todavía no hay entradas. Tocá + para crear una.'),
                     )
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 12),

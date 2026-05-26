@@ -382,7 +382,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
             FilledButton.icon(
               onPressed: _revealProtectedSecret,
               icon: const Icon(Icons.lock_open),
-              label: Text(_revealedSecret == null ? 'Reveal Secret' : 'Reveal Again'),
+              label: Text(_revealedSecret == null ? 'Revelar Secreto' : 'Revelar de Nuevo'),
             ),
           ],
           const SizedBox(height: 12),
@@ -433,8 +433,8 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'Recovery completed but the key could not be loaded. '
-                  'Please try revealing the secret again.',
+                  'Recuperación completada pero no se pudo cargar la '
+                  'clave. Intentá revelar el secreto de nuevo.',
                 ),
               ),
             );
@@ -451,7 +451,8 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'Master password not configured. Set it up from Settings.',
+                  'Contraseña maestra no configurada. '
+                  'Configurala desde Ajustes.',
                 ),
               ),
             );
@@ -481,7 +482,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
-                    'Recovery completed but the key could not be loaded.',
+                    'Recuperación completada pero no se pudo cargar la clave.',
                   ),
                 ),
               );
@@ -543,7 +544,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to decrypt: ${e.toString()}')),
+          SnackBar(content: Text('Error al descifrar: ${e.toString()}')),
         );
       }
     }
@@ -568,7 +569,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocalState) => AlertDialog(
-          title: const Text('Master Password'),
+          title: const Text('Contraseña Maestra'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -578,7 +579,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
                 obscureText: true,
                 autofocus: true,
                 decoration: const InputDecoration(
-                  labelText: 'Enter your master password',
+                  labelText: 'Ingresá tu contraseña maestra',
                 ),
               ),
               if (hint != null) ...[
@@ -588,7 +589,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
                     showHint ? Icons.visibility_off : Icons.visibility,
                     size: 16,
                   ),
-                  label: Text(showHint ? 'Hide hint' : 'Show hint'),
+                  label: Text(showHint ? 'Ocultar pista' : 'Mostrar pista'),
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
                     minimumSize: Size.zero,
@@ -608,7 +609,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
                       border: Border.all(color: Colors.amber.shade200),
                     ),
                     child: Text(
-                      'Hint: $hint',
+                      'Pista: $hint',
                       style: const TextStyle(fontSize: 13),
                     ),
                   ),
@@ -636,7 +637,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
                   }
                 },
                 child: const Text(
-                  'Forgot your master password?',
+                  '¿Olvidaste tu contraseña maestra?',
                   style: TextStyle(fontSize: 13),
                 ),
               ),
@@ -646,7 +647,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
             TextButton(
               onPressed: () =>
                   Navigator.pop(ctx, _RevealDialogResult.cancelled()),
-              child: const Text('Cancel'),
+              child: const Text('Cancelar'),
             ),
             FilledButton(
               onPressed: () {
@@ -657,7 +658,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
                   _RevealDialogResult.password(text),
                 );
               },
-              child: const Text('OK'),
+              child: const Text('Aceptar'),
             ),
           ],
         ),
@@ -674,19 +675,19 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Wrong Password'),
+        title: const Text('Contraseña Incorrecta'),
         content: const Text(
-          'The master password you entered is incorrect. '
-          'You can try again or use a backup code to recover access.',
+          'La contraseña maestra que ingresaste es incorrecta. '
+          'Podés intentar de nuevo o usar un código de respaldo para recuperar el acceso.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Try Again'),
+            child: const Text('Intentar de nuevo'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Use Backup Code'),
+            child: const Text('Usar Código de Respaldo'),
           ),
         ],
       ),

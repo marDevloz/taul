@@ -13,23 +13,22 @@ class DeleteMpDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       icon: const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 40),
-      title: const Text('Delete Master Password?'),
+      title: const Text('¿Eliminar Contraseña Maestra?'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'This will permanently delete your master password configuration '
-            'including the password hash, hint, and all backup codes.',
+            'Esto va a eliminar permanentemente tu configuración de '
+            'contraseña maestra, incluyendo el hash, la pista y todos '
+            'los códigos de respaldo.',
           ),
           const SizedBox(height: 12),
           Text(
             protectedEntryCount > 0
-                ? 'There ${_areProtected(protectedEntryCount)} '
-                    '${_protectedEntries(protectedEntryCount)} that will become '
-                    'UNRECOVERABLE.'
-                : 'There are no protected entries. You can set up a new '
-                    'master password at any time.',
+                ? _buildProtectedWarning(protectedEntryCount)
+                : 'No hay entradas protegidas. Podés configurar una '
+                    'nueva contraseña maestra en cualquier momento.',
             style: TextStyle(
               fontWeight: FontWeight.w600,
               color: protectedEntryCount > 0 ? Colors.red : Colors.orange,
@@ -44,8 +43,8 @@ class DeleteMpDialog extends StatelessWidget {
               border: Border.all(color: Colors.red.shade200),
             ),
             child: const Text(
-              'This action CANNOT be undone. If you have protected entries, '
-              'they will be permanently inaccessible.',
+              'Esta acción NO se puede deshacer. Si tenés entradas '
+              'protegidas, van a quedar permanentemente inaccesibles.',
               style: TextStyle(fontSize: 13),
             ),
           ),
@@ -54,18 +53,20 @@ class DeleteMpDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: const Text('Cancelar'),
         ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: Colors.red),
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('Delete'),
+          child: const Text('Eliminar'),
         ),
       ],
     );
   }
 
-  String _areProtected(int count) => count == 1 ? 'is' : 'are';
-  String _protectedEntries(int count) =>
-      count == 1 ? '1 protected entry' : '$count protected entries';
+  String _buildProtectedWarning(int count) {
+    return count == 1
+        ? 'Hay 1 entrada protegida que va a quedar IRRECUPERABLE.'
+        : 'Hay $count entradas protegidas que van a quedar IRRECUPERABLES.';
+  }
 }
