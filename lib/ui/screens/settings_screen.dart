@@ -47,7 +47,7 @@ class SettingsScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
         // ── Master Password Section ──
-        _sectionHeader('Contraseña Maestra'),
+        _sectionHeader(context, 'Contraseña Maestra'),
         _statusTile(context, ref, config, isConfigured),
 
         if (isConfigured) ...[
@@ -86,7 +86,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const Divider(),
           // Danger Zone
-          _sectionHeader('Zona de Peligro'),
+          _sectionHeader(context, 'Zona de Peligro'),
           _actionTile(
             context,
             icon: Icons.delete_forever,
@@ -109,15 +109,15 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _sectionHeader(String title) {
+  Widget _sectionHeader(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: Colors.grey,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
           letterSpacing: 0.5,
         ),
       ),
@@ -133,7 +133,7 @@ class SettingsScreen extends ConsumerWidget {
     return ListTile(
       leading: Icon(
         isConfigured ? Icons.check_circle : Icons.cancel,
-        color: isConfigured ? Colors.green : Colors.grey,
+        color: isConfigured ? Colors.green : Theme.of(context).colorScheme.onSurfaceVariant,
       ),
       title: Text(isConfigured ? 'Configurada' : 'No configurada'),
       subtitle: Text(
@@ -320,7 +320,7 @@ class SettingsScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(

@@ -38,9 +38,9 @@ class DeleteMpDialog extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.red.shade50,
+              color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.red.shade200),
+              border: Border.all(color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5)),
             ),
             child: const Text(
               'Esta acción NO se puede deshacer. Si tenés entradas '

@@ -171,7 +171,7 @@ class EntryDetailView extends ConsumerWidget {
                           children: [
                             Text(_labelForType(selectedType), style: const TextStyle(fontSize: 12)),
                             const SizedBox(width: 4),
-                            Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey.shade600),
+                            Icon(Icons.arrow_drop_down, size: 16, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
                           ],
                         ),
                       ),
@@ -604,9 +604,9 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
+                      color: Theme.of(context).colorScheme.tertiaryContainer,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.amber.shade200),
+                      border: Border.all(color: Theme.of(context).colorScheme.tertiary),
                     ),
                     child: Text(
                       'Pista: $hint',
@@ -721,13 +721,13 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: Colors.grey),
+            Icon(icon, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 2),
                   Text(
                     obscure ? '?' * (value.length.clamp(6, 20)) : (value.isNotEmpty ? value : '(vacío)'),
