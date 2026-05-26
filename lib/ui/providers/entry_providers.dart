@@ -140,6 +140,13 @@ final entryListProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
   return ref.watch(listEntriesProvider).call();
 });
 
+/// Lista ordenada de IDs de entradas visibles, para navegación
+/// anterior/siguiente en la pantalla de detalle.
+final entryIdListProvider = Provider.autoDispose<List<String>>((ref) {
+  final entries = ref.watch(entryListProvider).valueOrNull ?? [];
+  return entries.map((e) => e.id).toList();
+});
+
 final trashListProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
   return ref.watch(listEntriesProvider).call(includeDeleted: true).then(
     (entries) => entries.where((e) => e.isDeleted).toList(),

@@ -12,6 +12,7 @@ import 'package:flutter/services.dart'
         KeyRepeatEvent,
         LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:taul/core/constants.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
@@ -55,6 +56,10 @@ class EntryDetailView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final entryAsync = ref.watch(entryDetailProvider(entryId));
+    final entryIds = ref.watch(entryIdListProvider);
+    final currentIndex = entryIds.indexOf(entryId);
+    final hasPrevious = currentIndex > 0;
+    final hasNext = currentIndex < entryIds.length - 1;
 
     return Focus(
       autofocus: true,
@@ -80,12 +85,50 @@ class EntryDetailView extends ConsumerWidget {
           return KeyEventResult.handled;
         }
 
+        // Ctrl+Left → entrada anterior
+        if (ctrl && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+          _goToAdjacent(entryIds, currentIndex, context, -1);
+          return KeyEventResult.handled;
+        }
+
+        // Ctrl+Right → entrada siguiente
+        if (ctrl && event.logicalKey == LogicalKeyboardKey.arrowRight) {
+          _goToAdjacent(entryIds, currentIndex, context, 1);
+          return KeyEventResult.handled;
+        }
+
+        // Ctrl+Tab → siguiente, Ctrl+Shift+Tab → anterior
+        if (ctrl && event.logicalKey == LogicalKeyboardKey.tab) {
+          final shift =
+              HardwareKeyboard.instance
+                      .isLogicalKeyPressed(LogicalKeyboardKey.shiftLeft) ||
+                  HardwareKeyboard.instance
+                      .isLogicalKeyPressed(LogicalKeyboardKey.shiftRight);
+          _goToAdjacent(entryIds, currentIndex, context, shift ? -1 : 1);
+          return KeyEventResult.handled;
+        }
+
         return KeyEventResult.ignored;
       },
       child: Scaffold(
         appBar: AppBar(
           title: Text(entryAsync.valueOrNull?.type.label ?? 'Entrada'),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.chevron_left),
+              tooltip: 'Anterior',
+              onPressed: hasPrevious
+                  ? () => context.go('/entry/${entryIds[currentIndex - 1]}')
+                  : null,
+            ),
+            IconButton(
+              icon: const Icon(Icons.chevron_right),
+              tooltip: 'Siguiente',
+              onPressed: hasNext
+                  ? () => context.go('/entry/${entryIds[currentIndex + 1]}')
+                  : null,
+            ),
+            const SizedBox(width: 8),
             IconButton(
               icon: const Icon(Icons.edit),
               onPressed: () => _showEdit(context, ref),
@@ -105,6 +148,17 @@ class EntryDetailView extends ConsumerWidget {
       ),
     ),
   );
+  }
+
+  static void _goToAdjacent(
+    List<String> ids,
+    int currentIndex,
+    BuildContext context,
+    int direction,
+  ) {
+    final target = currentIndex + direction;
+    if (target < 0 || target >= ids.length) return;
+    context.go('/entry/${ids[target]}');
   }
 
   void _showEdit(BuildContext context, WidgetRef ref) {
