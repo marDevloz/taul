@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:taul/core/constants.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:go_router/go_router.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
@@ -49,13 +50,38 @@ class HomeView extends ConsumerWidget {
                   ? const Center(
                       child: Text('Todavía no hay entradas. Tocá + para crear una.'),
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      itemCount: entries.length,
-                      itemBuilder: (context, index) => EntryCard(
-                        entry: entries[index],
-                        onTap: () => _openEntry(context, entries[index].id),
-                      ),
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth;
+                        if (width < Breakpoints.mobile) {
+                          return ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            itemCount: entries.length,
+                            itemBuilder: (context, index) => EntryCard(
+                              entry: entries[index],
+                              onTap: () => _openEntry(context, entries[index].id),
+                            ),
+                          );
+                        }
+                        final crossAxisCount =
+                            width < Breakpoints.tablet ? 2 : 3;
+                        return GridView.builder(
+                          padding: const EdgeInsets.all(12),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            childAspectRatio: 1.8,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                          itemCount: entries.length,
+                          itemBuilder: (context, index) => EntryCard(
+                            entry: entries[index],
+                            isGrid: true,
+                            onTap: () => _openEntry(context, entries[index].id),
+                          ),
+                        );
+                      },
                     ),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (err, _) => Center(child: Text('Error: $err')),

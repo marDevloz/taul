@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:taul/core/constants.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
@@ -284,8 +285,10 @@ class _NoteContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+    final isWide = MediaQuery.of(context).size.width >= Breakpoints.tablet;
+
+    final body = SingleChildScrollView(
+      padding: EdgeInsets.all(isWide ? 24 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -312,6 +315,16 @@ class _NoteContent extends StatelessWidget {
         ],
       ),
     );
+
+    if (isWide) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: body,
+        ),
+      );
+    }
+    return body;
   }
 
   String _formatDate(DateTime dt) {
@@ -346,9 +359,10 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
     final username = entry.metadata['username'] ?? '';
     final url = entry.metadata['url'] ?? '';
     final displayedSecret = entry.requiresAuth ? (_revealedSecret ?? '') : (entry.secret ?? '');
+    final isWide = MediaQuery.of(context).size.width >= Breakpoints.tablet;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+    final body = SingleChildScrollView(
+      padding: EdgeInsets.all(isWide ? 24 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -410,6 +424,16 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
         ],
       ),
     );
+
+    if (isWide) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: body,
+        ),
+      );
+    }
+    return body;
   }
 
   Future<void> _revealProtectedSecret() async {
