@@ -2,6 +2,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/domain/entities/entry.dart';
@@ -292,7 +293,10 @@ class _NoteContent extends StatelessWidget {
           const SizedBox(height: 8),
           Text(entry.title, style: theme.textTheme.headlineSmall),
           const SizedBox(height: 16),
-          Text(entry.content, style: theme.textTheme.bodyLarge),
+          MarkdownBody(
+            data: entry.content,
+            selectable: true,
+          ),
           if (entry.tags.isNotEmpty) ...[
             const SizedBox(height: 16),
             Wrap(spacing: 6, children: entry.tags.map((t) => Chip(label: Text(t))).toList()),
