@@ -16,6 +16,8 @@ import 'package:taul/domain/usecases/update_entry.dart';
 import 'package:taul/infrastructure/database/app_database.dart' as db;
 import 'package:taul/infrastructure/database/entry_dao.dart';
 import 'package:taul/infrastructure/database/entry_repository_impl.dart';
+import 'package:taul/infrastructure/export/export_service.dart';
+import 'package:taul/infrastructure/export/import_service.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/screens/credential_protection_controller.dart';
@@ -88,6 +90,14 @@ final credentialProtectionControllerProvider =
 
 final entryRepositoryProvider = Provider<IEntryRepository>((ref) {
   return EntryRepositoryImpl(dao: ref.watch(daoProvider));
+});
+
+final exportServiceProvider = Provider<ExportService>((ref) {
+  return ExportService();
+});
+
+final importServiceProvider = Provider<ImportService>((ref) {
+  return ImportService(repository: ref.watch(entryRepositoryProvider));
 });
 
 // --- Use case providers ---
