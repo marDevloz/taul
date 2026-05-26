@@ -18,6 +18,38 @@ import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/screens/credential_protection_controller.dart';
 
+// --- App lock state ---
+
+enum AppLockStatus { unlocked, locked, checking }
+
+class AppLockNotifier extends StateNotifier<AppLockStatus> {
+  AppLockNotifier(this._ref) : super(AppLockStatus.checking) {
+    _checkInitialStatus();
+  }
+
+  final Ref _ref;
+
+  Future<void> _checkInitialStatus() async {
+    try {
+      final config = await _ref.read(masterPasswordStoreProvider).readFull();
+      final isConfigured = config != null &&
+          config.encryptedStorageKeyHex != null &&
+          config.encryptedStorageKeyHex!.isNotEmpty;
+      state = isConfigured ? AppLockStatus.locked : AppLockStatus.unlocked;
+    } catch (_) {
+      state = AppLockStatus.unlocked;
+    }
+  }
+
+  void unlock() => state = AppLockStatus.unlocked;
+  void lock() => state = AppLockStatus.locked;
+}
+
+final appLockProvider =
+    StateNotifierProvider<AppLockNotifier, AppLockStatus>((ref) {
+  return AppLockNotifier(ref);
+});
+
 // --- Master password key cache (volatile, in-memory) ---
 
 class MasterPasswordNotifier extends StateNotifier<Uint8List?> {

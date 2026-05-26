@@ -1,0 +1,206 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/widgets/master_password_recovery_dialog.dart';
+
+class LockScreen extends ConsumerStatefulWidget {
+  const LockScreen({super.key});
+
+  @override
+  ConsumerState<LockScreen> createState() => _LockScreenState();
+}
+
+class _LockScreenState extends ConsumerState<LockScreen> {
+  final _passwordCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _obscurePassword = true;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Scaffold(
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ── Lock icon ──
+                Icon(
+                  Icons.lock_outline_rounded,
+                  size: 72,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(height: 16),
+
+                // ── Title ──
+                Text(
+                  'Taúl',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Ingresá tu contraseña maestra para desbloquear',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+
+                // ── Password field ──
+                TextField(
+                  controller: _passwordCtrl,
+                  obscureText: _obscurePassword,
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _onUnlock(),
+                  decoration: InputDecoration(
+                    labelText: 'Contraseña maestra',
+                    prefixIcon: const Icon(Icons.key_rounded),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                    border: const OutlineInputBorder(),
+                    errorText: _error,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // ── Unlock button ──
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton.icon(
+                    onPressed: _loading ? null : _onUnlock,
+                    icon: _loading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.lock_open_rounded),
+                    label: Text(_loading ? 'Verificando...' : 'Desbloquear'),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // ── Forgot password link ──
+                TextButton(
+                  onPressed: _loading ? null : _onForgotPassword,
+                  child: const Text('¿Olvidaste tu contraseña?'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onUnlock() async {
+    final password = _passwordCtrl.text;
+    if (password.isEmpty) {
+      setState(() => _error = 'Ingresá tu contraseña maestra');
+      return;
+    }
+
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+
+    try {
+      final authService = ref.read(entryAuthServiceProvider);
+      final store = ref.read(masterPasswordStoreProvider);
+      final config = await store.readFull();
+
+      if (config == null) {
+        // No config at all — shouldn't happen if we're showing the lock screen
+        ref.read(appLockProvider.notifier).unlock();
+        return;
+      }
+
+      final salt = authService.hexToBytes(config.saltHex);
+      final isValid = await authService.verifyMasterPassword(
+        password: password,
+        salt: salt,
+        expectedHashHex: config.hashHex,
+      );
+
+      if (!isValid) {
+        setState(() {
+          _error = 'Contraseña incorrecta';
+          _loading = false;
+        });
+        return;
+      }
+
+      // Derive KEK and unwrap DEK
+      final kek = await authService.deriveMasterKey(
+        password: password,
+        salt: salt,
+      );
+
+      if (config.encryptedStorageKeyHex != null &&
+          config.encryptedStorageKeyHex!.isNotEmpty) {
+        final dek = await authService.unwrapStorageKey(
+          payload: EncryptionPayload(
+            ciphertextHex: config.encryptedStorageKeyHex!,
+            nonceHex: config.encryptedStorageKeyNonceHex ?? '',
+            tagHex: config.encryptedStorageKeyTagHex ?? '',
+          ),
+          kek: kek,
+        );
+        ref.read(masterPasswordProvider.notifier).setMasterPassword(dek);
+      } else {
+        // Pre-migration: cache the KEK directly as the master key
+        ref.read(masterPasswordProvider.notifier).setMasterPassword(kek);
+      }
+
+      if (!context.mounted) return;
+      ref.read(appLockProvider.notifier).unlock();
+    } catch (e) {
+      setState(() {
+        _error = 'Error al verificar: $e';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _onForgotPassword() async {
+    final result = await showDialog<RecoveryResult>(
+      context: context,
+      builder: (_) => const MasterPasswordRecoveryDialog(),
+    );
+
+    if (result != null && result.success && mounted) {
+      ref.read(appLockProvider.notifier).unlock();
+    }
+  }
+}
