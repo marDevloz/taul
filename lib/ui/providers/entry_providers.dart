@@ -146,11 +146,33 @@ final searchResultsProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
 
 final selectedTypeFilterProvider = StateProvider<EntryType?>((ref) => null);
 
+final selectedTopicFilterProvider = StateProvider<String?>((ref) => null);
+
+/// Todos los topicKeys únicos de entradas no eliminadas, ordenados.
+final topicsListProvider = Provider.autoDispose<List<String>>((ref) {
+  final entries = ref.watch(entryListProvider).valueOrNull ?? [];
+  final topics = entries
+      .map((e) => e.topicKey)
+      .where((t) => t != null && t.isNotEmpty)
+      .cast<String>()
+      .toSet()
+      .toList();
+  topics.sort();
+  return topics;
+});
+
 final filteredEntriesProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
   final type = ref.watch(selectedTypeFilterProvider);
+  final topicKey = ref.watch(selectedTopicFilterProvider);
   final entries = ref.watch(entryListProvider).valueOrNull ?? [];
-  if (type == null) return entries;
-  return entries.where((e) => e.type == type).toList();
+  var result = entries;
+  if (type != null) {
+    result = result.where((e) => e.type == type).toList();
+  }
+  if (topicKey != null) {
+    result = result.where((e) => e.topicKey == topicKey).toList();
+  }
+  return result;
 });
 
 // --- Full config provider for reactive UI ---

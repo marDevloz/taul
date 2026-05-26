@@ -20,6 +20,7 @@ class UpdateEntry {
     String? cipherTag,
     bool clearProtection = false,
     EntryType? type,
+    String? topicKey,
   }) async {
     final updated = existing.copyWith(
       title: title?.trim() ?? existing.title,
@@ -32,6 +33,7 @@ class UpdateEntry {
       cipherNonce: clearProtection ? null : (cipherNonce ?? existing.cipherNonce),
       cipherTag: clearProtection ? null : (cipherTag ?? existing.cipherTag),
       type: type ?? existing.type,
+      topicKey: topicKey == null ? existing.topicKey : (topicKey.isEmpty ? null : topicKey),
       updatedAt: DateTime.now(),
       version: existing.version + 1,
     );

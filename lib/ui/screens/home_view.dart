@@ -49,6 +49,8 @@ class HomeView extends ConsumerWidget {
           const TaulSearchBar(),
           const SizedBox(height: 8),
           const FilterChipsRow(),
+          const SizedBox(height: 6),
+          const TopicFilterChips(),
           const SizedBox(height: 8),
           Expanded(
             child: entriesAsync.when(

@@ -27,7 +27,7 @@ class EntryRepositoryImpl implements IEntryRepository {
     String? topicKey,
     bool includeDeleted = false,
   }) {
-    return _dao.list(type: type?.label, includeDeleted: includeDeleted);
+    return _dao.list(type: type?.label, topicKey: topicKey, includeDeleted: includeDeleted);
   }
 
   @override

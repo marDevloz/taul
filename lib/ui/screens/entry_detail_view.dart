@@ -106,6 +106,7 @@ class EntryDetailView extends ConsumerWidget {
     final titleCtrl = TextEditingController(text: entry.title);
     final contentCtrl = TextEditingController(text: entry.content);
     final tagsCtrl = TextEditingController(text: entry.tags.join(', '));
+    final topicCtrl = TextEditingController(text: entry.topicKey ?? '');
 
     showModalBottomSheet(
       context: context,
@@ -156,6 +157,15 @@ class EntryDetailView extends ConsumerWidget {
                   decoration: const InputDecoration(
                     labelText: 'Tags (opcional)',
                     hintText: 'separados por coma: dev, personal',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: topicCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Tema (opcional)',
+                    hintText: 'ej: dev, personal, finanzas',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -216,12 +226,16 @@ class EntryDetailView extends ConsumerWidget {
                                     .map((t) => t.trim())
                                     .where((t) => t.isNotEmpty)
                                     .toList();
+                                final topicText = topicCtrl.text.trim();
                                 await ref.read(updateEntryProvider).call(
                                   entry,
                                   title: titleCtrl.text,
                                   content: contentCtrl.text,
                                   tags: tags,
                                   type: selectedType,
+                                  topicKey: topicText.isEmpty
+                                      ? (entry.topicKey != null ? '' : null)
+                                      : topicText,
                                 );
                                 ref.invalidate(entryDetailProvider(entryId));
                                 ref.invalidate(entryListProvider);

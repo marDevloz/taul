@@ -45,11 +45,21 @@ class EntryCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.titleSmall,
         ),
-        subtitle: subtitle ?? Text(
-          entry.content,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodySmall,
+        subtitle: subtitle ?? Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              entry.content,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall,
+            ),
+            if (entry.topicKey != null) ...[
+              const SizedBox(height: 4),
+              _TopicLabel(entry.topicKey!),
+            ],
+          ],
         ),
         trailing: trailingAction ?? Text(
           _formatDate(entry.updatedAt),
@@ -75,15 +85,19 @@ class EntryCard extends StatelessWidget {
                 children: [
                   Icon(_typeIcon, size: 16, color: theme.colorScheme.primary),
                   const SizedBox(width: 6),
-                  Text(
-                    entry.type.label,
-                    style: theme.textTheme.labelSmall,
-                  ),
-                  const Spacer(),
-                  Text(
-                    _formatDate(entry.updatedAt),
-                    style: theme.textTheme.labelSmall,
-                  ),
+              Text(
+                entry.type.label,
+                style: theme.textTheme.labelSmall,
+              ),
+              if (entry.topicKey != null) ...[
+                const SizedBox(width: 6),
+                _TopicLabel(entry.topicKey!),
+              ],
+              const Spacer(),
+              Text(
+                _formatDate(entry.updatedAt),
+                style: theme.textTheme.labelSmall,
+              ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -113,5 +127,29 @@ class EntryCard extends StatelessWidget {
     if (diff.inMinutes < 60) return '${diff.inMinutes}m';
     if (diff.inHours < 24) return '${diff.inHours}h';
     return '${dt.day}/${dt.month}';
+  }
+}
+
+class _TopicLabel extends StatelessWidget {
+  final String topicKey;
+  const _TopicLabel(this.topicKey);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer.withAlpha(150),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        topicKey,
+        style: theme.textTheme.labelSmall?.copyWith(
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
   }
 }

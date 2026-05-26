@@ -14,6 +14,7 @@ class QuickAddSheet extends ConsumerStatefulWidget {
 
 class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   final _controller = TextEditingController();
+  final _topicCtrl = TextEditingController();
   EntryType? _detectedType;
   EntryType? _manualType;
   bool _isSaving = false;
@@ -42,6 +43,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   @override
   void dispose() {
     _controller.dispose();
+    _topicCtrl.dispose();
     super.dispose();
   }
 
@@ -86,10 +88,12 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
 
     try {
       // Le pasamos el tipo explícito para que no se pierda al sacar prefijos
+      final topicText = _topicCtrl.text.trim();
       await ref.read(createEntryProvider).call(
         title: title,
         content: content,
         type: type,
+        topicKey: topicText.isEmpty ? null : topicText,
       );
       ref.invalidate(entryListProvider);
       if (mounted) Navigator.pop(context);
@@ -223,6 +227,17 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
             ),
             maxLines: 4,
             minLines: 1,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _topicCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Tema (opcional)',
+              hintText: 'ej: dev, personal',
+              border: OutlineInputBorder(),
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
           ),
           const SizedBox(height: 12),
 

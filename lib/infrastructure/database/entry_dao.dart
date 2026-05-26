@@ -40,10 +40,13 @@ class EntryDao {
     return _fromDbEntry(row);
   }
 
-  Future<List<Entry>> list({String? type, bool includeDeleted = false}) async {
+  Future<List<Entry>> list({String? type, String? topicKey, bool includeDeleted = false}) async {
     var query = _database.select(_database.entries);
     if (type != null) {
       query = query..where((t) => t.type.equals(type));
+    }
+    if (topicKey != null) {
+      query = query..where((t) => t.topicKey.equals(topicKey));
     }
     if (!includeDeleted) {
       query = query..where((t) => t.deletedAt.isNull());
