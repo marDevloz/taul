@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
 import 'package:taul/ui/screens/entry_detail_view.dart';
 import 'package:taul/ui/screens/quick_add_sheet.dart';
+import 'package:taul/ui/widgets/empty_states.dart';
 import 'package:taul/ui/widgets/entry_card.dart';
 import 'package:taul/ui/widgets/filter_chips.dart';
 import 'package:taul/ui/widgets/search_bar_widget.dart';
@@ -47,9 +48,7 @@ class HomeView extends ConsumerWidget {
           Expanded(
             child: entriesAsync.when(
               data: (entries) => entries.isEmpty
-                  ? const Center(
-                      child: Text('Todavía no hay entradas. Tocá + para crear una.'),
-                    )
+                  ? _buildEmptyState(context, ref, searchQuery)
                   : LayoutBuilder(
                       builder: (context, constraints) {
                         final width = constraints.maxWidth;
@@ -93,6 +92,21 @@ class HomeView extends ConsumerWidget {
         onPressed: () => _showNewEntryOptions(context),
         child: const Icon(Icons.add),
       ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, WidgetRef ref, String searchQuery) {
+    if (searchQuery.isNotEmpty) {
+      return const EmptyStateSearch();
+    }
+
+    final selectedType = ref.watch(selectedTypeFilterProvider);
+    if (selectedType != null) {
+      return EmptyStateFiltered(type: selectedType);
+    }
+
+    return EmptyStateAll(
+      onCreateEntry: () => _showNewEntryOptions(context),
     );
   }
 
