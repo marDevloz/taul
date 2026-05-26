@@ -34,6 +34,11 @@ class HomeView extends ConsumerWidget {
             },
           ),
           IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Papelera',
+            onPressed: () => context.go('/trash'),
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => context.go('/settings'),
           ),

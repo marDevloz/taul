@@ -6,12 +6,16 @@ class EntryCard extends StatelessWidget {
   final Entry entry;
   final VoidCallback? onTap;
   final bool isGrid;
+  final Widget? trailingAction;
+  final Widget? subtitle;
 
   const EntryCard({
     super.key,
     required this.entry,
     this.onTap,
     this.isGrid = false,
+    this.trailingAction,
+    this.subtitle,
   });
 
   IconData get _typeIcon {
@@ -41,13 +45,13 @@ class EntryCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.titleSmall,
         ),
-        subtitle: Text(
+        subtitle: subtitle ?? Text(
           entry.content,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.bodySmall,
         ),
-        trailing: Text(
+        trailing: trailingAction ?? Text(
           _formatDate(entry.updatedAt),
           style: theme.textTheme.labelSmall,
         ),

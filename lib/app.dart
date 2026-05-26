@@ -6,6 +6,7 @@ import 'package:taul/ui/screens/home_view.dart';
 import 'package:taul/ui/screens/entry_detail_view.dart';
 import 'package:taul/ui/screens/lock_screen.dart';
 import 'package:taul/ui/screens/settings_screen.dart';
+import 'package:taul/ui/screens/trash_screen.dart';
 import 'package:taul/ui/widgets/inactivity_detector.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -26,6 +27,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         name: 'settings',
         builder: (_, __) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/trash',
+        name: 'trash',
+        builder: (_, __) => const TrashScreen(),
       ),
     ],
   );

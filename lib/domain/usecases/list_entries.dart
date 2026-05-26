@@ -7,7 +7,7 @@ class ListEntries {
 
   ListEntries({required IEntryRepository repository}) : _repository = repository;
 
-  Future<List<Entry>> call({EntryType? type, String? topicKey}) {
-    return _repository.list(type: type, topicKey: topicKey);
+  Future<List<Entry>> call({EntryType? type, String? topicKey, bool includeDeleted = false}) {
+    return _repository.list(type: type, topicKey: topicKey, includeDeleted: includeDeleted);
   }
 }

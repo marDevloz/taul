@@ -7,8 +7,10 @@ import 'package:taul/domain/repositories/i_entry_repository.dart';
 import 'package:taul/domain/services/master_password_recovery_service.dart';
 import 'package:taul/domain/usecases/create_entry.dart';
 import 'package:taul/domain/usecases/delete_entry.dart';
+import 'package:taul/domain/usecases/empty_trash.dart';
 import 'package:taul/domain/usecases/get_entry.dart';
 import 'package:taul/domain/usecases/list_entries.dart';
+import 'package:taul/domain/usecases/restore_entry.dart';
 import 'package:taul/domain/usecases/search_entries.dart';
 import 'package:taul/domain/usecases/update_entry.dart';
 import 'package:taul/infrastructure/database/app_database.dart' as db;
@@ -106,6 +108,14 @@ final deleteEntryProvider = Provider<DeleteEntry>((ref) {
   return DeleteEntry(repository: ref.watch(entryRepositoryProvider));
 });
 
+final restoreEntryProvider = Provider<RestoreEntry>((ref) {
+  return RestoreEntry(repository: ref.watch(entryRepositoryProvider));
+});
+
+final emptyTrashProvider = Provider<EmptyTrash>((ref) {
+  return EmptyTrash(repository: ref.watch(entryRepositoryProvider));
+});
+
 final listEntriesProvider = Provider<ListEntries>((ref) {
   return ListEntries(repository: ref.watch(entryRepositoryProvider));
 });
@@ -118,6 +128,12 @@ final searchEntriesProvider = Provider<SearchEntries>((ref) {
 
 final entryListProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
   return ref.watch(listEntriesProvider).call();
+});
+
+final trashListProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
+  return ref.watch(listEntriesProvider).call(includeDeleted: true).then(
+    (entries) => entries.where((e) => e.isDeleted).toList(),
+  );
 });
 
 final entrySearchProvider = StateProvider<String>((ref) => '');
