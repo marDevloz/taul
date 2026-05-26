@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
+import 'package:taul/ui/providers/auto_lock_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/screens/credential_protection_controller.dart';
 import 'package:taul/ui/screens/master_password_setup_dialog.dart';
@@ -85,6 +86,10 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _regenerateCodes(context, ref),
           ),
           const Divider(),
+          // ── Auto-lock Section ──
+          _sectionHeader(context, 'Seguridad'),
+          _autoLockTile(context, ref),
+          const Divider(),
           // Danger Zone
           _sectionHeader(context, 'Zona de Peligro'),
           _actionTile(
@@ -156,6 +161,71 @@ class SettingsScreen extends ConsumerWidget {
       title: Text(title, style: textColor != null ? TextStyle(color: textColor) : null),
       trailing: const Icon(Icons.chevron_right, size: 20),
       onTap: onTap,
+    );
+  }
+
+  // ── Auto-lock ──
+
+  static const _autoLockOptions = <(Duration, String)>[
+    (Duration.zero, 'Nunca'),
+    (Duration(minutes: 1), '1 minuto'),
+    (Duration(minutes: 5), '5 minutos'),
+    (Duration(minutes: 15), '15 minutos'),
+    (Duration(minutes: 30), '30 minutos'),
+  ];
+
+  static const _defaultAutoLock = Duration(minutes: 5);
+
+  Widget _autoLockTile(BuildContext context, WidgetRef ref) {
+    final autoLock = ref.watch(autoLockProvider);
+    final current = autoLock.duration;
+
+    return ListTile(
+      leading: const Icon(Icons.timer_outlined),
+      title: const Text('Bloqueo automático'),
+      subtitle: Text(_autoLockLabel(current)),
+      trailing: const Icon(Icons.chevron_right, size: 20),
+      onTap: () => _showAutoLockDialog(context, ref),
+    );
+  }
+
+  String _autoLockLabel(Duration d) {
+    if (d == Duration.zero) return 'Nunca';
+    final entry = _autoLockOptions.firstWhere(
+      (o) => o.$1 == d,
+      orElse: () => (_defaultAutoLock, ''),
+    );
+    return entry.$2;
+  }
+
+  Future<void> _showAutoLockDialog(BuildContext context, WidgetRef ref) async {
+    final current = ref.read(autoLockProvider).duration;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Bloqueo automático'),
+        children: [
+          RadioGroup<Duration>(
+            groupValue: current,
+            onChanged: (d) {
+              if (d == null) return;
+              ref.read(autoLockProvider.notifier).setDuration(d);
+              Navigator.pop(ctx);
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final opt in _autoLockOptions)
+                  RadioListTile<Duration>(
+                    title: Text(opt.$2),
+                    value: opt.$1,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
