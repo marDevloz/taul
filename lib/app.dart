@@ -8,6 +8,7 @@ import 'package:taul/ui/screens/lock_screen.dart';
 import 'package:taul/ui/screens/settings_screen.dart';
 import 'package:taul/ui/screens/trash_screen.dart';
 import 'package:taul/ui/widgets/inactivity_detector.dart';
+import 'package:taul/ui/widgets/keyboard_shortcuts.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -70,7 +71,9 @@ class TaulApp extends ConsumerWidget {
         if (lockStatus == AppLockStatus.locked) {
           return const LockScreen();
         }
-        return InactivityDetector(child: child!);
+        return AppKeyboardShortcuts(
+          child: InactivityDetector(child: child!),
+        );
       },
     );
   }

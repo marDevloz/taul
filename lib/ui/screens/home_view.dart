@@ -16,6 +16,13 @@ class HomeView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Listen for Ctrl+N shortcut events (fired from AppKeyboardShortcuts).
+    ref.listen<int>(createEntryEventProvider, (prev, next) {
+      if (prev != null && next != prev) {
+        _showNewEntryOptions(context);
+      }
+    });
+
     final searchQuery = ref.watch(entrySearchProvider);
     final entriesAsync = searchQuery.isEmpty
         ? ref.watch(filteredEntriesProvider)

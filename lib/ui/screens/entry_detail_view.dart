@@ -3,7 +3,14 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:flutter/services.dart'
+    show
+        Clipboard,
+        ClipboardData,
+        HardwareKeyboard,
+        KeyDownEvent,
+        KeyRepeatEvent,
+        LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/constants.dart';
 import 'package:taul/domain/entities/entry.dart';
@@ -49,28 +56,55 @@ class EntryDetailView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final entryAsync = ref.watch(entryDetailProvider(entryId));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(entryAsync.valueOrNull?.type.label ?? 'Entrada'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () => _showEdit(context, ref),
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () => _confirmDelete(context, ref),
-          ),
-        ],
-      ),
-      body: entryAsync.when(
+    return Focus(
+      autofocus: true,
+      onKeyEvent: (node, event) {
+        if (event is KeyRepeatEvent) return KeyEventResult.ignored;
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+        final ctrl =
+            HardwareKeyboard.instance
+                    .isLogicalKeyPressed(LogicalKeyboardKey.controlLeft) ||
+                HardwareKeyboard.instance
+                    .isLogicalKeyPressed(LogicalKeyboardKey.controlRight);
+
+        // Ctrl+E → editar entrada
+        if (ctrl && event.logicalKey == LogicalKeyboardKey.keyE) {
+          _showEdit(context, ref);
+          return KeyEventResult.handled;
+        }
+
+        // Delete → eliminar entrada
+        if (event.logicalKey == LogicalKeyboardKey.delete) {
+          _confirmDelete(context, ref);
+          return KeyEventResult.handled;
+        }
+
+        return KeyEventResult.ignored;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(entryAsync.valueOrNull?.type.label ?? 'Entrada'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () => _showEdit(context, ref),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () => _confirmDelete(context, ref),
+            ),
+          ],
+        ),
+        body: entryAsync.when(
         data: (entry) => entry.type == EntryType.credential
             ? _CredentialContent(entry: entry)
             : _NoteContent(entry: entry),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error: $err')),
       ),
-    );
+    ),
+  );
   }
 
   void _showEdit(BuildContext context, WidgetRef ref) {

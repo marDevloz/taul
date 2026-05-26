@@ -2,30 +2,49 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
-class TaulSearchBar extends StatefulWidget {
+class TaulSearchBar extends ConsumerStatefulWidget {
   const TaulSearchBar({super.key});
 
   @override
-  State<TaulSearchBar> createState() => _TaulSearchBarState();
+  ConsumerState<TaulSearchBar> createState() => _TaulSearchBarState();
 }
 
-class _TaulSearchBarState extends State<TaulSearchBar> {
+class _TaulSearchBarState extends ConsumerState<TaulSearchBar> {
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
   bool _isOpen = false;
 
-  ProviderContainer get _container => ProviderScope.containerOf(context);
+  @override
+  void initState() {
+    super.initState();
+    ref.listen(focusSearchProvider, (bool? prev, bool next) {
+      if (next) {
+        _openAndFocus();
+        ref.read(focusSearchProvider.notifier).state = false;
+      }
+    });
+  }
 
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  void _openAndFocus() {
+    setState(() => _isOpen = true);
+    // Post-frame because the TextField may not be laid out yet.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
   }
 
   void _open() => setState(() => _isOpen = true);
 
   void _close() {
     _controller.clear();
-    _container.read(entrySearchProvider.notifier).state = '';
+    ref.read(entrySearchProvider.notifier).state = '';
     setState(() => _isOpen = false);
   }
 
@@ -57,9 +76,10 @@ class _TaulSearchBarState extends State<TaulSearchBar> {
   Widget _buildSearchInput() {
     return TextField(
       controller: _controller,
+      focusNode: _focusNode,
       autofocus: true,
       onChanged: (value) =>
-          _container.read(entrySearchProvider.notifier).state = value,
+          ref.read(entrySearchProvider.notifier).state = value,
       decoration: InputDecoration(
         hintText: 'Buscar en Taúl...',
         prefixIcon: const Icon(Icons.search, size: 20),

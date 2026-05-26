@@ -232,3 +232,13 @@ final masterPasswordStatusProvider = FutureProvider<bool>((ref) {
 final entryDetailProvider = FutureProvider.autoDispose.family<Entry, String>((ref, id) {
   return ref.watch(getEntryProvider).call(id);
 });
+
+// --- Keyboard shortcut event providers ---
+
+/// Set to `true` to request focus on the search bar.
+/// The search bar widget resets it to `false` after focusing.
+final focusSearchProvider = StateProvider<bool>((ref) => false);
+
+/// Increment to trigger a "create new entry" event.
+/// HomeView listens to this and opens the new-entry options.
+final createEntryEventProvider = StateProvider<int>((ref) => 0);
