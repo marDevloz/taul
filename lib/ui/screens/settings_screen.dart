@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/auto_lock_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/providers/theme_provider.dart';
 import 'package:taul/ui/screens/credential_protection_controller.dart';
 import 'package:taul/ui/screens/master_password_setup_dialog.dart';
 import 'package:taul/ui/widgets/delete_mp_dialog.dart';
@@ -89,6 +90,10 @@ class SettingsScreen extends ConsumerWidget {
           // ── Auto-lock Section ──
           _sectionHeader(context, 'Seguridad'),
           _autoLockTile(context, ref),
+          const Divider(),
+          // ── Tema Section ──
+          _sectionHeader(context, 'Tema'),
+          _themeTile(context, ref),
           const Divider(),
           // ── Data Section ──
           _sectionHeader(context, 'Datos'),
@@ -236,6 +241,71 @@ class SettingsScreen extends ConsumerWidget {
                     title: Text(opt.$2),
                     value: opt.$1,
                   ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Theme ──
+
+  static const _themeLabels = <ThemeMode, String>{
+    ThemeMode.system: 'Sistema',
+    ThemeMode.dark: 'Oscuro',
+    ThemeMode.light: 'Claro',
+  };
+
+  Widget _themeTile(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(themeModeProvider);
+
+    return ListTile(
+      leading: const Icon(Icons.dark_mode_outlined),
+      title: const Text('Tema'),
+      subtitle: Text(_themeLabels[current] ?? 'Sistema'),
+      trailing: const Icon(Icons.chevron_right, size: 20),
+      onTap: () => _showThemeDialog(context, ref),
+    );
+  }
+
+  Future<void> _showThemeDialog(BuildContext context, WidgetRef ref) async {
+    final current = ref.read(themeModeProvider);
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Tema'),
+        children: [
+          RadioGroup<ThemeMode>(
+            groupValue: current,
+            onChanged: (mode) {
+              if (mode == null) return;
+              switch (mode) {
+                case ThemeMode.system:
+                  ref.read(themeModeProvider.notifier).setSystem();
+                case ThemeMode.dark:
+                  ref.read(themeModeProvider.notifier).setDark();
+                case ThemeMode.light:
+                  ref.read(themeModeProvider.notifier).setLight();
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RadioListTile<ThemeMode>(
+                  title: Text('Sistema'),
+                  value: ThemeMode.system,
+                ),
+                RadioListTile<ThemeMode>(
+                  title: Text('Oscuro'),
+                  value: ThemeMode.dark,
+                ),
+                RadioListTile<ThemeMode>(
+                  title: Text('Claro'),
+                  value: ThemeMode.light,
+                ),
               ],
             ),
           ),

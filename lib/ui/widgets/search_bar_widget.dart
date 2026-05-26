@@ -17,11 +17,13 @@ class _TaulSearchBarState extends ConsumerState<TaulSearchBar> {
   @override
   void initState() {
     super.initState();
-    ref.listen(focusSearchProvider, (bool? prev, bool next) {
-      if (next) {
-        _openAndFocus();
-        ref.read(focusSearchProvider.notifier).state = false;
-      }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.listen(focusSearchProvider, (bool? prev, bool next) {
+        if (next) {
+          _openAndFocus();
+          ref.read(focusSearchProvider.notifier).state = false;
+        }
+      });
     });
   }
 

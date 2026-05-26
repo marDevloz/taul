@@ -27,7 +27,7 @@ class _InactivityDetectorState extends ConsumerState<InactivityDetector>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _syncWithLockState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncWithLockState());
   }
 
   @override

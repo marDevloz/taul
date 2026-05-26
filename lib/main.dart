@@ -6,22 +6,27 @@ import 'package:system_tray/system_tray.dart';
 import 'package:taul/app.dart';
 import 'package:window_manager/window_manager.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Desktop tray (fire-and-forget — non-blocking for startup)
+  // Desktop tray — async init before app starts
   if (Platform.isWindows) {
-    _initDesktopTray();
+    await _initDesktopTray();
   }
 
   runApp(const ProviderScope(child: TaulApp()));
 }
 
-/// Async desktop tray setup. Runs in background so main() stays sync.
+/// Desktop tray setup. Gracefully falls back if tray isn't available.
 Future<void> _initDesktopTray() async {
-  await windowManager.ensureInitialized();
-  await windowManager.setPreventClose(true);
-  _initSystemTray();
+  try {
+    await windowManager.ensureInitialized();
+    await windowManager.setPreventClose(true);
+    await _initSystemTray();
+  } catch (e) {
+    // System tray no disponible — la app funciona igual
+    // System tray no disponible — la app funciona igual
+  }
 }
 
 // ---------------------------------------------------------------------------
