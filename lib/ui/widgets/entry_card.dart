@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:taul/core/credential_parser.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 
@@ -27,6 +28,13 @@ class EntryCard extends StatelessWidget {
     };
   }
 
+  String get _displayContent {
+    if (entry.type == EntryType.credential && entry.metadata.containsKey('username')) {
+      return CredentialParser.maskUsername(entry.metadata['username']!);
+    }
+    return entry.content;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -50,15 +58,11 @@ class EntryCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              entry.content,
+              _displayContent,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall,
             ),
-            if (entry.topicKey != null) ...[
-              const SizedBox(height: 4),
-              _TopicLabel(entry.topicKey!),
-            ],
           ],
         ),
         trailing: trailingAction ?? Text(
@@ -89,10 +93,6 @@ class EntryCard extends StatelessWidget {
                 entry.type.label,
                 style: theme.textTheme.labelSmall,
               ),
-              if (entry.topicKey != null) ...[
-                const SizedBox(width: 6),
-                _TopicLabel(entry.topicKey!),
-              ],
               const Spacer(),
               Text(
                 _formatDate(entry.updatedAt),
@@ -109,7 +109,7 @@ class EntryCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                entry.content,
+                _displayContent,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall,
@@ -130,26 +130,3 @@ class EntryCard extends StatelessWidget {
   }
 }
 
-class _TopicLabel extends StatelessWidget {
-  final String topicKey;
-  const _TopicLabel(this.topicKey);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer.withAlpha(150),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        topicKey,
-        style: theme.textTheme.labelSmall?.copyWith(
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-}

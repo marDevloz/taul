@@ -24,10 +24,9 @@ class EntryRepositoryImpl implements IEntryRepository {
   @override
   Future<List<Entry>> list({
     EntryType? type,
-    String? topicKey,
     bool includeDeleted = false,
   }) {
-    return _dao.list(type: type?.label, topicKey: topicKey, includeDeleted: includeDeleted);
+    return _dao.list(type: type?.label, includeDeleted: includeDeleted);
   }
 
   @override

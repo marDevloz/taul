@@ -6,7 +6,6 @@ abstract class IEntryRepository {
   Future<Entry> getById(String id);
   Future<List<Entry>> list({
     EntryType? type,
-    String? topicKey,
     bool includeDeleted = false,
   });
   Future<List<Entry>> search(String query, {int limit = 100});

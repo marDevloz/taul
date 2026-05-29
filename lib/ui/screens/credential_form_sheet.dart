@@ -21,7 +21,6 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
   final _passwordCtrl = TextEditingController();
   final _urlCtrl = TextEditingController();
   final _tagsCtrl = TextEditingController();
-  final _topicCtrl = TextEditingController();
   bool _isSaving = false;
   bool _showPassword = false;
   bool _protectEntry = false;
@@ -38,7 +37,6 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
       _passwordCtrl.text = entry.requiresAuth ? '' : (entry.secret ?? '');
       _urlCtrl.text = entry.metadata['url'] ?? '';
       _tagsCtrl.text = entry.tags.join(', ');
-      _topicCtrl.text = entry.topicKey ?? '';
       _protectEntry = entry.requiresAuth;
     }
   }
@@ -50,7 +48,6 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
     _passwordCtrl.dispose();
     _urlCtrl.dispose();
     _tagsCtrl.dispose();
-    _topicCtrl.dispose();
     super.dispose();
   }
 
@@ -95,7 +92,6 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
         return;
       }
 
-      final topicText = _topicCtrl.text.trim();
       if (_isEditing) {
         final entry = widget.entry!;
         await ref.read(updateEntryProvider).call(
@@ -108,9 +104,6 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
           cipherTag: protection.cipherTag,
           clearProtection: protection.clearProtection,
           tags: tags,
-          topicKey: topicText.isEmpty
-              ? (entry.topicKey != null ? '' : null)
-              : topicText,
           metadata: {
             if (username.isNotEmpty) 'username': username,
             if (url.isNotEmpty) 'url': url,
@@ -128,7 +121,6 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
           cipherNonce: protection.cipherNonce,
           cipherTag: protection.cipherTag,
           tags: tags,
-          topicKey: topicText.isEmpty ? null : topicText,
           metadata: {
             if (username.isNotEmpty) 'username': username,
             if (url.isNotEmpty) 'url': url,
@@ -236,16 +228,6 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
                 hintText: 'separados por coma: dev, personal',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.label, size: 20),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _topicCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Tema (opcional)',
-                hintText: 'ej: dev, personal, finanzas',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.topic, size: 20),
               ),
             ),
             const SizedBox(height: 20),

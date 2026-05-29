@@ -19,6 +19,7 @@ import 'package:taul/infrastructure/database/entry_repository_impl.dart';
 import 'package:taul/infrastructure/export/export_service.dart';
 import 'package:taul/infrastructure/export/import_service.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/screens/credential_protection_controller.dart';
 
@@ -39,7 +40,11 @@ class AppLockNotifier extends StateNotifier<AppLockStatus> {
       final isConfigured = config != null &&
           config.encryptedStorageKeyHex != null &&
           config.encryptedStorageKeyHex!.isNotEmpty;
-      state = isConfigured ? AppLockStatus.locked : AppLockStatus.unlocked;
+
+      final prefs = await SharedPreferences.getInstance();
+      final appLockEnabled = prefs.getBool('app_lock_enabled') ?? false;
+
+      state = (isConfigured && appLockEnabled) ? AppLockStatus.locked : AppLockStatus.unlocked;
     } catch (_) {
       state = AppLockStatus.unlocked;
     }
@@ -52,6 +57,28 @@ class AppLockNotifier extends StateNotifier<AppLockStatus> {
 final appLockProvider =
     StateNotifierProvider<AppLockNotifier, AppLockStatus>((ref) {
   return AppLockNotifier(ref);
+});
+
+/// Toggle for the optional general lock on startup.
+class AppLockEnabledNotifier extends StateNotifier<bool> {
+  AppLockEnabledNotifier() : super(false);
+
+  Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getBool('app_lock_enabled') ?? false;
+  }
+
+  Future<void> setEnabled(bool value) async {
+    state = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('app_lock_enabled', value);
+  }
+}
+
+final appLockEnabledProvider = StateNotifierProvider<AppLockEnabledNotifier, bool>((ref) {
+  final notifier = AppLockEnabledNotifier();
+  notifier.load();
+  return notifier;
 });
 
 // --- Master password key cache (volatile, in-memory) ---
@@ -163,31 +190,12 @@ final searchResultsProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
 
 final selectedTypeFilterProvider = StateProvider<EntryType?>((ref) => null);
 
-final selectedTopicFilterProvider = StateProvider<String?>((ref) => null);
-
-/// Todos los topicKeys únicos de entradas no eliminadas, ordenados.
-final topicsListProvider = Provider.autoDispose<List<String>>((ref) {
-  final entries = ref.watch(entryListProvider).valueOrNull ?? [];
-  final topics = entries
-      .map((e) => e.topicKey)
-      .where((t) => t != null && t.isNotEmpty)
-      .cast<String>()
-      .toSet()
-      .toList();
-  topics.sort();
-  return topics;
-});
-
 final filteredEntriesProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
   final type = ref.watch(selectedTypeFilterProvider);
-  final topicKey = ref.watch(selectedTopicFilterProvider);
   final entries = ref.watch(entryListProvider).valueOrNull ?? [];
   var result = entries;
   if (type != null) {
     result = result.where((e) => e.type == type).toList();
-  }
-  if (topicKey != null) {
-    result = result.where((e) => e.topicKey == topicKey).toList();
   }
   return result;
 });
@@ -240,11 +248,18 @@ final entryDetailProvider = FutureProvider.autoDispose.family<Entry, String>((re
   return ref.watch(getEntryProvider).call(id);
 });
 
-// --- Keyboard shortcut event providers ---
+// --- Search bar state ---
+
+/// Tracks whether the search input is visible.
+/// The icon sits in AppBar.actions; when tapped, this becomes `true`
+/// and the TextField appears below.
+final isSearchOpenProvider = StateProvider<bool>((ref) => false);
 
 /// Set to `true` to request focus on the search bar.
 /// The search bar widget resets it to `false` after focusing.
 final focusSearchProvider = StateProvider<bool>((ref) => false);
+
+// --- Keyboard shortcut event providers ---
 
 /// Increment to trigger a "create new entry" event.
 /// HomeView listens to this and opens the new-entry options.

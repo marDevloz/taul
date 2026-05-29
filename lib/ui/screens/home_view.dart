@@ -30,8 +30,24 @@ class HomeView extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Taúl'),
+        title: GestureDetector(
+          onTap: () => _showShortcuts(context),
+          child: const Text('Taúl'),
+        ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: 'Buscar',
+            onPressed: () {
+              final isOpen = ref.read(isSearchOpenProvider);
+              if (isOpen) {
+                ref.read(entrySearchProvider.notifier).state = '';
+                ref.read(isSearchOpenProvider.notifier).state = false;
+              } else {
+                ref.read(isSearchOpenProvider.notifier).state = true;
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.sync),
             onPressed: () {
@@ -43,7 +59,7 @@ class HomeView extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.delete_outline),
             tooltip: 'Papelera',
-            onPressed: () => context.go('/trash'),
+            onPressed: () => context.push('/trash'),
           ),
           IconButton(
             icon: const Icon(Icons.settings),
@@ -54,10 +70,7 @@ class HomeView extends ConsumerWidget {
       body: Column(
         children: [
           const TaulSearchBar(),
-          const SizedBox(height: 8),
           const FilterChipsRow(),
-          const SizedBox(height: 6),
-          const TopicFilterChips(),
           const SizedBox(height: 8),
           Expanded(
             child: entriesAsync.when(
@@ -180,6 +193,99 @@ class HomeView extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       builder: (_) => const CredentialFormSheet(),
+    );
+  }
+
+  void _showShortcuts(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const _ShortcutsSheet(),
+    );
+  }
+}
+
+class _ShortcutsSheet extends StatelessWidget {
+  const _ShortcutsSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final shortcuts = [
+      ('Ctrl + N', 'Nueva entrada'),
+      ('Ctrl + F', 'Buscar'),
+      ('Ctrl + ,', 'Configuración'),
+      ('Ctrl + Shift + T', 'Papelera'),
+      ('Esc', 'Volver al inicio'),
+    ];
+
+    final typeHints = [
+      ('Texto común', 'Escribí directo'),
+      ('!  algo', 'Idea (empieza con !)'),
+      ('término: def', 'Glosario (tiene :)'),
+      ('*usuario,*pass', 'Credencial (tiene *)'),
+      ('#tag', 'Tags en cualquier tipo'),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.keyboard, size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text('Atajos de teclado', style: theme.textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text('Generales', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
+            const SizedBox(height: 8),
+            ...shortcuts.map((s) => _ShortcutRow(keyCombo: s.$1, description: s.$2)),
+            const SizedBox(height: 16),
+            Text('Escritura rápida', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
+            const SizedBox(height: 8),
+            ...typeHints.map((s) => _ShortcutRow(keyCombo: s.$1, description: s.$2)),
+            const SizedBox(height: 12),
+            Text(
+              'Tocá Taúl de nuevo para cerrar',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShortcutRow extends StatelessWidget {
+  final String keyCombo;
+  final String description;
+
+  const _ShortcutRow({required this.keyCombo, required this.description});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(keyCombo, style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
+          ),
+          const SizedBox(width: 12),
+          Flexible(child: Text(description, style: theme.textTheme.bodyMedium)),
+        ],
+      ),
     );
   }
 }
