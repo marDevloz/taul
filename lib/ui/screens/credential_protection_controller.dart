@@ -163,23 +163,16 @@ class CredentialProtectionController {
         config.encryptedStorageKeyHex != null &&
         config.encryptedStorageKeyHex!.isNotEmpty) {
       if (!context.mounted) return null;
-      final password = await _askForPassword(context);
-      if (password == null) return null;
 
       final salt = _authService.hexToBytes(config.saltHex);
-      final isValid = await _authService.verifyMasterPassword(
-        password: password,
-        salt: salt,
-        expectedHashHex: config.hashHex,
-      );
-      if (!isValid) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Master password inválida')),
-          );
-        }
-        return null;
-      }
+      final password = await _askForPassword(context, verify: (pwd) async {
+        return _authService.verifyMasterPassword(
+          password: pwd,
+          salt: salt,
+          expectedHashHex: config.hashHex,
+        );
+      });
+      if (password == null) return null;
 
       // Derive KEK and unwrap DEK
       final kek = await _authService.deriveMasterKey(password: password, salt: salt);
@@ -198,23 +191,16 @@ class CredentialProtectionController {
     // ─── Case 2: Config exists but no KEK/DEK (pre-migration) ──────────
     if (config != null) {
       if (!context.mounted) return null;
-      final password = await _askForPassword(context);
-      if (password == null) return null;
 
       final salt = _authService.hexToBytes(config.saltHex);
-      final isValid = await _authService.verifyMasterPassword(
-        password: password,
-        salt: salt,
-        expectedHashHex: config.hashHex,
-      );
-      if (!isValid) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Master password inválida')),
-          );
-        }
-        return null;
-      }
+      final password = await _askForPassword(context, verify: (pwd) async {
+        return _authService.verifyMasterPassword(
+          password: pwd,
+          salt: salt,
+          expectedHashHex: config.hashHex,
+        );
+      });
+      if (password == null) return null;
       final key = await _authService.deriveMasterKey(password: password, salt: salt);
       _masterPasswordNotifier?.setMasterPassword(key);
       return key;
@@ -286,9 +272,6 @@ class CredentialProtectionController {
       return cached;
     }
 
-    final password = await _askForPassword(context);
-    if (password == null) throw const UserCancelledException();
-
     final config = await _passwordStore.readFull();
     if (config == null ||
         config.encryptedStorageKeyHex == null ||
@@ -297,14 +280,14 @@ class CredentialProtectionController {
     }
 
     final salt = _authService.hexToBytes(config.saltHex);
-    final isValid = await _authService.verifyMasterPassword(
-      password: password,
-      salt: salt,
-      expectedHashHex: config.hashHex,
-    );
-    if (!isValid) {
-      throw Exception('Master password inválida');
-    }
+    final password = await _askForPassword(context, verify: (pwd) async {
+      return _authService.verifyMasterPassword(
+        password: pwd,
+        salt: salt,
+        expectedHashHex: config.hashHex,
+      );
+    });
+    if (password == null) throw const UserCancelledException();
 
     final kek = await _authService.deriveMasterKey(
       password: password,
@@ -329,29 +312,120 @@ class CredentialProtectionController {
     _cachedDek = null;
   }
 
-  Future<String?> _askForPassword(BuildContext context) async {
+  /// Shows a dialog that prompts for the master password.
+  ///
+  /// The [verify] callback is called with the entered password.
+  /// If it returns `false`, the dialog stays open and shows an inline error
+  /// so the user can retry. If it returns `true`, the dialog closes with the
+  /// verified password.
+  ///
+  /// Returns `null` if the user cancels.
+  Future<String?> _askForPassword(
+    BuildContext context, {
+    required Future<bool> Function(String password) verify,
+  }) async {
     final ctrl = TextEditingController();
+    String? error;
+    var obscurePassword = true;
+    var loading = false;
+
     final value = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Master password'),
-        content: TextField(
-          controller: ctrl,
-          obscureText: true,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Ingresá tu master password'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text),
-            child: const Text('Aceptar'),
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocalState) => AlertDialog(
+          title: const Text('Master password'),
+          content: TextField(
+            controller: ctrl,
+            obscureText: obscurePassword,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            onSubmitted: loading ? null : (_) async {
+              final password = ctrl.text;
+              if (password.isEmpty) {
+                setLocalState(() => error = 'Ingresá tu contraseña');
+                return;
+              }
+              setLocalState(() {
+                loading = true;
+                error = null;
+              });
+              try {
+                final isValid = await verify(password);
+                if (isValid) {
+                  Navigator.pop(ctx, password);
+                } else {
+                  setLocalState(() {
+                    loading = false;
+                    error = 'Contraseña incorrecta';
+                  });
+                }
+              } catch (_) {
+                setLocalState(() {
+                  loading = false;
+                  error = 'Error al verificar';
+                });
+              }
+            },
+            decoration: InputDecoration(
+              labelText: 'Ingresá tu master password',
+              errorText: error,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  obscurePassword
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
+                ),
+                onPressed: () =>
+                    setLocalState(() => obscurePassword = !obscurePassword),
+              ),
+            ),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: loading ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: loading ? null : () async {
+                final password = ctrl.text;
+                if (password.isEmpty) {
+                  setLocalState(() => error = 'Ingresá tu contraseña');
+                  return;
+                }
+                setLocalState(() {
+                  loading = true;
+                  error = null;
+                });
+                try {
+                  final isValid = await verify(password);
+                  if (isValid) {
+                    Navigator.pop(ctx, password);
+                  } else {
+                    setLocalState(() {
+                      loading = false;
+                      error = 'Contraseña incorrecta';
+                    });
+                  }
+                } catch (_) {
+                  setLocalState(() {
+                    loading = false;
+                    error = 'Error al verificar';
+                  });
+                }
+              },
+              child: loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Aceptar'),
+            ),
+          ],
+        ),
       ),
     );
-    ctrl.dispose();
-    if (value == null || value.trim().isEmpty) return null;
     return value;
   }
 
@@ -431,9 +505,6 @@ class CredentialProtectionController {
         ),
       ),
     );
-    passwordCtrl.dispose();
-    confirmCtrl.dispose();
-    hintCtrl.dispose();
     return result;
   }
 
@@ -463,7 +534,7 @@ class CredentialProtectionController {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(

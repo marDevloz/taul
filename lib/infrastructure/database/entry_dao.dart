@@ -110,7 +110,6 @@ class EntryDao {
       content: Value(entry.content),
       metadata: Value(jsonEncode(entry.metadata)),
       tags: Value(jsonEncode(entry.tags)),
-      topicKey: Value(entry.topicKey),
       secret: Value(entry.secret),
       requiresAuth: Value(entry.requiresAuth),
       encryptedSecret: Value(entry.encryptedSecret),
@@ -131,7 +130,6 @@ class EntryDao {
       'content': row.content,
       'metadata': row.metadata,
       'tags': row.tags,
-      'topicKey': row.topicKey,
       'secret': row.secret,
       'requiresAuth': row.requiresAuth,
       'encryptedSecret': row.encryptedSecret,
@@ -189,7 +187,6 @@ class EntryDao {
           ? Map<String, String>.from(jsonDecode(metadataRaw) as Map)
           : {},
       tags: tagsRaw != null ? List<String>.from(jsonDecode(tagsRaw) as List) : [],
-      topicKey: _val<String>(data, 'topicKey', 'topic_key'),
       secret: _val<String>(data, 'secret', 'secret'),
       requiresAuth: _bool(data, 'requiresAuth', 'requires_auth'),
       encryptedSecret: _val<String>(data, 'encryptedSecret', 'encrypted_secret'),

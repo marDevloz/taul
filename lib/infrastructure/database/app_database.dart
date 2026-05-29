@@ -21,7 +21,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.custom(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -63,6 +63,9 @@ class AppDatabase extends _$AppDatabase {
             await customInsert(
               'ALTER TABLE master_password_config ADD COLUMN backup_code_data TEXT',
             );
+          }
+          if (from < 5) {
+            await customInsert('ALTER TABLE entries DROP COLUMN topic_key');
           }
         },
         beforeOpen: (_) async {

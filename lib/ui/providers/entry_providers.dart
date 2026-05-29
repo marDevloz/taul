@@ -7,16 +7,79 @@ import 'package:taul/domain/repositories/i_entry_repository.dart';
 import 'package:taul/domain/services/master_password_recovery_service.dart';
 import 'package:taul/domain/usecases/create_entry.dart';
 import 'package:taul/domain/usecases/delete_entry.dart';
+import 'package:taul/domain/usecases/empty_trash.dart';
 import 'package:taul/domain/usecases/get_entry.dart';
 import 'package:taul/domain/usecases/list_entries.dart';
+import 'package:taul/domain/usecases/restore_entry.dart';
 import 'package:taul/domain/usecases/search_entries.dart';
 import 'package:taul/domain/usecases/update_entry.dart';
 import 'package:taul/infrastructure/database/app_database.dart' as db;
 import 'package:taul/infrastructure/database/entry_dao.dart';
 import 'package:taul/infrastructure/database/entry_repository_impl.dart';
+import 'package:taul/infrastructure/export/export_service.dart';
+import 'package:taul/infrastructure/export/import_service.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/screens/credential_protection_controller.dart';
+
+// --- App lock state ---
+
+enum AppLockStatus { unlocked, locked, checking }
+
+class AppLockNotifier extends StateNotifier<AppLockStatus> {
+  AppLockNotifier(this._ref) : super(AppLockStatus.checking) {
+    _checkInitialStatus();
+  }
+
+  final Ref _ref;
+
+  Future<void> _checkInitialStatus() async {
+    try {
+      final config = await _ref.read(masterPasswordStoreProvider).readFull();
+      final isConfigured = config != null &&
+          config.encryptedStorageKeyHex != null &&
+          config.encryptedStorageKeyHex!.isNotEmpty;
+
+      final prefs = await SharedPreferences.getInstance();
+      final appLockEnabled = prefs.getBool('app_lock_enabled') ?? false;
+
+      state = (isConfigured && appLockEnabled) ? AppLockStatus.locked : AppLockStatus.unlocked;
+    } catch (_) {
+      state = AppLockStatus.unlocked;
+    }
+  }
+
+  void unlock() => state = AppLockStatus.unlocked;
+  void lock() => state = AppLockStatus.locked;
+}
+
+final appLockProvider =
+    StateNotifierProvider<AppLockNotifier, AppLockStatus>((ref) {
+  return AppLockNotifier(ref);
+});
+
+/// Toggle for the optional general lock on startup.
+class AppLockEnabledNotifier extends StateNotifier<bool> {
+  AppLockEnabledNotifier() : super(false);
+
+  Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getBool('app_lock_enabled') ?? false;
+  }
+
+  Future<void> setEnabled(bool value) async {
+    state = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('app_lock_enabled', value);
+  }
+}
+
+final appLockEnabledProvider = StateNotifierProvider<AppLockEnabledNotifier, bool>((ref) {
+  final notifier = AppLockEnabledNotifier();
+  notifier.load();
+  return notifier;
+});
 
 // --- Master password key cache (volatile, in-memory) ---
 
@@ -56,6 +119,14 @@ final entryRepositoryProvider = Provider<IEntryRepository>((ref) {
   return EntryRepositoryImpl(dao: ref.watch(daoProvider));
 });
 
+final exportServiceProvider = Provider<ExportService>((ref) {
+  return ExportService();
+});
+
+final importServiceProvider = Provider<ImportService>((ref) {
+  return ImportService(repository: ref.watch(entryRepositoryProvider));
+});
+
 // --- Use case providers ---
 
 final createEntryProvider = Provider<CreateEntry>((ref) {
@@ -74,6 +145,14 @@ final deleteEntryProvider = Provider<DeleteEntry>((ref) {
   return DeleteEntry(repository: ref.watch(entryRepositoryProvider));
 });
 
+final restoreEntryProvider = Provider<RestoreEntry>((ref) {
+  return RestoreEntry(repository: ref.watch(entryRepositoryProvider));
+});
+
+final emptyTrashProvider = Provider<EmptyTrash>((ref) {
+  return EmptyTrash(repository: ref.watch(entryRepositoryProvider));
+});
+
 final listEntriesProvider = Provider<ListEntries>((ref) {
   return ListEntries(repository: ref.watch(entryRepositoryProvider));
 });
@@ -86,6 +165,19 @@ final searchEntriesProvider = Provider<SearchEntries>((ref) {
 
 final entryListProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
   return ref.watch(listEntriesProvider).call();
+});
+
+/// Lista ordenada de IDs de entradas visibles, para navegación
+/// anterior/siguiente en la pantalla de detalle.
+final entryIdListProvider = Provider.autoDispose<List<String>>((ref) {
+  final entries = ref.watch(entryListProvider).valueOrNull ?? [];
+  return entries.map((e) => e.id).toList();
+});
+
+final trashListProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
+  return ref.watch(listEntriesProvider).call(includeDeleted: true).then(
+    (entries) => entries.where((e) => e.isDeleted).toList(),
+  );
 });
 
 final entrySearchProvider = StateProvider<String>((ref) => '');
@@ -101,8 +193,11 @@ final selectedTypeFilterProvider = StateProvider<EntryType?>((ref) => null);
 final filteredEntriesProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
   final type = ref.watch(selectedTypeFilterProvider);
   final entries = ref.watch(entryListProvider).valueOrNull ?? [];
-  if (type == null) return entries;
-  return entries.where((e) => e.type == type).toList();
+  var result = entries;
+  if (type != null) {
+    result = result.where((e) => e.type == type).toList();
+  }
+  return result;
 });
 
 // --- Full config provider for reactive UI ---
@@ -152,3 +247,20 @@ final masterPasswordStatusProvider = FutureProvider<bool>((ref) {
 final entryDetailProvider = FutureProvider.autoDispose.family<Entry, String>((ref, id) {
   return ref.watch(getEntryProvider).call(id);
 });
+
+// --- Search bar state ---
+
+/// Tracks whether the search input is visible.
+/// The icon sits in AppBar.actions; when tapped, this becomes `true`
+/// and the TextField appears below.
+final isSearchOpenProvider = StateProvider<bool>((ref) => false);
+
+/// Set to `true` to request focus on the search bar.
+/// The search bar widget resets it to `false` after focusing.
+final focusSearchProvider = StateProvider<bool>((ref) => false);
+
+// --- Keyboard shortcut event providers ---
+
+/// Increment to trigger a "create new entry" event.
+/// HomeView listens to this and opens the new-entry options.
+final createEntryEventProvider = StateProvider<int>((ref) => 0);

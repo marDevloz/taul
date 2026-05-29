@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
+import 'package:taul/ui/providers/auto_lock_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/providers/theme_provider.dart';
 import 'package:taul/ui/screens/credential_protection_controller.dart';
 import 'package:taul/ui/screens/master_password_setup_dialog.dart';
 import 'package:taul/ui/widgets/delete_mp_dialog.dart';
@@ -47,7 +49,7 @@ class SettingsScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
         // ── Master Password Section ──
-        _sectionHeader('Contraseña Maestra'),
+        _sectionHeader(context, 'Contraseña Maestra'),
         _statusTile(context, ref, config, isConfigured),
 
         if (isConfigured) ...[
@@ -85,8 +87,32 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _regenerateCodes(context, ref),
           ),
           const Divider(),
+          // ── Auto-lock Section ──
+          _sectionHeader(context, 'Seguridad'),
+          _appLockToggle(context, ref),
+          _autoLockTile(context, ref),
+          const Divider(),
+          // ── Tema Section ──
+          _sectionHeader(context, 'Tema'),
+          _themeTile(context, ref),
+          const Divider(),
+          // ── Data Section ──
+          _sectionHeader(context, 'Datos'),
+          _actionTile(
+            context,
+            icon: Icons.file_download,
+            title: 'Exportar datos',
+            onTap: () => _exportData(context, ref),
+          ),
+          _actionTile(
+            context,
+            icon: Icons.file_upload,
+            title: 'Importar datos',
+            onTap: () => _importData(context, ref),
+          ),
+          const Divider(),
           // Danger Zone
-          _sectionHeader('Zona de Peligro'),
+          _sectionHeader(context, 'Zona de Peligro'),
           _actionTile(
             context,
             icon: Icons.delete_forever,
@@ -109,15 +135,15 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _sectionHeader(String title) {
+  Widget _sectionHeader(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: Colors.grey,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
           letterSpacing: 0.5,
         ),
       ),
@@ -133,7 +159,7 @@ class SettingsScreen extends ConsumerWidget {
     return ListTile(
       leading: Icon(
         isConfigured ? Icons.check_circle : Icons.cancel,
-        color: isConfigured ? Colors.green : Colors.grey,
+        color: isConfigured ? Colors.green : Theme.of(context).colorScheme.onSurfaceVariant,
       ),
       title: Text(isConfigured ? 'Configurada' : 'No configurada'),
       subtitle: Text(
@@ -156,6 +182,159 @@ class SettingsScreen extends ConsumerWidget {
       title: Text(title, style: textColor != null ? TextStyle(color: textColor) : null),
       trailing: const Icon(Icons.chevron_right, size: 20),
       onTap: onTap,
+    );
+  }
+
+  // ── App Lock Toggle ──
+
+  Widget _appLockToggle(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(appLockEnabledProvider);
+
+    return SwitchListTile(
+      secondary: const Icon(Icons.lock_outline),
+      title: const Text('Bloqueo general'),
+      subtitle: Text(enabled ? 'Pedir contraseña al iniciar' : 'Sin bloqueo al iniciar'),
+      value: enabled,
+      onChanged: (value) async {
+        await ref.read(appLockEnabledProvider.notifier).setEnabled(value);
+        if (value) {
+          // If turning ON and MP is configured, lock immediately
+          ref.read(appLockProvider.notifier).lock();
+        } else {
+          // If turning OFF, unlock immediately
+          ref.read(appLockProvider.notifier).unlock();
+        }
+      },
+    );
+  }
+
+  // ── Auto-lock ──
+
+  static const _autoLockOptions = <(Duration, String)>[
+    (Duration.zero, 'Nunca'),
+    (Duration(minutes: 1), '1 minuto'),
+    (Duration(minutes: 5), '5 minutos'),
+    (Duration(minutes: 15), '15 minutos'),
+    (Duration(minutes: 30), '30 minutos'),
+  ];
+
+  static const _defaultAutoLock = Duration(minutes: 5);
+
+  Widget _autoLockTile(BuildContext context, WidgetRef ref) {
+    final autoLock = ref.watch(autoLockProvider);
+    final current = autoLock.duration;
+
+    return ListTile(
+      leading: const Icon(Icons.timer_outlined),
+      title: const Text('Bloqueo automático'),
+      subtitle: Text(_autoLockLabel(current)),
+      trailing: const Icon(Icons.chevron_right, size: 20),
+      onTap: () => _showAutoLockDialog(context, ref),
+    );
+  }
+
+  String _autoLockLabel(Duration d) {
+    if (d == Duration.zero) return 'Nunca';
+    final entry = _autoLockOptions.firstWhere(
+      (o) => o.$1 == d,
+      orElse: () => (_defaultAutoLock, ''),
+    );
+    return entry.$2;
+  }
+
+  Future<void> _showAutoLockDialog(BuildContext context, WidgetRef ref) async {
+    final current = ref.read(autoLockProvider).duration;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Bloqueo automático'),
+        children: [
+          RadioGroup<Duration>(
+            groupValue: current,
+            onChanged: (d) {
+              if (d == null) return;
+              ref.read(autoLockProvider.notifier).setDuration(d);
+              Navigator.pop(ctx);
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final opt in _autoLockOptions)
+                  RadioListTile<Duration>(
+                    title: Text(opt.$2),
+                    value: opt.$1,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Theme ──
+
+  static const _themeLabels = <ThemeMode, String>{
+    ThemeMode.system: 'Sistema',
+    ThemeMode.dark: 'Oscuro',
+    ThemeMode.light: 'Claro',
+  };
+
+  Widget _themeTile(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(themeModeProvider);
+
+    return ListTile(
+      leading: const Icon(Icons.dark_mode_outlined),
+      title: const Text('Tema'),
+      subtitle: Text(_themeLabels[current] ?? 'Sistema'),
+      trailing: const Icon(Icons.chevron_right, size: 20),
+      onTap: () => _showThemeDialog(context, ref),
+    );
+  }
+
+  Future<void> _showThemeDialog(BuildContext context, WidgetRef ref) async {
+    final current = ref.read(themeModeProvider);
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Tema'),
+        children: [
+          RadioGroup<ThemeMode>(
+            groupValue: current,
+            onChanged: (mode) {
+              if (mode == null) return;
+              switch (mode) {
+                case ThemeMode.system:
+                  ref.read(themeModeProvider.notifier).setSystem();
+                case ThemeMode.dark:
+                  ref.read(themeModeProvider.notifier).setDark();
+                case ThemeMode.light:
+                  ref.read(themeModeProvider.notifier).setLight();
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RadioListTile<ThemeMode>(
+                  title: Text('Sistema'),
+                  value: ThemeMode.system,
+                ),
+                RadioListTile<ThemeMode>(
+                  title: Text('Oscuro'),
+                  value: ThemeMode.dark,
+                ),
+                RadioListTile<ThemeMode>(
+                  title: Text('Claro'),
+                  value: ThemeMode.light,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -320,7 +499,7 @@ class SettingsScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -414,5 +593,167 @@ class SettingsScreen extends ConsumerWidget {
         );
       }
     }
+  }
+
+  // ── Import / Export ──
+
+  Future<void> _exportData(BuildContext context, WidgetRef ref) async {
+    // 1. Progress dialog
+    if (!context.mounted) return;
+    _showProgressDialog(context, 'Exportando datos...');
+
+    try {
+      // 2. Get all active entries
+      final entries = await ref.read(entryListProvider.future);
+      if (!context.mounted) return;
+
+      // 3. Generate JSON
+      final exportService = ref.read(exportServiceProvider);
+      final json = exportService.exportToJson(entries);
+
+      // 4. Dismiss progress
+      if (context.mounted) Navigator.of(context).pop();
+
+      // 5. Save file via FilePicker
+      final savedPath = await exportService.saveToFile(json, context);
+
+      // 6. Snackbar
+      if (!context.mounted) return;
+      if (savedPath != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Exportación guardada en $savedPath')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al exportar: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _importData(BuildContext context, WidgetRef ref) async {
+    if (!context.mounted) return;
+
+    // 1. Confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Importar datos'),
+        content: const Text(
+          'Esto va a agregar entradas al vault actual. '
+          'Las entradas existentes con el mismo ID se van a saltar. '
+          '¿Continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Importar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    // 2. Progress dialog
+    _showProgressDialog(context, 'Importando datos...');
+
+    try {
+      // 3. Import
+      final importService = ref.read(importServiceProvider);
+      final result = await importService.importFromFile(context);
+
+      if (!context.mounted) return;
+
+      // 4. Dismiss progress
+      Navigator.of(context).pop();
+
+      // 5. Invalidate entry list
+      ref.invalidate(entryListProvider);
+
+      // 6. Build result message
+      final buffer = StringBuffer();
+      buffer.write('Se importaron ${result.imported} entradas.');
+      if (result.skipped > 0) {
+        buffer.write(' ${result.skipped} se saltaron por duplicadas.');
+      }
+      if (result.hasErrors) {
+        buffer.write(' ${result.errors.length} errores.');
+      }
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(buffer.toString()),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+
+      // Show error details if any
+      if (result.hasErrors && context.mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Errores de importación'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: result.errors.length,
+                itemBuilder: (_, i) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text(
+                    result.errors[i],
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cerrar'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al importar: $e')),
+        );
+      }
+    }
+  }
+
+  void _showProgressDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Center(
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(message),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

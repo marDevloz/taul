@@ -32,6 +32,17 @@ dependencies:
   logger: ^2.5.0
   uuid: ^4.5.1
   intl: ^0.20.2
+  shared_preferences: ^2.3.4
+
+  # Markdown rendering
+  flutter_markdown: ^0.7.6
+
+  # File picker (import/export)
+  file_picker: ^11.0.2
+
+  # System tray (minimize to tray on desktop)
+  system_tray: ^0.1.1
+  window_manager: ^0.5.1
 
 dev_dependencies:
   flutter_test:
@@ -52,3 +63,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/images/icon.png

@@ -10,74 +10,70 @@ class FilterChipsRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedType = ref.watch(selectedTypeFilterProvider);
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          _buildChip(
-            context: context,
-            ref: ref,
-            type: null,
-            icon: Icons.all_inclusive,
-            label: 'Todas',
-            selected: selectedType == null,
-          ),
-          const SizedBox(width: 6),
-          _buildChip(
-            context: context,
-            ref: ref,
-            type: EntryType.glossary,
-            icon: Icons.book,
-            label: 'Glosario',
-            selected: selectedType == EntryType.glossary,
-          ),
-          const SizedBox(width: 6),
-          _buildChip(
-            context: context,
-            ref: ref,
-            type: EntryType.note,
-            icon: Icons.description,
-            label: 'Nota',
-            selected: selectedType == EntryType.note,
-          ),
-          const SizedBox(width: 6),
-          _buildChip(
-            context: context,
-            ref: ref,
-            type: EntryType.idea,
-            icon: Icons.lightbulb,
-            label: 'Idea',
-            selected: selectedType == EntryType.idea,
-          ),
-          const SizedBox(width: 6),
-          _buildChip(
-            context: context,
-            ref: ref,
-            type: EntryType.credential,
-            icon: Icons.lock,
-            label: 'Credencial',
-            selected: selectedType == EntryType.credential,
-          ),
-        ],
+      child: SizedBox(
+        height: 26,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: 5,
+          separatorBuilder: (_, __) => const SizedBox(width: 4),
+          itemBuilder: (context, index) {
+            final (type, label, icon, active) = switch (index) {
+              0 => (null, 'Todas', Icons.all_inclusive, selectedType == null),
+              1 => (EntryType.glossary, 'Glosario', Icons.book, selectedType == EntryType.glossary),
+              2 => (EntryType.note, 'Nota', Icons.description, selectedType == EntryType.note),
+              3 => (EntryType.idea, 'Idea', Icons.lightbulb, selectedType == EntryType.idea),
+              4 => (EntryType.credential, 'Credencial', Icons.lock, selectedType == EntryType.credential),
+              _ => throw StateError('unreachable'),
+            };
+            return _TinyPill(
+              icon: icon,
+              label: label,
+              selected: active,
+              onTap: () => ref.read(selectedTypeFilterProvider.notifier).state = type,
+            );
+          },
+        ),
       ),
     );
   }
+}
 
-  Widget _buildChip({
-    required BuildContext context,
-    required WidgetRef ref,
-    required EntryType? type,
-    required IconData icon,
-    required String label,
-    required bool selected,
-  }) {
-    return FilterChip(
-      avatar: Icon(icon, size: 18),
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => ref.read(selectedTypeFilterProvider.notifier).state = type,
-      showCheckmark: false,
+class _TinyPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TinyPill({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: selected ? theme.colorScheme.secondaryContainer : Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 12, color: selected ? theme.colorScheme.onSecondaryContainer : theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Text(label, style: TextStyle(fontSize: 11, color: selected ? theme.colorScheme.onSecondaryContainer : theme.colorScheme.onSurfaceVariant)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -2,8 +2,18 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter/services.dart'
+    show
+        Clipboard,
+        ClipboardData,
+        HardwareKeyboard,
+        KeyDownEvent,
+        KeyRepeatEvent,
+        LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:taul/core/constants.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
@@ -46,29 +56,109 @@ class EntryDetailView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final entryAsync = ref.watch(entryDetailProvider(entryId));
+    final entryIds = ref.watch(entryIdListProvider);
+    final currentIndex = entryIds.indexOf(entryId);
+    final hasPrevious = currentIndex > 0;
+    final hasNext = currentIndex < entryIds.length - 1;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(entryAsync.valueOrNull?.type.label ?? 'Entrada'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () => _showEdit(context, ref),
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () => _confirmDelete(context, ref),
-          ),
-        ],
-      ),
-      body: entryAsync.when(
+    return Focus(
+      autofocus: true,
+      onKeyEvent: (node, event) {
+        if (event is KeyRepeatEvent) return KeyEventResult.ignored;
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+        final ctrl =
+            HardwareKeyboard.instance
+                    .isLogicalKeyPressed(LogicalKeyboardKey.controlLeft) ||
+                HardwareKeyboard.instance
+                    .isLogicalKeyPressed(LogicalKeyboardKey.controlRight);
+
+        // Ctrl+E → editar entrada
+        if (ctrl && event.logicalKey == LogicalKeyboardKey.keyE) {
+          _showEdit(context, ref);
+          return KeyEventResult.handled;
+        }
+
+        // Delete → eliminar entrada
+        if (event.logicalKey == LogicalKeyboardKey.delete) {
+          _confirmDelete(context, ref);
+          return KeyEventResult.handled;
+        }
+
+        // Ctrl+Left → entrada anterior
+        if (ctrl && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+          _goToAdjacent(entryIds, currentIndex, context, -1);
+          return KeyEventResult.handled;
+        }
+
+        // Ctrl+Right → entrada siguiente
+        if (ctrl && event.logicalKey == LogicalKeyboardKey.arrowRight) {
+          _goToAdjacent(entryIds, currentIndex, context, 1);
+          return KeyEventResult.handled;
+        }
+
+        // Ctrl+Tab → siguiente, Ctrl+Shift+Tab → anterior
+        if (ctrl && event.logicalKey == LogicalKeyboardKey.tab) {
+          final shift =
+              HardwareKeyboard.instance
+                      .isLogicalKeyPressed(LogicalKeyboardKey.shiftLeft) ||
+                  HardwareKeyboard.instance
+                      .isLogicalKeyPressed(LogicalKeyboardKey.shiftRight);
+          _goToAdjacent(entryIds, currentIndex, context, shift ? -1 : 1);
+          return KeyEventResult.handled;
+        }
+
+        return KeyEventResult.ignored;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(entryAsync.valueOrNull?.type.label ?? 'Entrada'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.chevron_left),
+              tooltip: 'Anterior',
+              onPressed: hasPrevious
+                  ? () => context.go('/entry/${entryIds[currentIndex - 1]}')
+                  : null,
+            ),
+            IconButton(
+              icon: const Icon(Icons.chevron_right),
+              tooltip: 'Siguiente',
+              onPressed: hasNext
+                  ? () => context.go('/entry/${entryIds[currentIndex + 1]}')
+                  : null,
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () => _showEdit(context, ref),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () => _confirmDelete(context, ref),
+            ),
+          ],
+        ),
+        body: entryAsync.when(
         data: (entry) => entry.type == EntryType.credential
             ? _CredentialContent(entry: entry)
             : _NoteContent(entry: entry),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error: $err')),
       ),
-    );
+    ),
+  );
+  }
+
+  static void _goToAdjacent(
+    List<String> ids,
+    int currentIndex,
+    BuildContext context,
+    int direction,
+  ) {
+    final target = currentIndex + direction;
+    if (target < 0 || target >= ids.length) return;
+    context.go('/entry/${ids[target]}');
   }
 
   void _showEdit(BuildContext context, WidgetRef ref) {
@@ -104,7 +194,6 @@ class EntryDetailView extends ConsumerWidget {
     final titleCtrl = TextEditingController(text: entry.title);
     final contentCtrl = TextEditingController(text: entry.content);
     final tagsCtrl = TextEditingController(text: entry.tags.join(', '));
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -164,14 +253,20 @@ class EntryDetailView extends ConsumerWidget {
                     const SizedBox(width: 8),
                     PopupMenuButton<EntryType>(
                       onSelected: (t) => setLocalState(() => selectedType = t),
-                      child: Chip(
-                        avatar: Icon(_iconForType(selectedType), size: 16),
-                        label: Row(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(_labelForType(selectedType), style: const TextStyle(fontSize: 12)),
+                            Icon(_iconForType(selectedType), size: 14),
                             const SizedBox(width: 4),
-                            Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey.shade600),
+                            Text(_labelForType(selectedType), style: const TextStyle(fontSize: 11)),
+                            const SizedBox(width: 2),
+                            Icon(Icons.arrow_drop_down, size: 14, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
                           ],
                         ),
                       ),
@@ -283,23 +378,34 @@ class _NoteContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+    final isWide = MediaQuery.of(context).size.width >= Breakpoints.tablet;
+
+    final body = SingleChildScrollView(
+      padding: EdgeInsets.all(isWide ? 24 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Chip(label: Text(entry.type.label)),
+          Chip(
+            label: Text(entry.type.label, style: const TextStyle(fontSize: 12)),
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
           const SizedBox(height: 8),
           Text(entry.title, style: theme.textTheme.headlineSmall),
           const SizedBox(height: 16),
-          Text(entry.content, style: theme.textTheme.bodyLarge),
+          MarkdownBody(
+            data: entry.content,
+            selectable: true,
+          ),
           if (entry.tags.isNotEmpty) ...[
             const SizedBox(height: 16),
-            Wrap(spacing: 6, children: entry.tags.map((t) => Chip(label: Text(t))).toList()),
-          ],
-          if (entry.topicKey != null) ...[
-            const SizedBox(height: 8),
-            Text('Tema: ${entry.topicKey}', style: theme.textTheme.bodySmall),
+            Wrap(spacing: 6, children: entry.tags.map((t) => Chip(
+              label: Text(t, style: const TextStyle(fontSize: 12)),
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            )).toList()),
           ],
           const SizedBox(height: 24),
           Text('Creado: ${_formatDate(entry.createdAt)}', style: theme.textTheme.bodySmall),
@@ -308,6 +414,16 @@ class _NoteContent extends StatelessWidget {
         ],
       ),
     );
+
+    if (isWide) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: body,
+        ),
+      );
+    }
+    return body;
   }
 
   String _formatDate(DateTime dt) {
@@ -342,9 +458,10 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
     final username = entry.metadata['username'] ?? '';
     final url = entry.metadata['url'] ?? '';
     final displayedSecret = entry.requiresAuth ? (_revealedSecret ?? '') : (entry.secret ?? '');
+    final isWide = MediaQuery.of(context).size.width >= Breakpoints.tablet;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+    final body = SingleChildScrollView(
+      padding: EdgeInsets.all(isWide ? 24 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -406,14 +523,34 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
         ],
       ),
     );
+
+    if (isWide) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: body,
+        ),
+      );
+    }
+    return body;
   }
 
   Future<void> _revealProtectedSecret() async {
     final entry = widget.entry;
-    if (!entry.requiresAuth ||
-        entry.encryptedSecret == null ||
+    if (!entry.requiresAuth) return;
+
+    // Si la credencial se creó por quick-add (sin cifrado), revela el secret directo
+    if (entry.encryptedSecret == null ||
         entry.cipherNonce == null ||
         entry.cipherTag == null) {
+      if (entry.secret != null) {
+        setState(() => _revealedSecret = entry.secret);
+        // Auto-ocultar después de 30 segundos
+        _hideTimer?.cancel();
+        _hideTimer = Timer(const Duration(seconds: 30), () {
+          if (mounted) setState(() => _revealedSecret = null);
+        });
+      }
       return;
     }
 
@@ -422,7 +559,34 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
     Uint8List? key = masterKeyNotifier.cachedKey;
 
     if (key == null) {
-      final result = await _showMasterPasswordDialog(entry: entry);
+      final store = ref.read(masterPasswordStoreProvider);
+      final config = await store.readFull();
+
+      if (config == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Contraseña maestra no configurada. '
+                'Configurala desde Ajustes.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      final salt = auth.hexToBytes(config.saltHex);
+      final result = await _showMasterPasswordDialog(
+        entry: entry,
+        verify: (password) async {
+          return auth.verifyMasterPassword(
+            password: password,
+            salt: salt,
+            expectedHashHex: config.hashHex,
+          );
+        },
+      );
       if (result == null || result.cancelled || !mounted) return;
 
       if (result.recoveryCompleted) {
@@ -442,78 +606,32 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
           return;
         }
       } else {
-        // User entered a master password.
+        // User entered a valid master password.
         final password = result.password!;
-        final store = ref.read(masterPasswordStoreProvider);
-        final config = await store.readFull();
-        if (config == null) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Contraseña maestra no configurada. '
-                  'Configurala desde Ajustes.',
-                ),
-              ),
-            );
-          }
-          return;
-        }
 
-        final salt = auth.hexToBytes(config.saltHex);
-        final isValid = await auth.verifyMasterPassword(
-          password: password,
-          salt: salt,
-          expectedHashHex: config.hashHex,
-        );
-
-        if (!isValid) {
-          // Wrong password — show recovery option.
-          final recoveryChosen = await _showRecoveryOption();
-          if (!recoveryChosen || !mounted) return;
-
-          final recovered = await _openRecoveryDialog();
-          if (!recovered || !mounted) return;
-
-          // After recovery, key should be cached.
-          key = masterKeyNotifier.cachedKey;
-          if (key == null) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Recuperación completada pero no se pudo cargar la clave.',
-                  ),
-                ),
-              );
-            }
-            return;
-          }
+        // Unwrap DEK from encrypted storage key.
+        if (config.encryptedStorageKeyHex != null &&
+            config.encryptedStorageKeyHex!.isNotEmpty) {
+          final kek = await auth.deriveMasterKey(
+            password: password,
+            salt: salt,
+          );
+          key = await auth.unwrapStorageKey(
+            payload: EncryptionPayload(
+              ciphertextHex: config.encryptedStorageKeyHex!,
+              nonceHex: config.encryptedStorageKeyNonceHex ?? '',
+              tagHex: config.encryptedStorageKeyTagHex ?? '',
+            ),
+            kek: kek,
+          );
         } else {
-          // Valid password: unwrap DEK from encrypted storage key.
-          if (config.encryptedStorageKeyHex != null &&
-              config.encryptedStorageKeyHex!.isNotEmpty) {
-            final kek = await auth.deriveMasterKey(
-              password: password,
-              salt: salt,
-            );
-            key = await auth.unwrapStorageKey(
-              payload: EncryptionPayload(
-                ciphertextHex: config.encryptedStorageKeyHex!,
-                nonceHex: config.encryptedStorageKeyNonceHex ?? '',
-                tagHex: config.encryptedStorageKeyTagHex ?? '',
-              ),
-              kek: kek,
-            );
-          } else {
-            // Pre-migration: derive key directly from password.
-            key = await auth.deriveMasterKey(
-              password: password,
-              salt: salt,
-            );
-          }
-          masterKeyNotifier.setMasterPassword(key);
+          // Pre-migration: derive key directly from password.
+          key = await auth.deriveMasterKey(
+            password: password,
+            salt: salt,
+          );
         }
+        masterKeyNotifier.setMasterPassword(key);
       }
     }
 
@@ -550,23 +668,59 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
     }
   }
 
-  /// Shows the master password reveal dialog with hint and recovery link.
+  /// Shows the master password reveal dialog with inline verification.
   ///
   /// The dialog includes:
-  /// - Password field
+  /// - Password field with visibility toggle and inline error
   /// - "Show hint" toggle (if a hint exists)
   /// - "Forgot password?" link → opens [MasterPasswordRecoveryDialog]
   ///
   /// Returns the result indicating what action the user took.
   Future<_RevealDialogResult?> _showMasterPasswordDialog({
     required Entry entry,
+    required Future<bool> Function(String password) verify,
   }) async {
     final hint = await ref.read(masterPasswordHintProvider.future);
     final ctrl = TextEditingController();
+    String? error;
+    var obscurePassword = true;
     var showHint = false;
+    var loading = false;
+
+    Future<void> verifyAndPop(
+      BuildContext ctx,
+      void Function(void Function()) setLocalState,
+    ) async {
+      final password = ctrl.text;
+      if (password.isEmpty) {
+        setLocalState(() => error = 'Ingresá tu contraseña');
+        return;
+      }
+      setLocalState(() {
+        loading = true;
+        error = null;
+      });
+      try {
+        final isValid = await verify(password);
+        if (isValid) {
+          Navigator.pop(ctx, _RevealDialogResult.password(password));
+        } else {
+          setLocalState(() {
+            loading = false;
+            error = 'Contraseña incorrecta';
+          });
+        }
+      } catch (_) {
+        setLocalState(() {
+          loading = false;
+          error = 'Error al verificar';
+        });
+      }
+    }
 
     final result = await showDialog<_RevealDialogResult>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocalState) => AlertDialog(
           title: const Text('Contraseña Maestra'),
@@ -576,10 +730,22 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
             children: [
               TextField(
                 controller: ctrl,
-                obscureText: true,
+                obscureText: obscurePassword,
                 autofocus: true,
-                decoration: const InputDecoration(
+                textInputAction: TextInputAction.done,
+                onSubmitted: loading ? null : (_) => verifyAndPop(ctx, setLocalState),
+                decoration: InputDecoration(
                   labelText: 'Ingresá tu contraseña maestra',
+                  errorText: error,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      obscurePassword
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded,
+                    ),
+                    onPressed: () =>
+                        setLocalState(() => obscurePassword = !obscurePassword),
+                  ),
                 ),
               ),
               if (hint != null) ...[
@@ -604,9 +770,10 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
+                      color: Theme.of(ctx).colorScheme.tertiaryContainer,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.amber.shade200),
+                      border: Border.all(
+                          color: Theme.of(ctx).colorScheme.tertiary),
                     ),
                     child: Text(
                       'Pista: $hint',
@@ -617,25 +784,28 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
               ],
               const SizedBox(height: 4),
               TextButton(
-                onPressed: () async {
-                  // Open recovery dialog on top of this one.
-                  final recoveryResult = await Navigator.push<RecoveryResult>(
-                    ctx,
-                    MaterialPageRoute(
-                      builder: (_) => const MasterPasswordRecoveryDialog(),
-                      fullscreenDialog: true,
-                    ),
-                  );
-                  // If recovery succeeded, close THIS dialog too.
-                  if (recoveryResult != null && recoveryResult.success) {
-                    if (ctx.mounted) {
-                      Navigator.pop(
-                        ctx,
-                        _RevealDialogResult.recovery(),
-                      );
-                    }
-                  }
-                },
+                onPressed: loading
+                    ? null
+                    : () async {
+                        final recoveryResult =
+                            await Navigator.push<RecoveryResult>(
+                          ctx,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const MasterPasswordRecoveryDialog(),
+                            fullscreenDialog: true,
+                          ),
+                        );
+                        if (recoveryResult != null &&
+                            recoveryResult.success) {
+                          if (ctx.mounted) {
+                            Navigator.pop(
+                              ctx,
+                              _RevealDialogResult.recovery(),
+                            );
+                          }
+                        }
+                      },
                 child: const Text(
                   '¿Olvidaste tu contraseña maestra?',
                   style: TextStyle(fontSize: 13),
@@ -645,67 +815,30 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
           ),
           actions: [
             TextButton(
-              onPressed: () =>
-                  Navigator.pop(ctx, _RevealDialogResult.cancelled()),
+              onPressed: loading
+                  ? null
+                  : () =>
+                      Navigator.pop(ctx, _RevealDialogResult.cancelled()),
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              onPressed: () {
-                final text = ctrl.text;
-                if (text.trim().isEmpty) return;
-                Navigator.pop(
-                  ctx,
-                  _RevealDialogResult.password(text),
-                );
-              },
-              child: const Text('Aceptar'),
+              onPressed: loading
+                  ? null
+                  : () => verifyAndPop(ctx, setLocalState),
+              child: loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Aceptar'),
             ),
           ],
         ),
       ),
     );
 
-    ctrl.dispose();
     return result;
-  }
-
-  /// Shows an option to try recovery after a wrong password.
-  /// Returns true if the user wants to start recovery.
-  Future<bool> _showRecoveryOption() async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Contraseña Incorrecta'),
-        content: const Text(
-          'La contraseña maestra que ingresaste es incorrecta. '
-          'Podés intentar de nuevo o usar un código de respaldo para recuperar el acceso.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Intentar de nuevo'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Usar Código de Respaldo'),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
-  }
-
-  /// Opens the [MasterPasswordRecoveryDialog] and returns true if recovery
-  /// was completed successfully.
-  Future<bool> _openRecoveryDialog() async {
-    final result = await Navigator.push<RecoveryResult>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const MasterPasswordRecoveryDialog(),
-        fullscreenDialog: true,
-      ),
-    );
-    return result?.success ?? false;
   }
 
   Widget _fieldCard({
@@ -721,13 +854,13 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: Colors.grey),
+            Icon(icon, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 2),
                   Text(
                     obscure ? '?' * (value.length.clamp(6, 20)) : (value.isNotEmpty ? value : '(vacío)'),

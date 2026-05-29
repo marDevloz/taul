@@ -14,7 +14,6 @@ class Entry with _$Entry {
     required String content,
     @Default({}) Map<String, String> metadata,
     @Default([]) List<String> tags,
-    String? topicKey,
     String? secret,
     @Default(false) bool requiresAuth,
     String? encryptedSecret,

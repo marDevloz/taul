@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:taul/core/credential_parser.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
@@ -22,6 +23,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     EntryType.note: 'Texto libre',
     EntryType.idea: '! idea genial',
     EntryType.glossary: 'Término: definición',
+    EntryType.credential: 'servicio,*usuario,*contraseña,#tag1,tag2',
   };
 
   /// Tipo efectivo: si el usuario eligió uno manual, ese; si no, el auto-detectado.
@@ -49,6 +51,8 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     setState(() {
       if (text.startsWith('!')) {
         _detectedType = EntryType.idea;
+      } else if (text.contains('*')) {
+        _detectedType = EntryType.credential;
       } else if (text.contains(':')) {
         _detectedType = EntryType.glossary;
       } else {
@@ -57,15 +61,32 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     });
   }
 
+  /// Extrae los #tags de un texto y devuelve el texto limpio + los tags.
+  ({String clean, List<String> tags}) _extractTags(String raw) {
+    final re = RegExp(r'#(\w+)');
+    final matches = re.allMatches(raw);
+    final tags = matches.map((m) => m.group(1)!).toList();
+    final clean = raw.replaceAll(re, '').replaceAll(RegExp(r'\s+'), ' ').trim();
+    return (clean: clean, tags: tags);
+  }
+
   Future<void> _save() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    final rawText = _controller.text.trim();
+    if (rawText.isEmpty) return;
 
     setState(() => _isSaving = true);
+
+    // Extraer #tags de todo el texto primero (aplica a todos los tipos)
+    final extracted = _extractTags(rawText);
+    final text = extracted.clean;
+    List<String> tags = extracted.tags;
 
     final type = _effectiveType;
     String title;
     String content;
+    Map<String, String> metadata = {};
+    String? secret;
+    bool requiresAuth = false;
 
     switch (type) {
       case EntryType.idea:
@@ -75,21 +96,35 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
         final splitIdx = text.indexOf(':');
         title = text.substring(0, splitIdx).trim();
         content = text.substring(splitIdx + 1).trim();
-      case EntryType.note:
-        title = text;
-        content = text;
       case EntryType.credential:
-        // Credenciales van por formulario separado
+        final parsed = CredentialParser.parse(rawText);
+        if (parsed != null) {
+          title = parsed.service;
+          content = parsed.username.isNotEmpty ? 'Usuario: ${parsed.username}' : parsed.service;
+          metadata = {'username': parsed.username};
+          secret = parsed.password;
+          requiresAuth = true;
+          // Fusionar tags sin duplicar: _extractTags ya atrapó #tag,
+          // CredentialParser además atrapa el formato #tag1,tag2
+          tags = {...tags, ...parsed.tags}.toList();
+        } else {
+          title = text;
+          content = text;
+        }
+      case EntryType.note:
         title = text;
         content = text;
     }
 
     try {
-      // Le pasamos el tipo explícito para que no se pierda al sacar prefijos
       await ref.read(createEntryProvider).call(
         title: title,
         content: content,
         type: type,
+        secret: secret,
+        requiresAuth: requiresAuth,
+        metadata: metadata,
+        tags: tags,
       );
       ref.invalidate(entryListProvider);
       if (mounted) Navigator.pop(context);
@@ -109,10 +144,10 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
 
     return Padding(
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        left: 12,
+        right: 12,
+        top: 12,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 12,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -123,23 +158,28 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
             children: [
               Text('Nueva entrada', style: Theme.of(context).textTheme.titleMedium),
               const Spacer(),
-              // Selector de tipo — tocalo para cambiar si la detección no fue la esperada
+              // Selector de tipo — compacto
               PopupMenuButton<EntryType>(
                 onSelected: _setType,
                 tooltip: 'Cambiar tipo',
-                child: Chip(
-                  avatar: Icon(_iconForType(_effectiveType), size: 16),
-                  label: Row(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _isManual
+                        ? Theme.of(context).colorScheme.primaryContainer
+                        : Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_labelForType(_effectiveType), style: const TextStyle(fontSize: 12)),
+                      Icon(_iconForType(_effectiveType), size: 14),
                       const SizedBox(width: 4),
-                      Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey.shade600),
+                      Text(_labelForType(_effectiveType), style: const TextStyle(fontSize: 11)),
+                      const SizedBox(width: 2),
+                      Icon(Icons.arrow_drop_down, size: 14, color: Colors.grey.shade600),
                     ],
                   ),
-                  backgroundColor: _isManual
-                      ? Theme.of(context).colorScheme.primaryContainer
-                      : null,
                 ),
                 itemBuilder: (_) => [
                   ...EntryType.values.where((t) => t != EntryType.credential).map(
@@ -172,32 +212,40 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
-          // Hints
+          // Hints compactos
           if (detectedType == null)
             Wrap(
-              spacing: 6,
-              runSpacing: 4,
+              spacing: 4,
+              runSpacing: 2,
               children: [
                 ActionChip(
-                  label: const Text('Texto libre', style: TextStyle(fontSize: 11)),
-                  avatar: const Icon(Icons.description, size: 14),
+                  label: const Text('Texto libre', style: TextStyle(fontSize: 10)),
+                  avatar: const Icon(Icons.description, size: 12),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
                   onPressed: () => _selectHint('Texto libre'),
                 ),
                 ActionChip(
-                  label: const Text('! idea', style: TextStyle(fontSize: 11)),
-                  avatar: const Icon(Icons.lightbulb, size: 14),
+                  label: const Text('! idea', style: TextStyle(fontSize: 10)),
+                  avatar: const Icon(Icons.lightbulb, size: 12),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
                   onPressed: () => _selectHint('! idea genial'),
                 ),
                 ActionChip(
-                  label: const Text('Término: definición', style: TextStyle(fontSize: 11)),
-                  avatar: const Icon(Icons.book, size: 14),
+                  label: const Text('Término: definición', style: TextStyle(fontSize: 10)),
+                  avatar: const Icon(Icons.book, size: 12),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
                   onPressed: () => _selectHint('Término: definición'),
                 ),
                 ActionChip(
-                  label: const Text('🔒 Credencial', style: TextStyle(fontSize: 11)),
-                  avatar: const Icon(Icons.lock, size: 14),
+                  label: const Text('🔒 Credencial', style: TextStyle(fontSize: 10)),
+                  avatar: const Icon(Icons.lock, size: 12),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
                   onPressed: () {
                     Navigator.pop(context);
                     widget.onCredentialRequested?.call();
@@ -210,7 +258,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
               _typeHints[detectedType]!,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
             ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
           // Text input
           TextField(
