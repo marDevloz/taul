@@ -35,48 +35,64 @@ class AppKeyboardShortcuts extends ConsumerWidget {
                     .isLogicalKeyPressed(LogicalKeyboardKey.shiftLeft) ||
                 HardwareKeyboard.instance
                     .isLogicalKeyPressed(LogicalKeyboardKey.shiftRight);
-        final location = GoRouterState.of(context).uri.toString();
 
         // ── Ctrl+N → nueva entrada (solo en home) ──
         if (ctrl && !shift && event.logicalKey == LogicalKeyboardKey.keyN) {
-          if (location == '/') {
-            ref.read(createEntryEventProvider.notifier).state++;
-            return KeyEventResult.handled;
+          try {
+            if (GoRouterState.of(context).uri.toString() == '/') {
+              ref.read(createEntryEventProvider.notifier).state++;
+              return KeyEventResult.handled;
+            }
+          } catch (_) {
+            // Router may not be available during transitions.
           }
           return KeyEventResult.ignored;
         }
 
         // ── Ctrl+F → enfocar búsqueda (solo en home) ──
         if (ctrl && !shift && event.logicalKey == LogicalKeyboardKey.keyF) {
-          if (location == '/') {
-            ref.read(focusSearchProvider.notifier).state = true;
-            return KeyEventResult.handled;
-          }
+          try {
+            if (GoRouterState.of(context).uri.toString() == '/') {
+              ref.read(focusSearchProvider.notifier).state = true;
+              return KeyEventResult.handled;
+            }
+          } catch (_) {}
           return KeyEventResult.ignored;
         }
 
         // ── Ctrl+, → settings (global) ──
         if (ctrl && !shift && event.logicalKey == LogicalKeyboardKey.comma) {
-          if (location != '/settings') {
-            context.go('/settings');
+          try {
+            if (GoRouterState.of(context).uri.toString() != '/settings') {
+              context.go('/settings');
+            }
+            return KeyEventResult.handled;
+          } catch (_) {
+            return KeyEventResult.ignored;
           }
-          return KeyEventResult.handled;
         }
 
         // ── Ctrl+Shift+T → papelera (global) ──
         if (ctrl && shift && event.logicalKey == LogicalKeyboardKey.keyT) {
-          if (location != '/trash') {
-            context.go('/trash');
+          try {
+            if (GoRouterState.of(context).uri.toString() != '/trash') {
+              context.push('/trash');
+            }
+            return KeyEventResult.handled;
+          } catch (_) {
+            return KeyEventResult.ignored;
           }
-          return KeyEventResult.handled;
         }
 
         // ── Escape → navegar a home ──
         if (event.logicalKey == LogicalKeyboardKey.escape) {
-          if (location != '/') {
-            context.go('/');
-            return KeyEventResult.handled;
-          }
+          try {
+            if (GoRouterState.of(context).uri.toString() != '/') {
+              context.go('/');
+              return KeyEventResult.handled;
+            }
+          } catch (_) {}
+          return KeyEventResult.ignored;
         }
 
         return KeyEventResult.ignored;

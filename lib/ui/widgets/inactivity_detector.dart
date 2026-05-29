@@ -40,8 +40,9 @@ class _InactivityDetectorState extends ConsumerState<InactivityDetector>
     final notifier = ref.read(autoLockProvider.notifier);
     final lockStatus = ref.read(appLockProvider);
     final hasKey = ref.read(masterPasswordProvider) != null;
+    final appLockEnabled = ref.read(appLockEnabledProvider);
 
-    if (lockStatus == AppLockStatus.unlocked && hasKey) {
+    if (lockStatus == AppLockStatus.unlocked && hasKey && appLockEnabled) {
       notifier.activate();
     } else {
       notifier.deactivate();
@@ -50,8 +51,10 @@ class _InactivityDetectorState extends ConsumerState<InactivityDetector>
 
   void _onLockStatusChange(AppLockStatus? _, AppLockStatus next) {
     final notifier = ref.read(autoLockProvider.notifier);
+    final appLockEnabled = ref.read(appLockEnabledProvider);
     if (next == AppLockStatus.unlocked &&
-        ref.read(masterPasswordProvider) != null) {
+        ref.read(masterPasswordProvider) != null &&
+        appLockEnabled) {
       notifier.activate();
     } else {
       notifier.deactivate();
@@ -60,7 +63,10 @@ class _InactivityDetectorState extends ConsumerState<InactivityDetector>
 
   void _onMasterPasswordChange(Uint8List? prev, Uint8List? next) {
     final notifier = ref.read(autoLockProvider.notifier);
-    if (next != null && ref.read(appLockProvider) == AppLockStatus.unlocked) {
+    final appLockEnabled = ref.read(appLockEnabledProvider);
+    if (next != null &&
+        ref.read(appLockProvider) == AppLockStatus.unlocked &&
+        appLockEnabled) {
       notifier.activate();
     } else if (next == null) {
       notifier.deactivate();

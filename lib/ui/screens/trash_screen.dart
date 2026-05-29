@@ -13,6 +13,7 @@ class TrashScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const BackButton(),
         title: const Text('Papelera'),
         actions: [
           trashAsync.when(

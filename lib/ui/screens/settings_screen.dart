@@ -89,6 +89,7 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(),
           // ── Auto-lock Section ──
           _sectionHeader(context, 'Seguridad'),
+          _appLockToggle(context, ref),
           _autoLockTile(context, ref),
           const Divider(),
           // ── Tema Section ──
@@ -181,6 +182,29 @@ class SettingsScreen extends ConsumerWidget {
       title: Text(title, style: textColor != null ? TextStyle(color: textColor) : null),
       trailing: const Icon(Icons.chevron_right, size: 20),
       onTap: onTap,
+    );
+  }
+
+  // ── App Lock Toggle ──
+
+  Widget _appLockToggle(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(appLockEnabledProvider);
+
+    return SwitchListTile(
+      secondary: const Icon(Icons.lock_outline),
+      title: const Text('Bloqueo general'),
+      subtitle: Text(enabled ? 'Pedir contraseña al iniciar' : 'Sin bloqueo al iniciar'),
+      value: enabled,
+      onChanged: (value) async {
+        await ref.read(appLockEnabledProvider.notifier).setEnabled(value);
+        if (value) {
+          // If turning ON and MP is configured, lock immediately
+          ref.read(appLockProvider.notifier).lock();
+        } else {
+          // If turning OFF, unlock immediately
+          ref.read(appLockProvider.notifier).unlock();
+        }
+      },
     );
   }
 
