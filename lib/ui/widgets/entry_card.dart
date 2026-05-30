@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:taul/core/credential_parser.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
@@ -58,10 +59,10 @@ class EntryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (isGrid) return _buildGridCard(theme);
-    return _buildListCard(theme);
+    return _buildListCard(context, theme);
   }
 
-  Widget _buildListCard(ThemeData theme) {
+  Widget _buildListCard(BuildContext context, ThemeData theme) {
     final radius = BorderRadius.circular(12);
     return GestureDetector(
       onTap: isSecure ? onTapGated : (!_isExpandable ? onTap : onToggle),
@@ -160,6 +161,31 @@ class EntryCard extends StatelessWidget {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall,
+                        )
+                      else
+                        Row(
+                          children: [
+                            Icon(Icons.copy, size: 14, color: theme.colorScheme.primary),
+                            const SizedBox(width: 6),
+                            GestureDetector(
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(text: entry.title));
+                                ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                                  SnackBar(
+                                    content: Text('Título copiado: ${entry.title}'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                'Copiar título',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                     ],
                   ),
