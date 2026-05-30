@@ -21,7 +21,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.custom(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -66,6 +66,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 5) {
             await customInsert('ALTER TABLE entries DROP COLUMN topic_key');
+          }
+          if (from < 6) {
+            await m.addColumn(entries, entries.tagsColor);
           }
         },
         beforeOpen: (_) async {

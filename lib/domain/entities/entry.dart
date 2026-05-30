@@ -14,6 +14,7 @@ class Entry with _$Entry {
     required String content,
     @Default({}) Map<String, String> metadata,
     @Default([]) List<String> tags,
+    @Default({}) Map<String, String> tagsColors,
     String? secret,
     @Default(false) bool requiresAuth,
     String? encryptedSecret,

@@ -66,6 +66,17 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, Entry> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _tagsColorMeta = const VerificationMeta(
+    'tagsColor',
+  );
+  @override
+  late final GeneratedColumn<String> tagsColor = GeneratedColumn<String>(
+    'tags_color',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _secretMeta = const VerificationMeta('secret');
   @override
   late final GeneratedColumn<String> secret = GeneratedColumn<String>(
@@ -176,6 +187,7 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, Entry> {
     content,
     metadata,
     tags,
+    tagsColor,
     secret,
     requiresAuth,
     encryptedSecret,
@@ -242,6 +254,12 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, Entry> {
       );
     } else if (isInserting) {
       context.missing(_tagsMeta);
+    }
+    if (data.containsKey('tags_color')) {
+      context.handle(
+        _tagsColorMeta,
+        tagsColor.isAcceptableOrUnknown(data['tags_color']!, _tagsColorMeta),
+      );
     }
     if (data.containsKey('secret')) {
       context.handle(
@@ -343,6 +361,10 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, Entry> {
         DriftSqlType.string,
         data['${effectivePrefix}tags'],
       )!,
+      tagsColor: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags_color'],
+      ),
       secret: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}secret'],
@@ -395,6 +417,7 @@ class Entry extends DataClass implements Insertable<Entry> {
   final String content;
   final String metadata;
   final String tags;
+  final String? tagsColor;
   final String? secret;
   final bool requiresAuth;
   final String? encryptedSecret;
@@ -411,6 +434,7 @@ class Entry extends DataClass implements Insertable<Entry> {
     required this.content,
     required this.metadata,
     required this.tags,
+    this.tagsColor,
     this.secret,
     required this.requiresAuth,
     this.encryptedSecret,
@@ -430,6 +454,9 @@ class Entry extends DataClass implements Insertable<Entry> {
     map['content'] = Variable<String>(content);
     map['metadata'] = Variable<String>(metadata);
     map['tags'] = Variable<String>(tags);
+    if (!nullToAbsent || tagsColor != null) {
+      map['tags_color'] = Variable<String>(tagsColor);
+    }
     if (!nullToAbsent || secret != null) {
       map['secret'] = Variable<String>(secret);
     }
@@ -460,6 +487,9 @@ class Entry extends DataClass implements Insertable<Entry> {
       content: Value(content),
       metadata: Value(metadata),
       tags: Value(tags),
+      tagsColor: tagsColor == null && nullToAbsent
+          ? const Value.absent()
+          : Value(tagsColor),
       secret: secret == null && nullToAbsent
           ? const Value.absent()
           : Value(secret),
@@ -494,6 +524,7 @@ class Entry extends DataClass implements Insertable<Entry> {
       content: serializer.fromJson<String>(json['content']),
       metadata: serializer.fromJson<String>(json['metadata']),
       tags: serializer.fromJson<String>(json['tags']),
+      tagsColor: serializer.fromJson<String?>(json['tagsColor']),
       secret: serializer.fromJson<String?>(json['secret']),
       requiresAuth: serializer.fromJson<bool>(json['requiresAuth']),
       encryptedSecret: serializer.fromJson<String?>(json['encryptedSecret']),
@@ -515,6 +546,7 @@ class Entry extends DataClass implements Insertable<Entry> {
       'content': serializer.toJson<String>(content),
       'metadata': serializer.toJson<String>(metadata),
       'tags': serializer.toJson<String>(tags),
+      'tagsColor': serializer.toJson<String?>(tagsColor),
       'secret': serializer.toJson<String?>(secret),
       'requiresAuth': serializer.toJson<bool>(requiresAuth),
       'encryptedSecret': serializer.toJson<String?>(encryptedSecret),
@@ -534,6 +566,7 @@ class Entry extends DataClass implements Insertable<Entry> {
     String? content,
     String? metadata,
     String? tags,
+    Value<String?> tagsColor = const Value.absent(),
     Value<String?> secret = const Value.absent(),
     bool? requiresAuth,
     Value<String?> encryptedSecret = const Value.absent(),
@@ -550,6 +583,7 @@ class Entry extends DataClass implements Insertable<Entry> {
     content: content ?? this.content,
     metadata: metadata ?? this.metadata,
     tags: tags ?? this.tags,
+    tagsColor: tagsColor.present ? tagsColor.value : this.tagsColor,
     secret: secret.present ? secret.value : this.secret,
     requiresAuth: requiresAuth ?? this.requiresAuth,
     encryptedSecret: encryptedSecret.present
@@ -570,6 +604,7 @@ class Entry extends DataClass implements Insertable<Entry> {
       content: data.content.present ? data.content.value : this.content,
       metadata: data.metadata.present ? data.metadata.value : this.metadata,
       tags: data.tags.present ? data.tags.value : this.tags,
+      tagsColor: data.tagsColor.present ? data.tagsColor.value : this.tagsColor,
       secret: data.secret.present ? data.secret.value : this.secret,
       requiresAuth: data.requiresAuth.present
           ? data.requiresAuth.value
@@ -597,6 +632,7 @@ class Entry extends DataClass implements Insertable<Entry> {
           ..write('content: $content, ')
           ..write('metadata: $metadata, ')
           ..write('tags: $tags, ')
+          ..write('tagsColor: $tagsColor, ')
           ..write('secret: $secret, ')
           ..write('requiresAuth: $requiresAuth, ')
           ..write('encryptedSecret: $encryptedSecret, ')
@@ -618,6 +654,7 @@ class Entry extends DataClass implements Insertable<Entry> {
     content,
     metadata,
     tags,
+    tagsColor,
     secret,
     requiresAuth,
     encryptedSecret,
@@ -638,6 +675,7 @@ class Entry extends DataClass implements Insertable<Entry> {
           other.content == this.content &&
           other.metadata == this.metadata &&
           other.tags == this.tags &&
+          other.tagsColor == this.tagsColor &&
           other.secret == this.secret &&
           other.requiresAuth == this.requiresAuth &&
           other.encryptedSecret == this.encryptedSecret &&
@@ -656,6 +694,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
   final Value<String> content;
   final Value<String> metadata;
   final Value<String> tags;
+  final Value<String?> tagsColor;
   final Value<String?> secret;
   final Value<bool> requiresAuth;
   final Value<String?> encryptedSecret;
@@ -673,6 +712,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     this.content = const Value.absent(),
     this.metadata = const Value.absent(),
     this.tags = const Value.absent(),
+    this.tagsColor = const Value.absent(),
     this.secret = const Value.absent(),
     this.requiresAuth = const Value.absent(),
     this.encryptedSecret = const Value.absent(),
@@ -691,6 +731,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     required String content,
     required String metadata,
     required String tags,
+    this.tagsColor = const Value.absent(),
     this.secret = const Value.absent(),
     this.requiresAuth = const Value.absent(),
     this.encryptedSecret = const Value.absent(),
@@ -716,6 +757,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     Expression<String>? content,
     Expression<String>? metadata,
     Expression<String>? tags,
+    Expression<String>? tagsColor,
     Expression<String>? secret,
     Expression<bool>? requiresAuth,
     Expression<String>? encryptedSecret,
@@ -734,6 +776,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
       if (content != null) 'content': content,
       if (metadata != null) 'metadata': metadata,
       if (tags != null) 'tags': tags,
+      if (tagsColor != null) 'tags_color': tagsColor,
       if (secret != null) 'secret': secret,
       if (requiresAuth != null) 'requires_auth': requiresAuth,
       if (encryptedSecret != null) 'encrypted_secret': encryptedSecret,
@@ -754,6 +797,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     Value<String>? content,
     Value<String>? metadata,
     Value<String>? tags,
+    Value<String?>? tagsColor,
     Value<String?>? secret,
     Value<bool>? requiresAuth,
     Value<String?>? encryptedSecret,
@@ -772,6 +816,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
       content: content ?? this.content,
       metadata: metadata ?? this.metadata,
       tags: tags ?? this.tags,
+      tagsColor: tagsColor ?? this.tagsColor,
       secret: secret ?? this.secret,
       requiresAuth: requiresAuth ?? this.requiresAuth,
       encryptedSecret: encryptedSecret ?? this.encryptedSecret,
@@ -805,6 +850,9 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     }
     if (tags.present) {
       map['tags'] = Variable<String>(tags.value);
+    }
+    if (tagsColor.present) {
+      map['tags_color'] = Variable<String>(tagsColor.value);
     }
     if (secret.present) {
       map['secret'] = Variable<String>(secret.value);
@@ -848,6 +896,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
           ..write('content: $content, ')
           ..write('metadata: $metadata, ')
           ..write('tags: $tags, ')
+          ..write('tagsColor: $tagsColor, ')
           ..write('secret: $secret, ')
           ..write('requiresAuth: $requiresAuth, ')
           ..write('encryptedSecret: $encryptedSecret, ')
@@ -1616,6 +1665,7 @@ typedef $$EntriesTableCreateCompanionBuilder =
       required String content,
       required String metadata,
       required String tags,
+      Value<String?> tagsColor,
       Value<String?> secret,
       Value<bool> requiresAuth,
       Value<String?> encryptedSecret,
@@ -1635,6 +1685,7 @@ typedef $$EntriesTableUpdateCompanionBuilder =
       Value<String> content,
       Value<String> metadata,
       Value<String> tags,
+      Value<String?> tagsColor,
       Value<String?> secret,
       Value<bool> requiresAuth,
       Value<String?> encryptedSecret,
@@ -1683,6 +1734,11 @@ class $$EntriesTableFilterComposer
 
   ColumnFilters<String> get tags => $composableBuilder(
     column: $table.tags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tagsColor => $composableBuilder(
+    column: $table.tagsColor,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1771,6 +1827,11 @@ class $$EntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get tagsColor => $composableBuilder(
+    column: $table.tagsColor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get secret => $composableBuilder(
     column: $table.secret,
     builder: (column) => ColumnOrderings(column),
@@ -1844,6 +1905,9 @@ class $$EntriesTableAnnotationComposer
   GeneratedColumn<String> get tags =>
       $composableBuilder(column: $table.tags, builder: (column) => column);
 
+  GeneratedColumn<String> get tagsColor =>
+      $composableBuilder(column: $table.tagsColor, builder: (column) => column);
+
   GeneratedColumn<String> get secret =>
       $composableBuilder(column: $table.secret, builder: (column) => column);
 
@@ -1912,6 +1976,7 @@ class $$EntriesTableTableManager
                 Value<String> content = const Value.absent(),
                 Value<String> metadata = const Value.absent(),
                 Value<String> tags = const Value.absent(),
+                Value<String?> tagsColor = const Value.absent(),
                 Value<String?> secret = const Value.absent(),
                 Value<bool> requiresAuth = const Value.absent(),
                 Value<String?> encryptedSecret = const Value.absent(),
@@ -1929,6 +1994,7 @@ class $$EntriesTableTableManager
                 content: content,
                 metadata: metadata,
                 tags: tags,
+                tagsColor: tagsColor,
                 secret: secret,
                 requiresAuth: requiresAuth,
                 encryptedSecret: encryptedSecret,
@@ -1948,6 +2014,7 @@ class $$EntriesTableTableManager
                 required String content,
                 required String metadata,
                 required String tags,
+                Value<String?> tagsColor = const Value.absent(),
                 Value<String?> secret = const Value.absent(),
                 Value<bool> requiresAuth = const Value.absent(),
                 Value<String?> encryptedSecret = const Value.absent(),
@@ -1965,6 +2032,7 @@ class $$EntriesTableTableManager
                 content: content,
                 metadata: metadata,
                 tags: tags,
+                tagsColor: tagsColor,
                 secret: secret,
                 requiresAuth: requiresAuth,
                 encryptedSecret: encryptedSecret,

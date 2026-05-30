@@ -110,6 +110,9 @@ class EntryDao {
       content: Value(entry.content),
       metadata: Value(jsonEncode(entry.metadata)),
       tags: Value(jsonEncode(entry.tags)),
+      tagsColor: entry.tagsColors.isEmpty
+          ? const Value(null)
+          : Value(jsonEncode(entry.tagsColors)),
       secret: Value(entry.secret),
       requiresAuth: Value(entry.requiresAuth),
       encryptedSecret: Value(entry.encryptedSecret),
@@ -130,6 +133,7 @@ class EntryDao {
       'content': row.content,
       'metadata': row.metadata,
       'tags': row.tags,
+      'tags_color': row.tagsColor,
       'secret': row.secret,
       'requiresAuth': row.requiresAuth,
       'encryptedSecret': row.encryptedSecret,
@@ -176,6 +180,7 @@ class EntryDao {
 
   Entry _fromMap(Map<String, dynamic> data) {
     final tagsRaw = _val<String>(data, 'tags', 'tags');
+    final tagsColorsRaw = _val<String>(data, 'tagsColors', 'tags_color');
     final metadataRaw = _val<String>(data, 'metadata', 'metadata');
 
     return Entry(
@@ -187,6 +192,9 @@ class EntryDao {
           ? Map<String, String>.from(jsonDecode(metadataRaw) as Map)
           : {},
       tags: tagsRaw != null ? List<String>.from(jsonDecode(tagsRaw) as List) : [],
+      tagsColors: tagsColorsRaw != null
+          ? Map<String, String>.from(jsonDecode(tagsColorsRaw) as Map)
+          : {},
       secret: _val<String>(data, 'secret', 'secret'),
       requiresAuth: _bool(data, 'requiresAuth', 'requires_auth'),
       encryptedSecret: _val<String>(data, 'encryptedSecret', 'encrypted_secret'),

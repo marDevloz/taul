@@ -208,9 +208,9 @@ void main() {
     });
   });
 
-  group('Migration v3→v4', () {
-    test('schema_version_should_be_4', () {
-      expect(database.schemaVersion, 4);
+  group('Schema version', () {
+    test('schema_version_should_be_6', () {
+      expect(database.schemaVersion, 6);
     });
 
     test('should_have_backup_code_data_column_available', () async {
