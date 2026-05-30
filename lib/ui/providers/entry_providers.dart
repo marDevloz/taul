@@ -190,12 +190,34 @@ final searchResultsProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
 
 final selectedTypeFilterProvider = StateProvider<EntryType?>((ref) => null);
 
+/// Tag seleccionado para filtrar. `null` = mostrar todos.
+final selectedTagFilterProvider = StateProvider<String?>((ref) => null);
+
+/// Todos los tags únicos de entradas no eliminadas.
+/// Ordenados por frecuencia de uso (más usado primero).
+final tagsListProvider = Provider<List<String>>((ref) {
+  final entries = ref.watch(entryListProvider).valueOrNull ?? [];
+  final freq = <String, int>{};
+  for (final e in entries) {
+    for (final tag in e.tags) {
+      freq[tag] = (freq[tag] ?? 0) + 1;
+    }
+  }
+  final sorted = freq.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  return sorted.map((e) => e.key).toList();
+});
+
 final filteredEntriesProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
   final type = ref.watch(selectedTypeFilterProvider);
+  final tag = ref.watch(selectedTagFilterProvider);
   final entries = ref.watch(entryListProvider).valueOrNull ?? [];
   var result = entries;
   if (type != null) {
     result = result.where((e) => e.type == type).toList();
+  }
+  if (tag != null && tag.isNotEmpty) {
+    result = result.where((e) => e.tags.contains(tag)).toList();
   }
   return result;
 });

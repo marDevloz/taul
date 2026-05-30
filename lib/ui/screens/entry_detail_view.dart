@@ -112,6 +112,11 @@ class EntryDetailView extends ConsumerWidget {
       },
       child: Scaffold(
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: 'Volver',
+            onPressed: () => context.pop(),
+          ),
           title: Text(entryAsync.valueOrNull?.type.label ?? 'Entrada'),
           actions: [
             IconButton(
@@ -371,12 +376,12 @@ class EntryDetailView extends ConsumerWidget {
   }
 }
 
-class _NoteContent extends StatelessWidget {
+class _NoteContent extends ConsumerWidget {
   final Entry entry;
   const _NoteContent({required this.entry});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isWide = MediaQuery.of(context).size.width >= Breakpoints.tablet;
 
@@ -392,7 +397,11 @@ class _NoteContent extends StatelessWidget {
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           const SizedBox(height: 8),
-          Text(entry.title, style: theme.textTheme.headlineSmall),
+          Text(entry.title.isNotEmpty ? entry.title : '(sin título)',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
+                color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
+              )),
           const SizedBox(height: 16),
           MarkdownBody(
             data: entry.content,
@@ -400,11 +409,15 @@ class _NoteContent extends StatelessWidget {
           ),
           if (entry.tags.isNotEmpty) ...[
             const SizedBox(height: 16),
-            Wrap(spacing: 6, children: entry.tags.map((t) => Chip(
+            Wrap(spacing: 6, children: entry.tags.map((t) => ActionChip(
               label: Text(t, style: const TextStyle(fontSize: 12)),
               visualDensity: VisualDensity.compact,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              onPressed: () {
+                ref.read(selectedTagFilterProvider.notifier).state = t;
+                context.pop();
+              },
             )).toList()),
           ],
           const SizedBox(height: 24),
@@ -470,7 +483,11 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
               children: [
                 const Icon(Icons.lock, size: 40, color: Colors.amber),
                 const SizedBox(height: 8),
-                Text(entry.title, style: theme.textTheme.headlineSmall),
+          Text(entry.title.isNotEmpty ? entry.title : '(sin título)',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
+                color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
+              )),
               ],
             ),
           ),
@@ -514,7 +531,16 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
           ],
           if (entry.tags.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Wrap(spacing: 6, children: entry.tags.map((t) => Chip(label: Text(t))).toList()),
+            Wrap(spacing: 6, children: entry.tags.map((t) => ActionChip(
+              label: Text(t),
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              onPressed: () {
+                ref.read(selectedTagFilterProvider.notifier).state = t;
+                context.pop();
+              },
+            )).toList()),
           ],
           const SizedBox(height: 24),
           Text('Creado: ${_formatDate(entry.createdAt)}', style: theme.textTheme.bodySmall),

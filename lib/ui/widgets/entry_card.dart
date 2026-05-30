@@ -48,10 +48,13 @@ class EntryCard extends StatelessWidget {
       child: ListTile(
         leading: Icon(_typeIcon, color: theme.colorScheme.primary),
         title: Text(
-          entry.title,
+          entry.title.isNotEmpty ? entry.title : '(sin título)',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleSmall,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
+            color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
+          ),
         ),
         subtitle: subtitle ?? Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,10 +105,13 @@ class EntryCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                entry.title,
+                entry.title.isNotEmpty ? entry.title : '(sin título)',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
+                  color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
+                ),
               ),
               const SizedBox(height: 4),
               Text(

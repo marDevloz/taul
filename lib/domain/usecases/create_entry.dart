@@ -1,4 +1,3 @@
-import 'package:taul/core/errors/failures.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/domain/repositories/i_entry_repository.dart';
@@ -26,10 +25,6 @@ class CreateEntry {
     List<String> tags = const [],
     Map<String, String> metadata = const {},
   }) async {
-    if (title.trim().isEmpty) {
-      throw const ValidationFailure(message: 'Title cannot be empty');
-    }
-
     final now = DateTime.now();
     final entry = Entry(
       id: _uuid.v4(),

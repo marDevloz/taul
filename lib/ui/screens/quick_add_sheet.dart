@@ -5,7 +5,7 @@ import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
 class QuickAddSheet extends ConsumerStatefulWidget {
-  final VoidCallback? onCredentialRequested;
+  final Future<void> Function()? onCredentialRequested;
 
   const QuickAddSheet({super.key, this.onCredentialRequested});
 
@@ -21,9 +21,9 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
 
   static const _typeHints = {
     EntryType.note: 'Texto libre',
-    EntryType.idea: '! idea genial',
-    EntryType.glossary: 'Término: definición',
-    EntryType.credential: 'servicio,*usuario,*contraseña,#tag1,tag2',
+    EntryType.idea: '!idea genial',
+    EntryType.glossary: 'Término:definición',
+    EntryType.credential: 'servicio*user*pass*url(opcional) -#tag',
   };
 
   /// Tipo efectivo: si el usuario eligió uno manual, ese; si no, el auto-detectado.
@@ -47,13 +47,31 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     super.dispose();
   }
 
+  /// Busca "Title# " al inicio del texto y devuelve title + el resto.
+  /// El separador es `#` solo — tags ahora usan `-#` así que no hay colisión.
+  /// Ej: "Salsa# !idea genial" → (title:"Salsa", rest:"!idea genial")
+  ({String title, String rest}) _splitTitle(String raw) {
+    for (int i = 0; i < raw.length; i++) {
+      if (raw[i] == '#' && i + 1 < raw.length && raw[i + 1] == ' ') {
+        return (
+          title: raw.substring(0, i).trim(),
+          rest: raw.substring(i + 1).trim(),
+        );
+      }
+    }
+    return (title: '', rest: raw);
+  }
+
   void _onTextChanged(String text) {
+    // Ignorar el Title# para la detección de tipo
+    final rest = _splitTitle(text).rest;
     setState(() {
-      if (text.startsWith('!')) {
+      if (rest.startsWith('!')) {
         _detectedType = EntryType.idea;
-      } else if (text.contains('*')) {
+      } else if (rest.contains('*')) {
         _detectedType = EntryType.credential;
-      } else if (text.contains(':')) {
+      } else if (RegExp(r'\w:').hasMatch(rest)) {
+        // Detect "word:" pattern for glossary (no space before :)
         _detectedType = EntryType.glossary;
       } else {
         _detectedType = EntryType.note;
@@ -61,13 +79,82 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     });
   }
 
-  /// Extrae los #tags de un texto y devuelve el texto limpio + los tags.
+  /// Extrae los -#tags de un texto y devuelve el texto limpio + los tags.
+  /// El formato exacto es `-#tag` — el `-` antes de `#` es el marker.
+  /// Los tags pueden contener guiones: `-#gol-caracol`.
   ({String clean, List<String> tags}) _extractTags(String raw) {
-    final re = RegExp(r'#(\w+)');
+    final re = RegExp(r'-#([\w-]+)');
     final matches = re.allMatches(raw);
     final tags = matches.map((m) => m.group(1)!).toList();
     final clean = raw.replaceAll(re, '').replaceAll(RegExp(r'\s+'), ' ').trim();
     return (clean: clean, tags: tags);
+  }
+
+  /// Vista previa del parseo: muestra tipo detectado, título y tags.
+  Widget _buildParsePreview() {
+    final rawText = _controller.text.trim();
+    if (rawText.isEmpty) return const SizedBox.shrink();
+
+    final extracted = _extractTags(rawText);
+    final parsed = _splitTitle(extracted.clean);
+    final type = _effectiveType;
+    final tags = extracted.tags;
+
+    // Build preview chips
+    final chips = <Widget>[];
+
+    // Type chip
+    chips.add(_PreviewChip(
+      icon: _iconForType(type),
+      label: _labelForType(type),
+      color: Theme.of(context).colorScheme.primaryContainer,
+    ));
+
+    // Title chip (only if explicitly set)
+    if (parsed.title.isNotEmpty) {
+      chips.add(_PreviewChip(
+        icon: Icons.title,
+        label: '"${parsed.title}"',
+        color: Theme.of(context).colorScheme.tertiaryContainer,
+      ));
+    }
+
+    // Tags chips
+    for (final tag in tags) {
+      chips.add(_PreviewChip(
+        icon: Icons.tag,
+        label: tag,
+        color: Theme.of(context).colorScheme.secondaryContainer,
+      ));
+    }
+
+    // Credential preview (service + masked user + url)
+    if (type == EntryType.credential) {
+      final cred = CredentialParser.parse(rawText);
+      if (cred != null) {
+        chips.add(_PreviewChip(
+          icon: Icons.person,
+          label: CredentialParser.maskUsername(cred.username),
+          color: Theme.of(context).colorScheme.errorContainer,
+        ));
+        if (cred.url.isNotEmpty) {
+          chips.add(_PreviewChip(
+            icon: Icons.link,
+            label: cred.url,
+            color: Theme.of(context).colorScheme.tertiaryContainer,
+          ));
+        }
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        children: chips,
+      ),
+    );
   }
 
   Future<void> _save() async {
@@ -76,13 +163,17 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
 
     setState(() => _isSaving = true);
 
-    // Extraer #tags de todo el texto primero (aplica a todos los tipos)
+    // Extraer #tags de todo el texto original
     final extracted = _extractTags(rawText);
     final text = extracted.clean;
     List<String> tags = extracted.tags;
 
-    final type = _effectiveType;
-    String title;
+    // Extraer título opcional: "Title# resto"
+    final parsed = _splitTitle(text);
+    String entryTitle = parsed.title;
+    final body = parsed.rest;
+
+    var type = _effectiveType;
     String content;
     Map<String, String> metadata = {};
     String? secret;
@@ -90,42 +181,52 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
 
     switch (type) {
       case EntryType.idea:
-        title = text.substring(1).trim();
-        content = title;
+        // Sacar el ! del inicio y el resto es contenido
+        content = body.startsWith('!') ? body.substring(1).trim() : body;
       case EntryType.glossary:
-        final splitIdx = text.indexOf(':');
-        title = text.substring(0, splitIdx).trim();
-        content = text.substring(splitIdx + 1).trim();
-      case EntryType.credential:
-        final parsed = CredentialParser.parse(rawText);
-        if (parsed != null) {
-          title = parsed.service;
-          content = parsed.username.isNotEmpty ? 'Usuario: ${parsed.username}' : parsed.service;
-          metadata = {'username': parsed.username};
-          secret = parsed.password;
-          requiresAuth = true;
-          // Fusionar tags sin duplicar: _extractTags ya atrapó #tag,
-          // CredentialParser además atrapa el formato #tag1,tag2
-          tags = {...tags, ...parsed.tags}.toList();
+        final splitIdx = body.indexOf(':');
+        if (splitIdx >= 0) {
+          // Si no hay título explícito, usar el término como título (backward compat)
+          if (entryTitle.isEmpty) {
+            entryTitle = body.substring(0, splitIdx).trim();
+          }
+          content = body.substring(splitIdx + 1).trim();
         } else {
-          title = text;
-          content = text;
+          content = body;
+        }
+      case EntryType.credential:
+        final parsedCred = CredentialParser.parse(rawText);
+        if (parsedCred != null) {
+          if (entryTitle.isEmpty) entryTitle = parsedCred.service;
+          content = parsedCred.username.isNotEmpty
+              ? 'Usuario: ${parsedCred.username}'
+              : parsedCred.service;
+          metadata = {
+            if (parsedCred.username.isNotEmpty) 'username': parsedCred.username,
+            if (parsedCred.url.isNotEmpty) 'url': parsedCred.url,
+          };
+          secret = parsedCred.password;
+          requiresAuth = true;
+          tags = {...tags, ...parsedCred.tags}.toList();
+        } else {
+          // Parser no encontró * — guardar como nota
+          type = EntryType.note;
+          content = body;
         }
       case EntryType.note:
-        title = text;
-        content = text;
+        content = body;
     }
 
     try {
       await ref.read(createEntryProvider).call(
-        title: title,
-        content: content,
-        type: type,
-        secret: secret,
-        requiresAuth: requiresAuth,
-        metadata: metadata,
-        tags: tags,
-      );
+            title: entryTitle,
+            content: content,
+            type: type,
+            secret: secret,
+            requiresAuth: requiresAuth,
+            metadata: metadata,
+            tags: tags,
+          );
       ref.invalidate(entryListProvider);
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -228,27 +329,27 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                   onPressed: () => _selectHint('Texto libre'),
                 ),
                 ActionChip(
-                  label: const Text('! idea', style: TextStyle(fontSize: 10)),
+                  label: const Text('!idea', style: TextStyle(fontSize: 10)),
                   avatar: const Icon(Icons.lightbulb, size: 12),
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
-                  onPressed: () => _selectHint('! idea genial'),
+                  onPressed: () => _selectHint('!idea genial'),
                 ),
                 ActionChip(
-                  label: const Text('Término: definición', style: TextStyle(fontSize: 10)),
+                  label: const Text('Término:def', style: TextStyle(fontSize: 10)),
                   avatar: const Icon(Icons.book, size: 12),
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
-                  onPressed: () => _selectHint('Término: definición'),
+                  onPressed: () => _selectHint('Término:definición'),
                 ),
                 ActionChip(
                   label: const Text('🔒 Credencial', style: TextStyle(fontSize: 10)),
                   avatar: const Icon(Icons.lock, size: 12),
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
-                  onPressed: () {
-                    Navigator.pop(context);
-                    widget.onCredentialRequested?.call();
+                  onPressed: () async {
+                    await widget.onCredentialRequested?.call();
+                    if (mounted && context.mounted) Navigator.pop(context);
                   },
                 ),
               ],
@@ -260,18 +361,25 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
             ),
           const SizedBox(height: 6),
 
-          // Text input
+          // Text input — estilo papel de notas
           TextField(
             controller: _controller,
             autofocus: true,
             onChanged: _onTextChanged,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: 'Escribí algo...',
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             ),
-            maxLines: 4,
-            minLines: 1,
+            maxLines: 8,
+            minLines: 3,
+            style: const TextStyle(height: 1.5),
           ),
+
+          // Parse preview
+          _buildParsePreview(),
+
           const SizedBox(height: 12),
 
           // Save button
@@ -303,5 +411,37 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
       EntryType.glossary => 'Glosario',
       EntryType.credential => 'Credencial',
     };
+  }
+}
+
+/// Chip compacto para el preview de parseo.
+class _PreviewChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _PreviewChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(fontSize: 11)),
+        ],
+      ),
+    );
   }
 }

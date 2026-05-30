@@ -7,8 +7,9 @@ import 'package:taul/ui/screens/credential_protection_controller.dart';
 
 class CredentialFormSheet extends ConsumerStatefulWidget {
   final Entry? entry;
+  final VoidCallback? onGoBack;
 
-  const CredentialFormSheet({super.key, this.entry});
+  const CredentialFormSheet({super.key, this.entry, this.onGoBack});
 
   @override
   ConsumerState<CredentialFormSheet> createState() => _CredentialFormSheetState();
@@ -156,6 +157,15 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
           children: [
             Row(
               children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, size: 20),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    widget.onGoBack?.call();
+                  },
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
                 const Icon(Icons.lock, size: 20),
                 const SizedBox(width: 8),
                 Text(

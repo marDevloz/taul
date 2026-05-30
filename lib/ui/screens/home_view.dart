@@ -19,7 +19,7 @@ class HomeView extends ConsumerWidget {
     // Listen for Ctrl+N shortcut events (fired from AppKeyboardShortcuts).
     ref.listen<int>(createEntryEventProvider, (prev, next) {
       if (prev != null && next != prev) {
-        _showNewEntryOptions(context);
+        _showQuickAdd(context);
       }
     });
 
@@ -71,6 +71,7 @@ class HomeView extends ConsumerWidget {
         children: [
           const TaulSearchBar(),
           const FilterChipsRow(),
+          const TagFilterRow(),
           const SizedBox(height: 8),
           Expanded(
             child: entriesAsync.when(
@@ -116,7 +117,7 @@ class HomeView extends ConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showNewEntryOptions(context),
+        onPressed: () => _showQuickAdd(context),
         child: const Icon(Icons.add),
       ),
     );
@@ -133,48 +134,13 @@ class HomeView extends ConsumerWidget {
     }
 
     return EmptyStateAll(
-      onCreateEntry: () => _showNewEntryOptions(context),
+      onCreateEntry: () => _showQuickAdd(context),
     );
   }
 
   void _openEntry(BuildContext context, String id) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => EntryDetailView(entryId: id)),
-    );
-  }
-
-  void _showNewEntryOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.edit_note),
-                title: const Text('Nota, idea o glosario'),
-                subtitle: const Text('Texto libre — detecta el tipo automáticamente'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showQuickAdd(context);
-                },
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.lock),
-                title: const Text('Credencial'),
-                subtitle: const Text('Servicio, usuario y contraseña'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showCredentialForm(context);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -188,11 +154,13 @@ class HomeView extends ConsumerWidget {
     );
   }
 
-  void _showCredentialForm(BuildContext context) {
-    showModalBottomSheet(
+  Future<void> _showCredentialForm(BuildContext context) async {
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const CredentialFormSheet(),
+      builder: (_) => CredentialFormSheet(
+        onGoBack: () => _showQuickAdd(context),
+      ),
     );
   }
 
@@ -221,10 +189,10 @@ class _ShortcutsSheet extends StatelessWidget {
 
     final typeHints = [
       ('Texto común', 'Escribí directo'),
-      ('!  algo', 'Idea (empieza con !)'),
-      ('término: def', 'Glosario (tiene :)'),
-      ('*usuario,*pass', 'Credencial (tiene *)'),
-      ('#tag', 'Tags en cualquier tipo'),
+      ('!idea', 'Idea'),
+      ('Término:def', 'Glosario'),
+      ('servicio*user*pass[*url]', 'Credencial'),
+      ('-#tag', 'Tags'),
     ];
 
     return Padding(
