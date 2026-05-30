@@ -169,16 +169,17 @@ class EntryCard extends StatelessWidget {
                             const SizedBox(width: 6),
                             GestureDetector(
                               onTap: () {
-                                Clipboard.setData(ClipboardData(text: entry.title));
+                                final text = '${entry.title}\n\n${entry.content}';
+                                Clipboard.setData(ClipboardData(text: text));
                                 ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                                  SnackBar(
-                                    content: Text('Título copiado: ${entry.title}'),
-                                    duration: const Duration(seconds: 2),
+                                  const SnackBar(
+                                    content: Text('Contenido copiado'),
+                                    duration: Duration(seconds: 2),
                                   ),
                                 );
                               },
                               child: Text(
-                                'Copiar título',
+                                'Copiar todo',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.primary,
                                   decoration: TextDecoration.underline,
