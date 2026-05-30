@@ -138,12 +138,29 @@ class EntryCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        _displayContent,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall,
-                      ),
+                      if (isSecure)
+                        Row(
+                          children: [
+                            Icon(Icons.lock_outline, size: 14, color: theme.colorScheme.primary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Esta entrada está protegida',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Text(
+                          _displayContent,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
                     ],
                   ),
                   trailing: trailingAction ?? Text(
@@ -160,26 +177,7 @@ class EntryCard extends StatelessWidget {
                           entry: entry,
                           isSecure: isSecure,
                         )
-                      : isSecure
-                          ? Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.lock_outline, size: 14, color: theme.colorScheme.primary),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      'Esta entrada está protegida',
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: theme.colorScheme.onSurfaceVariant,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : const SizedBox.shrink(),
+                      : const SizedBox.shrink(),
                 ),
               ],
             ),
@@ -277,12 +275,29 @@ class EntryCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    _displayContent,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  if (isSecure)
+                    Row(
+                      children: [
+                        Icon(Icons.lock_outline, size: 14, color: theme.colorScheme.primary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Esta entrada está protegida',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Text(
+                      _displayContent,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
+                    ),
                 ],
               ),
             ),

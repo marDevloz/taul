@@ -123,10 +123,10 @@ class _HomeViewState extends ConsumerState<HomeView> {
                                     : () async {
                                         final ok = await showMasterPasswordGate(context: context, ref: ref);
                                         if (!ok || !context.mounted) return;
-                                        _unlockEntry(entry.id);
                                         if (isCredential) {
                                           _openEntry(context, entry.id);
                                         } else {
+                                          _unlockEntry(entry.id);
                                           setState(() {
                                             _expandedEntryId = entry.id;
                                           });
@@ -137,7 +137,6 @@ class _HomeViewState extends ConsumerState<HomeView> {
                                     : () async {
                                         final ok = await showMasterPasswordGate(context: context, ref: ref);
                                         if (!ok || !context.mounted) return;
-                                        _unlockEntry(entry.id);
                                         _openEntry(context, entry.id);
                                       },
                                 onTap: _isSelectMode ? null : () => _openEntry(context, entry.id),
@@ -163,6 +162,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                             final isSecure = ref.watch(hasSecureTagProvider(entry.id));
                             final isUnlocked = _unlockedEntryIds.contains(entry.id);
                             final showLocked = isSecure && !isUnlocked;
+                            final isCredential = entry.type.label == 'credential';
                             return EntryCard(
                               entry: entry,
                               isGrid: true,
@@ -170,25 +170,20 @@ class _HomeViewState extends ConsumerState<HomeView> {
                               isSecure: showLocked,
                               isSelected: _selectedEntryIds.contains(entry.id),
                               onLongPress: () => _enterSelectMode(entry.id),
-                              onTapGated: _isSelectMode
-                                  ? null
-                                  : () async {
-                                      final ok = await showMasterPasswordGate(context: context, ref: ref);
-                                      if (!ok || !context.mounted) return;
-                                      _unlockEntry(entry.id);
-                                      _openEntry(context, entry.id);
-                                    },
-                              onDoubleTapGated: _isSelectMode
-                                  ? null
-                                  : () async {
-                                      final ok = await showMasterPasswordGate(context: context, ref: ref);
-                                      if (!ok || !context.mounted) return;
-                                      _unlockEntry(entry.id);
-                                      _openEntry(context, entry.id);
-                                    },
                               onTap: _isSelectMode
                                   ? () => _toggleSelection(entry.id)
-                                  : () => _openEntry(context, entry.id),
+                                  : showLocked
+                                      ? () async {
+                                          final ok = await showMasterPasswordGate(context: context, ref: ref);
+                                          if (!ok || !context.mounted) return;
+                                          if (isCredential) {
+                                            _openEntry(context, entry.id);
+                                          } else {
+                                            _unlockEntry(entry.id);
+                                            _openEntry(context, entry.id);
+                                          }
+                                        }
+                                      : () => _openEntry(context, entry.id),
                             );
                           },
                         );
