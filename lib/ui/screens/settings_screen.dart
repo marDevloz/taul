@@ -111,6 +111,16 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _importData(context, ref),
           ),
           const Divider(),
+          // ── Tag Management Section ──
+          _sectionHeader(context, 'Etiquetas'),
+          _actionTile(
+            context,
+            icon: Icons.label,
+            title: 'Gestionar etiquetas',
+            subtitle: 'Crear, editar y eliminar etiquetas',
+            onTap: () => context.push('/settings/tags'),
+          ),
+          const Divider(),
           // Danger Zone
           _sectionHeader(context, 'Zona de Peligro'),
           _actionTile(
@@ -174,12 +184,14 @@ class SettingsScreen extends ConsumerWidget {
     BuildContext context, {
     required IconData icon,
     required String title,
+    String? subtitle,
     required VoidCallback onTap,
     Color? textColor,
   }) {
     return ListTile(
       leading: Icon(icon, color: textColor),
       title: Text(title, style: textColor != null ? TextStyle(color: textColor) : null),
+      subtitle: subtitle != null ? Text(subtitle) : null,
       trailing: const Icon(Icons.chevron_right, size: 20),
       onTap: onTap,
     );

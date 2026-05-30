@@ -17,6 +17,9 @@ import 'package:taul/domain/usecases/update_entry_tags_colors.dart';
 import 'package:taul/infrastructure/database/app_database.dart' as db;
 import 'package:taul/infrastructure/database/entry_dao.dart';
 import 'package:taul/infrastructure/database/entry_repository_impl.dart';
+import 'package:taul/infrastructure/database/tag_settings_dao.dart';
+import 'package:taul/infrastructure/database/tag_settings_repository_impl.dart';
+import 'package:taul/domain/repositories/i_tag_settings_repository.dart';
 import 'package:taul/infrastructure/export/export_service.dart';
 import 'package:taul/infrastructure/export/import_service.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
@@ -118,6 +121,14 @@ final credentialProtectionControllerProvider =
 
 final entryRepositoryProvider = Provider<IEntryRepository>((ref) {
   return EntryRepositoryImpl(dao: ref.watch(daoProvider));
+});
+
+final tagSettingsDaoProvider = Provider<TagSettingsDao>((ref) {
+  return TagSettingsDao(ref.watch(databaseProvider));
+});
+
+final tagSettingsRepositoryProvider = Provider<ITagSettingsRepository>((ref) {
+  return TagSettingsRepositoryImpl(dao: ref.watch(tagSettingsDaoProvider));
 });
 
 final exportServiceProvider = Provider<ExportService>((ref) {

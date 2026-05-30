@@ -7,6 +7,7 @@ import 'package:taul/ui/screens/home_view.dart';
 import 'package:taul/ui/screens/entry_detail_view.dart';
 import 'package:taul/ui/screens/lock_screen.dart';
 import 'package:taul/ui/screens/settings_screen.dart';
+import 'package:taul/ui/screens/tag_management_screen.dart';
 import 'package:taul/ui/screens/trash_screen.dart';
 import 'package:taul/ui/widgets/inactivity_detector.dart';
 import 'package:taul/ui/widgets/keyboard_shortcuts.dart';
@@ -29,6 +30,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         name: 'settings',
         builder: (_, __) => const SettingsScreen(),
+        routes: [
+          GoRoute(
+            path: 'tags',
+            name: 'tags',
+            builder: (_, __) => const TagManagementScreen(),
+          ),
+        ],
       ),
       GoRoute(
         path: '/trash',

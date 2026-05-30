@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/shared/tag_color_mixer.dart';
 import 'package:taul/shared/tag_palette.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/providers/tag_settings_providers.dart';
 
 /// Pre-computes the mixed display color for an entry.
 ///
@@ -43,22 +44,17 @@ final tagColorForEntryProvider =
   },
 );
 
-/// Builds a global map of tag → first-assigned Color found across all visible
-/// entries. Used by the filter row to show colored tag pills.
+/// Builds a global map of tag → Color from the tag_settings table as the
+/// canonical source of truth. Used by the filter row to show colored tag pills.
 ///
-/// Scans all non-deleted entries in [entryListProvider] and picks the first
-/// color assigned to each tag. If no entry assigns a color to a particular
-/// tag, that tag is omitted from the map (no background color in the pill).
+/// Falls back to the old entry-scanned approach only for tags without a
+/// setting (backward compatible during migration).
 final tagColorMapProvider = Provider.autoDispose<Map<String, Color>>((ref) {
-  final entries = ref.watch(entryListProvider).valueOrNull ?? [];
+  final tagMap = ref.watch(tagSettingsMapProvider);
   final result = <String, Color>{};
-  for (final entry in entries) {
-    for (final tag in entry.tags) {
-      if (result.containsKey(tag)) continue;
-      final hex = entry.tagsColors[tag];
-      if (hex != null) {
-        result[tag] = _parseHex(hex);
-      }
+  for (final entry in tagMap.entries) {
+    if (entry.value.color != null) {
+      result[entry.key] = _parseHex(entry.value.color!);
     }
   }
   return result;
