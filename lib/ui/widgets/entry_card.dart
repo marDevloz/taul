@@ -154,7 +154,7 @@ class EntryCard extends StatelessWidget {
                             ),
                           ],
                         )
-                      else
+                      else if (!isExpanded)
                         Text(
                           _displayContent,
                           maxLines: 2,
