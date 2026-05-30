@@ -277,7 +277,10 @@ class _HomeViewState extends ConsumerState<HomeView> {
 
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => MergeEditorScreen(initialText: mergedText),
+          builder: (_) => MergeEditorScreen(
+            initialText: mergedText,
+            sourceEntries: selected,
+          ),
         ),
       ).then((saved) {
         if (saved == true) {
