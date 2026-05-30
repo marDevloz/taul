@@ -38,6 +38,11 @@ class EntryRepositoryImpl implements IEntryRepository {
   Future<Entry> update(Entry entry) => _dao.update(entry);
 
   @override
+  Future<void> updateTagsColors(String id, Map<String, String> tagsColors) {
+    return _dao.updateTagsColors(id, tagsColors);
+  }
+
+  @override
   Future<void> softDelete(String id) async {
     final entry = await getById(id);
     final updated = entry.copyWith(deletedAt: DateTime.now(), updatedAt: DateTime.now());

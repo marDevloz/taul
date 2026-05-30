@@ -13,6 +13,7 @@ import 'package:taul/domain/usecases/list_entries.dart';
 import 'package:taul/domain/usecases/restore_entry.dart';
 import 'package:taul/domain/usecases/search_entries.dart';
 import 'package:taul/domain/usecases/update_entry.dart';
+import 'package:taul/domain/usecases/update_entry_tags_colors.dart';
 import 'package:taul/infrastructure/database/app_database.dart' as db;
 import 'package:taul/infrastructure/database/entry_dao.dart';
 import 'package:taul/infrastructure/database/entry_repository_impl.dart';
@@ -139,6 +140,10 @@ final getEntryProvider = Provider<GetEntry>((ref) {
 
 final updateEntryProvider = Provider<UpdateEntry>((ref) {
   return UpdateEntry(repository: ref.watch(entryRepositoryProvider));
+});
+
+final updateEntryTagsColorsProvider = Provider<UpdateEntryTagsColors>((ref) {
+  return UpdateEntryTagsColors(repository: ref.watch(entryRepositoryProvider));
 });
 
 final deleteEntryProvider = Provider<DeleteEntry>((ref) {

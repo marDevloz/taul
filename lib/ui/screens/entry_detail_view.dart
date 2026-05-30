@@ -523,11 +523,8 @@ class _NoteContent extends ConsumerWidget {
       final newTagsColors = Map<String, String>.from(entry.tagsColors);
       newTagsColors[tagName] = selectedHex;
 
-      // Save updated entry
-      await ref.read(updateEntryProvider).call(
-        entry,
-        tagsColors: newTagsColors,
-      );
+      // Save updated entry via tagsColors-only use case (no version bump)
+      await ref.read(updateEntryTagsColorsProvider).call(entry, newTagsColors);
 
       // Propagate color to ALL entries sharing this tag
       final allEntries = ref.read(entryListProvider).valueOrNull ?? [];
@@ -536,7 +533,7 @@ class _NoteContent extends ConsumerWidget {
         final otherColors = Map<String, String>.from(other.tagsColors);
         if (otherColors[tagName] != selectedHex) {
           otherColors[tagName] = selectedHex;
-          await ref.read(updateEntryProvider).call(other, tagsColors: otherColors);
+          await ref.read(updateEntryTagsColorsProvider).call(other, otherColors);
         }
       }
 
@@ -1056,11 +1053,8 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
       final newTagsColors = Map<String, String>.from(entry.tagsColors);
       newTagsColors[tagName] = selectedHex;
 
-      // Save updated entry
-      await ref.read(updateEntryProvider).call(
-        entry,
-        tagsColors: newTagsColors,
-      );
+      // Save updated entry via tagsColors-only use case (no version bump)
+      await ref.read(updateEntryTagsColorsProvider).call(entry, newTagsColors);
 
       // Propagate color to ALL entries sharing this tag
       final allEntries = ref.read(entryListProvider).valueOrNull ?? [];
@@ -1069,7 +1063,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
         final otherColors = Map<String, String>.from(other.tagsColors);
         if (otherColors[tagName] != selectedHex) {
           otherColors[tagName] = selectedHex;
-          await ref.read(updateEntryProvider).call(other, tagsColors: otherColors);
+          await ref.read(updateEntryTagsColorsProvider).call(other, otherColors);
         }
       }
 

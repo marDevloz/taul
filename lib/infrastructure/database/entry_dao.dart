@@ -26,6 +26,14 @@ class EntryDao {
     return entry;
   }
 
+  Future<void> updateTagsColors(String id, Map<String, String> tagsColors) async {
+    final tagsColorValue =
+        tagsColors.isEmpty ? const Value(null) : Value(jsonEncode(tagsColors));
+    await (_database.update(_database.entries)
+      ..where((t) => t.id.equals(id)))
+        .write(db.EntriesCompanion(tagsColor: tagsColorValue));
+  }
+
   Future<void> delete(String id) async {
     await (_database.delete(_database.entries)
       ..where((t) => t.id.equals(id)))
