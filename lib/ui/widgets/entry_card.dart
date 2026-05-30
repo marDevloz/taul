@@ -15,6 +15,8 @@ class EntryCard extends StatelessWidget {
   final VoidCallback? onToggle;
   final bool isSecure;
   final VoidCallback? onUnlock;
+  final bool isSelected;
+  final VoidCallback? onLongPress;
 
   const EntryCard({
     super.key,
@@ -28,6 +30,8 @@ class EntryCard extends StatelessWidget {
     this.onToggle,
     this.isSecure = false,
     this.onUnlock,
+    this.isSelected = false,
+    this.onLongPress,
   });
 
   IconData get _typeIcon {
@@ -58,23 +62,29 @@ class EntryCard extends StatelessWidget {
     return GestureDetector(
       onTap: isSecure ? null : onToggle,
       onDoubleTap: onTap,
+      onLongPress: onLongPress,
       child: Card(
         margin: const EdgeInsets.symmetric(vertical: 4),
         color: Colors.transparent,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: radius,
-          side: BorderSide(color: theme.colorScheme.outlineVariant),
+          side: BorderSide(
+            color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
+            width: isSelected ? 2 : 1,
+          ),
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
             Positioned.fill(
               child: ColoredBox(
-                color: displayColor?.withValues(alpha: 0.15) ?? theme.colorScheme.surface,
+                color: isSelected
+                    ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                    : (displayColor?.withValues(alpha: 0.15) ?? theme.colorScheme.surface),
               ),
             ),
-            if (displayColor != null)
+            if (displayColor != null && !isSelected)
               Positioned(
                 left: 0,
                 top: 0,
@@ -91,6 +101,19 @@ class EntryCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                ),
+              ),
+            if (isSelected)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.teal,
+                    shape: BoxShape.circle,
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  child: const Icon(Icons.check, size: 16, color: Colors.white),
                 ),
               ),
             Column(
@@ -160,16 +183,21 @@ class EntryCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
+        side: BorderSide(
+          color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
+          width: isSelected ? 2 : 1,
+        ),
       ),
       child: Stack(
         children: [
           Positioned.fill(
             child: ColoredBox(
-              color: displayColor?.withValues(alpha: 0.15) ?? theme.colorScheme.surface,
+              color: isSelected
+                  ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                  : (displayColor?.withValues(alpha: 0.15) ?? theme.colorScheme.surface),
             ),
           ),
-          if (displayColor != null)
+          if (displayColor != null && !isSelected)
             Positioned(
               left: 0,
               top: 0,
@@ -188,8 +216,22 @@ class EntryCard extends StatelessWidget {
                 ),
               ),
             ),
+          if (isSelected)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.teal,
+                  shape: BoxShape.circle,
+                ),
+                padding: const EdgeInsets.all(4),
+                child: const Icon(Icons.check, size: 16, color: Colors.white),
+              ),
+            ),
           InkWell(
             onTap: onTap,
+            onLongPress: onLongPress,
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(

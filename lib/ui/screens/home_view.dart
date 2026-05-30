@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/constants.dart';
+import 'package:taul/domain/services/merge_service.dart';
 import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/effective_auth_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:go_router/go_router.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
 import 'package:taul/ui/screens/entry_detail_view.dart';
+import 'package:taul/ui/screens/merge_editor_screen.dart';
 import 'package:taul/ui/screens/quick_add_sheet.dart';
 import 'package:taul/ui/widgets/empty_states.dart';
 import 'package:taul/ui/widgets/entry_card.dart';
@@ -22,6 +24,8 @@ class HomeView extends ConsumerStatefulWidget {
 
 class _HomeViewState extends ConsumerState<HomeView> {
   String? _expandedEntryId;
+  bool _isSelectMode = false;
+  final Set<String> _selectedEntryIds = {};
 
   @override
   Widget build(BuildContext context) {
@@ -38,44 +42,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
         : ref.watch(searchResultsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: GestureDetector(
-          onTap: () => _showShortcuts(context),
-          child: const Text('Taúl'),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            tooltip: 'Buscar',
-            onPressed: () {
-              final isOpen = ref.read(isSearchOpenProvider);
-              if (isOpen) {
-                ref.read(entrySearchProvider.notifier).state = '';
-                ref.read(isSearchOpenProvider.notifier).state = false;
-              } else {
-                ref.read(isSearchOpenProvider.notifier).state = true;
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.sync),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Sync coming in Phase 3')),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Papelera',
-            onPressed: () => context.push('/trash'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => context.go('/settings'),
-          ),
-        ],
-      ),
+      appBar: _isSelectMode ? _buildSelectAppBar() : _buildNormalAppBar(),
       body: Column(
         children: [
           const TaulSearchBar(),
@@ -100,15 +67,19 @@ class _HomeViewState extends ConsumerState<HomeView> {
                               return EntryCard(
                                 entry: entry,
                                 displayColor: color,
-                                isExpanded: _expandedEntryId == entry.id,
+                                isExpanded: !_isSelectMode && _expandedEntryId == entry.id,
                                 isSecure: isSecure,
-                                onToggle: () {
-                                  setState(() {
-                                    _expandedEntryId = _expandedEntryId == entry.id ? null : entry.id;
-                                  });
-                                },
+                                isSelected: _selectedEntryIds.contains(entry.id),
+                                onLongPress: () => _enterSelectMode(entry.id),
+                                onToggle: _isSelectMode
+                                    ? () => _toggleSelection(entry.id)
+                                    : () {
+                                        setState(() {
+                                          _expandedEntryId = _expandedEntryId == entry.id ? null : entry.id;
+                                        });
+                                      },
                                 onUnlock: () => _openEntry(context, entry.id),
-                                onTap: () => _openEntry(context, entry.id),
+                                onTap: _isSelectMode ? null : () => _openEntry(context, entry.id),
                               );
                             },
                           );
@@ -134,7 +105,11 @@ class _HomeViewState extends ConsumerState<HomeView> {
                               isGrid: true,
                               displayColor: color,
                               isSecure: isSecure,
-                              onTap: () => _openEntry(context, entry.id),
+                              isSelected: _selectedEntryIds.contains(entry.id),
+                              onLongPress: () => _enterSelectMode(entry.id),
+                              onTap: _isSelectMode
+                                  ? () => _toggleSelection(entry.id)
+                                  : () => _openEntry(context, entry.id),
                             );
                           },
                         );
@@ -192,6 +167,126 @@ class _HomeViewState extends ConsumerState<HomeView> {
         onGoBack: () => _showQuickAdd(context),
       ),
     );
+  }
+
+  AppBar _buildNormalAppBar() {
+    return AppBar(
+      title: GestureDetector(
+        onTap: () => _showShortcuts(context),
+        child: const Text('Taúl'),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.search),
+          tooltip: 'Buscar',
+          onPressed: () {
+            final isOpen = ref.read(isSearchOpenProvider);
+            if (isOpen) {
+              ref.read(entrySearchProvider.notifier).state = '';
+              ref.read(isSearchOpenProvider.notifier).state = false;
+            } else {
+              ref.read(isSearchOpenProvider.notifier).state = true;
+            }
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.sync),
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Sync coming in Phase 3')),
+            );
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete_outline),
+          tooltip: 'Papelera',
+          onPressed: () => context.push('/trash'),
+        ),
+        IconButton(
+          icon: const Icon(Icons.settings),
+          onPressed: () => context.go('/settings'),
+        ),
+      ],
+    );
+  }
+
+  AppBar _buildSelectAppBar() {
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        onPressed: _exitSelectMode,
+      ),
+      title: Text('${_selectedEntryIds.length} seleccionados'),
+      actions: [
+        TextButton(
+          onPressed: _selectedEntryIds.length >= 2 ? _navigateToMerge : null,
+          child: const Text('Combinar'),
+        ),
+        TextButton(
+          onPressed: _exitSelectMode,
+          child: const Text('Cancelar'),
+        ),
+      ],
+    );
+  }
+
+  void _enterSelectMode(String id) {
+    setState(() {
+      _isSelectMode = true;
+      _expandedEntryId = null;
+      _selectedEntryIds.add(id);
+    });
+  }
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedEntryIds.contains(id)) {
+        _selectedEntryIds.remove(id);
+        if (_selectedEntryIds.isEmpty) {
+          _isSelectMode = false;
+        }
+      } else {
+        _selectedEntryIds.add(id);
+      }
+    });
+  }
+
+  void _exitSelectMode() {
+    setState(() {
+      _isSelectMode = false;
+      _selectedEntryIds.clear();
+    });
+  }
+
+  void _navigateToMerge() {
+    if (_selectedEntryIds.length < 2) return;
+
+    // Collect selected entries from the current entries list
+    final entriesAsync = ref.read(entrySearchProvider).isEmpty
+        ? ref.read(filteredEntriesProvider)
+        : ref.read(searchResultsProvider);
+
+    entriesAsync.whenData((entries) {
+      final selected = entries
+          .where((e) => _selectedEntryIds.contains(e.id))
+          .toList();
+
+      if (selected.length < 2) return;
+
+      final mergedText = MergeService.concatenate(selected);
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MergeEditorScreen(initialText: mergedText),
+        ),
+      ).then((saved) {
+        if (saved == true) {
+          _exitSelectMode();
+          // Refresh the list by invalidating providers
+          ref.invalidate(entryListProvider);
+        }
+      });
+    });
   }
 
   void _showShortcuts(BuildContext context) {
