@@ -149,17 +149,48 @@ class EntryDetailView extends ConsumerWidget {
         body: entryAsync.when(
         data: (entry) {
           final displayColor = ref.watch(entryDisplayColorProvider(entry.id));
+          final theme = Theme.of(context);
           final content = entry.type == EntryType.credential
               ? _CredentialContent(entry: entry)
               : _NoteContent(entry: entry);
-          return Row(
-            children: [
-              Container(
-                width: 4,
-                color: displayColor ?? Colors.transparent,
-              ),
-              Expanded(child: content),
-            ],
+          return Card(
+            margin: EdgeInsets.zero,
+            color: Colors.transparent,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ColoredBox(
+                    color: displayColor?.withValues(alpha: 0.15) ??
+                        theme.colorScheme.surface,
+                  ),
+                ),
+                if (displayColor != null)
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 6,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            displayColor,
+                            displayColor.withValues(alpha: 0.4),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                content,
+              ],
+            ),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -411,11 +442,14 @@ class _NoteContent extends ConsumerWidget {
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           const SizedBox(height: 8),
-          Text(entry.title.isNotEmpty ? entry.title : '(sin título)',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
-                color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
-              )),
+          entry.title.isNotEmpty
+              ? SelectableText(entry.title,
+                  style: theme.textTheme.headlineSmall)
+              : Text('(sin título)',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontStyle: FontStyle.italic,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  )),
           const SizedBox(height: 16),
           MarkdownBody(
             data: entry.content,
@@ -553,11 +587,14 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
               children: [
                 const Icon(Icons.lock, size: 40, color: Colors.amber),
                 const SizedBox(height: 8),
-          Text(entry.title.isNotEmpty ? entry.title : '(sin título)',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
-                color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
-              )),
+          entry.title.isNotEmpty
+              ? SelectableText(entry.title,
+                  style: theme.textTheme.headlineSmall)
+              : Text('(sin título)',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontStyle: FontStyle.italic,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  )),
               ],
             ),
           ),
