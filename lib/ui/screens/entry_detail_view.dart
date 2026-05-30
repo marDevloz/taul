@@ -21,6 +21,7 @@ import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
 import 'package:taul/ui/widgets/master_password_recovery_dialog.dart';
+import 'package:taul/ui/widgets/palette_picker.dart';
 
 /// Result of the master password reveal dialog.
 ///
@@ -426,16 +427,19 @@ class _NoteContent extends ConsumerWidget {
               final tagColor = ref.watch(
                 tagColorForEntryProvider((entry.id, t)),
               );
-              return ActionChip(
-                label: Text(t, style: const TextStyle(fontSize: 12)),
-                backgroundColor: tagColor,
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                onPressed: () {
-                  ref.read(selectedTagFilterProvider.notifier).state = t;
-                  context.pop();
-                },
+              return GestureDetector(
+                onLongPress: () => _showPalettePicker(context, ref, entry, t),
+                child: ActionChip(
+                  label: Text(t, style: const TextStyle(fontSize: 12)),
+                  backgroundColor: tagColor,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  onPressed: () {
+                    ref.read(selectedTagFilterProvider.notifier).state = t;
+                    context.pop();
+                  },
+                ),
               );
             }).toList()),
           ],
@@ -461,6 +465,43 @@ class _NoteContent extends ConsumerWidget {
   String _formatDate(DateTime dt) {
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _showPalettePicker(BuildContext context, WidgetRef ref, Entry entry, String tagName) async {
+    final currentHex = entry.tagsColors[tagName];
+    final initialColor = currentHex != null
+        ? Color(int.parse(currentHex.substring(1), radix: 16) + 0xFF000000)
+        : null;
+
+    final selectedHex = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Color for "$tagName"'),
+        content: PalettePicker(
+          initialColor: initialColor,
+          onColorSelected: (hex) => Navigator.pop(context, hex),
+        ),
+      ),
+    );
+
+    if (selectedHex != null && context.mounted) {
+      // Update entry's tagsColors map
+      final newTagsColors = Map<String, String>.from(entry.tagsColors);
+      newTagsColors[tagName] = selectedHex;
+
+      // Save updated entry
+      await ref.read(updateEntryProvider).call(
+        entry,
+        tagsColors: newTagsColors,
+      );
+
+      // Invalidate providers to refresh UI
+      ref.invalidate(entryDetailProvider(entry.id));
+      ref.invalidate(entryListProvider);
+      ref.invalidate(entryDisplayColorProvider(entry.id));
+      ref.invalidate(entryDisplayColorProvider);
+      ref.invalidate(tagColorMapProvider);
+    }
   }
 }
 
@@ -554,16 +595,19 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
               final tagColor = ref.watch(
                 tagColorForEntryProvider((entry.id, t)),
               );
-              return ActionChip(
-                label: Text(t),
-                backgroundColor: tagColor,
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                onPressed: () {
-                  ref.read(selectedTagFilterProvider.notifier).state = t;
-                  context.pop();
-                },
+              return GestureDetector(
+                onLongPress: () => _showPalettePicker(context, ref, entry, t),
+                child: ActionChip(
+                  label: Text(t),
+                  backgroundColor: tagColor,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  onPressed: () {
+                    ref.read(selectedTagFilterProvider.notifier).state = t;
+                    context.pop();
+                  },
+                ),
               );
             }).toList()),
           ],
@@ -941,6 +985,43 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
   String _formatDate(DateTime dt) {
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _showPalettePicker(BuildContext context, WidgetRef ref, Entry entry, String tagName) async {
+    final currentHex = entry.tagsColors[tagName];
+    final initialColor = currentHex != null
+        ? Color(int.parse(currentHex.substring(1), radix: 16) + 0xFF000000)
+        : null;
+
+    final selectedHex = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Color for "$tagName"'),
+        content: PalettePicker(
+          initialColor: initialColor,
+          onColorSelected: (hex) => Navigator.pop(context, hex),
+        ),
+      ),
+    );
+
+    if (selectedHex != null && context.mounted) {
+      // Update entry's tagsColors map
+      final newTagsColors = Map<String, String>.from(entry.tagsColors);
+      newTagsColors[tagName] = selectedHex;
+
+      // Save updated entry
+      await ref.read(updateEntryProvider).call(
+        entry,
+        tagsColors: newTagsColors,
+      );
+
+      // Invalidate providers to refresh UI
+      ref.invalidate(entryDetailProvider(entry.id));
+      ref.invalidate(entryListProvider);
+      ref.invalidate(entryDisplayColorProvider(entry.id));
+      ref.invalidate(entryDisplayColorProvider);
+      ref.invalidate(tagColorMapProvider);
+    }
   }
 }
 

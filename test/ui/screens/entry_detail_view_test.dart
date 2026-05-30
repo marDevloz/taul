@@ -80,7 +80,7 @@ void main() {
       await tester.pumpWidget(createTestApp());
       await pumpAndSettle(tester);
 
-      expect(find.text('Reveal Secret'), findsOneWidget);
+      expect(find.text('Revelar Secreto'), findsOneWidget);
     });
 
     testWidgets('should_not_show_reveal_button_when_not_requires_auth',
