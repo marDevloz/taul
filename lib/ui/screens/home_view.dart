@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/constants.dart';
@@ -27,6 +29,40 @@ class _HomeViewState extends ConsumerState<HomeView> {
   String? _expandedEntryId;
   bool _isSelectMode = false;
   final Set<String> _selectedEntryIds = {};
+  final Set<String> _unlockedEntryIds = {};
+  final Map<String, DateTime> _unlockTimestamps = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _startAutoLockTimer();
+  }
+
+  void _startAutoLockTimer() {
+    Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      final now = DateTime.now();
+      final expired = _unlockTimestamps.entries
+          .where((e) => now.difference(e.value).inMinutes >= 1)
+          .map((e) => e.key)
+          .toList();
+      if (expired.isNotEmpty) {
+        setState(() {
+          for (final id in expired) {
+            _unlockedEntryIds.remove(id);
+            _unlockTimestamps.remove(id);
+          }
+        });
+      }
+    });
+  }
+
+  void _unlockEntry(String id) {
+    setState(() {
+      _unlockedEntryIds.add(id);
+      _unlockTimestamps[id] = DateTime.now();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,11 +101,14 @@ class _HomeViewState extends ConsumerState<HomeView> {
                               final entry = entries[index];
                               final color = ref.watch(entryDisplayColorProvider(entry.id));
                               final isSecure = ref.watch(hasSecureTagProvider(entry.id));
+                              final isUnlocked = _unlockedEntryIds.contains(entry.id);
+                              final showLocked = isSecure && !isUnlocked;
+                              final isCredential = entry.type.label == 'credential';
                               return EntryCard(
                                 entry: entry,
                                 displayColor: color,
-                                isExpanded: !_isSelectMode && _expandedEntryId == entry.id,
-                                isSecure: isSecure,
+                                isExpanded: !_isSelectMode && _expandedEntryId == entry.id && !showLocked,
+                                isSecure: showLocked,
                                 isSelected: _selectedEntryIds.contains(entry.id),
                                 onLongPress: () => _enterSelectMode(entry.id),
                                 onToggle: _isSelectMode
@@ -83,9 +122,13 @@ class _HomeViewState extends ConsumerState<HomeView> {
                                     ? null
                                     : () async {
                                         final ok = await showMasterPasswordGate(context: context, ref: ref);
-                                        if (ok && context.mounted) {
+                                        if (!ok || !context.mounted) return;
+                                        _unlockEntry(entry.id);
+                                        if (isCredential) {
+                                          _openEntry(context, entry.id);
+                                        } else {
                                           setState(() {
-                                            _expandedEntryId = _expandedEntryId == entry.id ? null : entry.id;
+                                            _expandedEntryId = entry.id;
                                           });
                                         }
                                       },
@@ -93,9 +136,9 @@ class _HomeViewState extends ConsumerState<HomeView> {
                                     ? null
                                     : () async {
                                         final ok = await showMasterPasswordGate(context: context, ref: ref);
-                                        if (ok && context.mounted) {
-                                          _openEntry(context, entry.id);
-                                        }
+                                        if (!ok || !context.mounted) return;
+                                        _unlockEntry(entry.id);
+                                        _openEntry(context, entry.id);
                                       },
                                 onTap: _isSelectMode ? null : () => _openEntry(context, entry.id),
                               );
@@ -118,28 +161,30 @@ class _HomeViewState extends ConsumerState<HomeView> {
                             final entry = entries[index];
                             final color = ref.watch(entryDisplayColorProvider(entry.id));
                             final isSecure = ref.watch(hasSecureTagProvider(entry.id));
+                            final isUnlocked = _unlockedEntryIds.contains(entry.id);
+                            final showLocked = isSecure && !isUnlocked;
                             return EntryCard(
                               entry: entry,
                               isGrid: true,
                               displayColor: color,
-                              isSecure: isSecure,
+                              isSecure: showLocked,
                               isSelected: _selectedEntryIds.contains(entry.id),
                               onLongPress: () => _enterSelectMode(entry.id),
                               onTapGated: _isSelectMode
                                   ? null
                                   : () async {
                                       final ok = await showMasterPasswordGate(context: context, ref: ref);
-                                      if (ok && context.mounted) {
-                                        _openEntry(context, entry.id);
-                                      }
+                                      if (!ok || !context.mounted) return;
+                                      _unlockEntry(entry.id);
+                                      _openEntry(context, entry.id);
                                     },
                               onDoubleTapGated: _isSelectMode
                                   ? null
                                   : () async {
                                       final ok = await showMasterPasswordGate(context: context, ref: ref);
-                                      if (ok && context.mounted) {
-                                        _openEntry(context, entry.id);
-                                      }
+                                      if (!ok || !context.mounted) return;
+                                      _unlockEntry(entry.id);
+                                      _openEntry(context, entry.id);
                                     },
                               onTap: _isSelectMode
                                   ? () => _toggleSelection(entry.id)
