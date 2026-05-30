@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/constants.dart';
 import 'package:taul/ui/providers/color_providers.dart';
+import 'package:taul/ui/providers/effective_auth_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:go_router/go_router.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
@@ -12,11 +13,18 @@ import 'package:taul/ui/widgets/entry_card.dart';
 import 'package:taul/ui/widgets/filter_chips.dart';
 import 'package:taul/ui/widgets/search_bar_widget.dart';
 
-class HomeView extends ConsumerWidget {
+class HomeView extends ConsumerStatefulWidget {
   const HomeView({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends ConsumerState<HomeView> {
+  String? _expandedEntryId;
+
+  @override
+  Widget build(BuildContext context) {
     // Listen for Ctrl+N shortcut events (fired from AppKeyboardShortcuts).
     ref.listen<int>(createEntryEventProvider, (prev, next) {
       if (prev != null && next != prev) {
@@ -88,9 +96,18 @@ class HomeView extends ConsumerWidget {
                             itemBuilder: (context, index) {
                               final entry = entries[index];
                               final color = ref.watch(entryDisplayColorProvider(entry.id));
+                              final isSecure = ref.watch(effectiveAuthProvider(entry.id));
                               return EntryCard(
                                 entry: entry,
                                 displayColor: color,
+                                isExpanded: _expandedEntryId == entry.id,
+                                isSecure: isSecure,
+                                onToggle: () {
+                                  setState(() {
+                                    _expandedEntryId = _expandedEntryId == entry.id ? null : entry.id;
+                                  });
+                                },
+                                onUnlock: () => _openEntry(context, entry.id),
                                 onTap: () => _openEntry(context, entry.id),
                               );
                             },
@@ -111,10 +128,12 @@ class HomeView extends ConsumerWidget {
                           itemBuilder: (context, index) {
                             final entry = entries[index];
                             final color = ref.watch(entryDisplayColorProvider(entry.id));
+                            final isSecure = ref.watch(effectiveAuthProvider(entry.id));
                             return EntryCard(
                               entry: entry,
                               isGrid: true,
                               displayColor: color,
+                              isSecure: isSecure,
                               onTap: () => _openEntry(context, entry.id),
                             );
                           },

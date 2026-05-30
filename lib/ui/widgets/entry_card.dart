@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:taul/core/credential_parser.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/ui/widgets/entry_expanded_content.dart';
 
 class EntryCard extends StatelessWidget {
   final Entry entry;
@@ -10,6 +11,10 @@ class EntryCard extends StatelessWidget {
   final Widget? trailingAction;
   final Widget? subtitle;
   final Color? displayColor;
+  final bool isExpanded;
+  final VoidCallback? onToggle;
+  final bool isSecure;
+  final VoidCallback? onUnlock;
 
   const EntryCard({
     super.key,
@@ -19,6 +24,10 @@ class EntryCard extends StatelessWidget {
     this.trailingAction,
     this.subtitle,
     this.displayColor,
+    this.isExpanded = false,
+    this.onToggle,
+    this.isSecure = false,
+    this.onUnlock,
   });
 
   IconData get _typeIcon {
@@ -46,71 +55,100 @@ class EntryCard extends StatelessWidget {
 
   Widget _buildListCard(ThemeData theme) {
     final radius = BorderRadius.circular(12);
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      color: Colors.transparent,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: radius,
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: ColoredBox(
-              color: displayColor?.withValues(alpha: 0.15) ?? theme.colorScheme.surface,
+    return GestureDetector(
+      onTap: isSecure ? null : onToggle,
+      onDoubleTap: onTap,
+      child: Card(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        color: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: ColoredBox(
+                color: displayColor?.withValues(alpha: 0.15) ?? theme.colorScheme.surface,
+              ),
             ),
-          ),
-          if (displayColor != null)
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: 6,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      displayColor!,
-                      displayColor!.withValues(alpha: 0.4),
-                    ],
+            if (displayColor != null)
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: 6,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        displayColor!,
+                        displayColor!.withValues(alpha: 0.4),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ListTile(
-            leading: Icon(_typeIcon, color: theme.colorScheme.primary),
-            title: Text(
-              entry.title.isNotEmpty ? entry.title : '(sin título)',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
-                color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
-              ),
-            ),
-            subtitle: subtitle ?? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  _displayContent,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall,
+                ListTile(
+                  leading: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_typeIcon, color: theme.colorScheme.primary),
+                      if (isSecure) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.lock, size: 14, color: Colors.amber),
+                      ],
+                    ],
+                  ),
+                  title: Text(
+                    entry.title.isNotEmpty ? entry.title : '(sin título)',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
+                      color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
+                    ),
+                  ),
+                  subtitle: subtitle ?? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _displayContent,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                  trailing: trailingAction ?? Text(
+                    _formatDate(entry.updatedAt),
+                    style: theme.textTheme.labelSmall,
+                  ),
+                ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeInOut,
+                  alignment: Alignment.topCenter,
+                  child: isExpanded
+                      ? EntryExpandedContent(
+                          entry: entry,
+                          isSecure: isSecure,
+                          onUnlock: onUnlock,
+                        )
+                      : const SizedBox.shrink(),
                 ),
               ],
             ),
-            trailing: trailingAction ?? Text(
-              _formatDate(entry.updatedAt),
-              style: theme.textTheme.labelSmall,
-            ),
-            onTap: onTap,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -161,6 +199,10 @@ class EntryCard extends StatelessWidget {
                   Row(
                     children: [
                       Icon(_typeIcon, size: 16, color: theme.colorScheme.primary),
+                      if (isSecure) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.lock, size: 12, color: Colors.amber),
+                      ],
                       const SizedBox(width: 6),
                       Text(
                         entry.type.label,
