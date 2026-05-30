@@ -45,111 +45,156 @@ class EntryCard extends StatelessWidget {
   }
 
   Widget _buildListCard(ThemeData theme) {
+    final radius = BorderRadius.circular(12);
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
-      child: ListTile(
-        leading: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (displayColor != null)
-              Container(
-                width: 8,
-                height: 8,
-                margin: const EdgeInsets.only(right: 8),
+      color: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ColoredBox(
+              color: displayColor?.withValues(alpha: 0.15) ?? theme.colorScheme.surface,
+            ),
+          ),
+          if (displayColor != null)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 6,
+              child: Container(
                 decoration: BoxDecoration(
-                  color: displayColor,
-                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      displayColor!,
+                      displayColor!.withValues(alpha: 0.4),
+                    ],
+                  ),
                 ),
               ),
-            Icon(_typeIcon, color: theme.colorScheme.primary),
-          ],
-        ),
-        title: Text(
-          entry.title.isNotEmpty ? entry.title : '(sin título)',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
-            color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
-          ),
-        ),
-        subtitle: subtitle ?? Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _displayContent,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall,
             ),
-          ],
-        ),
-        trailing: trailingAction ?? Text(
-          _formatDate(entry.updatedAt),
-          style: theme.textTheme.labelSmall,
-        ),
-        onTap: onTap,
+          ListTile(
+            leading: Icon(_typeIcon, color: theme.colorScheme.primary),
+            title: Text(
+              entry.title.isNotEmpty ? entry.title : '(sin título)',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
+                color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
+              ),
+            ),
+            subtitle: subtitle ?? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _displayContent,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+            trailing: trailingAction ?? Text(
+              _formatDate(entry.updatedAt),
+              style: theme.textTheme.labelSmall,
+            ),
+            onTap: onTap,
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildGridCard(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          left: BorderSide(
-            color: displayColor ?? Colors.transparent,
-            width: 4,
-          ),
-        ),
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      color: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
       ),
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-              Row(
-                children: [
-                  Icon(_typeIcon, size: 16, color: theme.colorScheme.primary),
-                  const SizedBox(width: 6),
-              Text(
-                entry.type.label,
-                style: theme.textTheme.labelSmall,
-              ),
-              const Spacer(),
-              Text(
-                _formatDate(entry.updatedAt),
-                style: theme.textTheme.labelSmall,
-              ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                entry.title.isNotEmpty ? entry.title : '(sin título)',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
-                  color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ColoredBox(
+              color: displayColor?.withValues(alpha: 0.15) ?? theme.colorScheme.surface,
+            ),
+          ),
+          if (displayColor != null)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 6,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      displayColor!,
+                      displayColor!.withValues(alpha: 0.4),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                _displayContent,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall,
+            ),
+          InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Icon(_typeIcon, size: 16, color: theme.colorScheme.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        entry.type.label,
+                        style: theme.textTheme.labelSmall,
+                      ),
+                      const Spacer(),
+                      Text(
+                        _formatDate(entry.updatedAt),
+                        style: theme.textTheme.labelSmall,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    entry.title.isNotEmpty ? entry.title : '(sin título)',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
+                      color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _displayContent,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        ],
       ),
     );
   }
@@ -162,4 +207,3 @@ class EntryCard extends StatelessWidget {
     return '${dt.day}/${dt.month}';
   }
 }
-
