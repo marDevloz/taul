@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
 class FilterChipsRow extends ConsumerWidget {
@@ -58,6 +59,7 @@ class _TagFilterRowState extends ConsumerState<TagFilterRow> {
   Widget build(BuildContext context) {
     final tags = ref.watch(tagsListProvider);
     final selectedTag = ref.watch(selectedTagFilterProvider);
+    final tagColors = ref.watch(tagColorMapProvider);
     final hasFilter = selectedTag != null && selectedTag.isNotEmpty;
     const maxVisible = 12;
 
@@ -95,6 +97,7 @@ class _TagFilterRowState extends ConsumerState<TagFilterRow> {
                 child: _TagPill(
                   label: tag,
                   selected: selectedTag == tag,
+                  color: tagColors[tag],
                   onTap: () =>
                       ref.read(selectedTagFilterProvider.notifier).state =
                           selectedTag == tag ? null : tag,

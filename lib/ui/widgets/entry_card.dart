@@ -9,6 +9,7 @@ class EntryCard extends StatelessWidget {
   final bool isGrid;
   final Widget? trailingAction;
   final Widget? subtitle;
+  final Color? displayColor;
 
   const EntryCard({
     super.key,
@@ -17,6 +18,7 @@ class EntryCard extends StatelessWidget {
     this.isGrid = false,
     this.trailingAction,
     this.subtitle,
+    this.displayColor,
   });
 
   IconData get _typeIcon {
@@ -46,7 +48,22 @@ class EntryCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
-        leading: Icon(_typeIcon, color: theme.colorScheme.primary),
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (displayColor != null)
+              Container(
+                width: 8,
+                height: 8,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: displayColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            Icon(_typeIcon, color: theme.colorScheme.primary),
+          ],
+        ),
         title: Text(
           entry.title.isNotEmpty ? entry.title : '(sin título)',
           maxLines: 1,
@@ -78,16 +95,25 @@ class EntryCard extends StatelessWidget {
   }
 
   Widget _buildGridCard(ThemeData theme) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          left: BorderSide(
+            color: displayColor ?? Colors.transparent,
+            width: 4,
+          ),
+        ),
+      ),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
               Row(
                 children: [
                   Icon(_typeIcon, size: 16, color: theme.colorScheme.primary),
@@ -123,6 +149,7 @@ class EntryCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

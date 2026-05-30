@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/constants.dart';
+import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:go_router/go_router.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
@@ -84,10 +85,15 @@ class HomeView extends ConsumerWidget {
                           return ListView.builder(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             itemCount: entries.length,
-                            itemBuilder: (context, index) => EntryCard(
-                              entry: entries[index],
-                              onTap: () => _openEntry(context, entries[index].id),
-                            ),
+                            itemBuilder: (context, index) {
+                              final entry = entries[index];
+                              final color = ref.watch(entryDisplayColorProvider(entry.id));
+                              return EntryCard(
+                                entry: entry,
+                                displayColor: color,
+                                onTap: () => _openEntry(context, entry.id),
+                              );
+                            },
                           );
                         }
                         final crossAxisCount =
@@ -102,11 +108,16 @@ class HomeView extends ConsumerWidget {
                             mainAxisSpacing: 8,
                           ),
                           itemCount: entries.length,
-                          itemBuilder: (context, index) => EntryCard(
-                            entry: entries[index],
-                            isGrid: true,
-                            onTap: () => _openEntry(context, entries[index].id),
-                          ),
+                          itemBuilder: (context, index) {
+                            final entry = entries[index];
+                            final color = ref.watch(entryDisplayColorProvider(entry.id));
+                            return EntryCard(
+                              entry: entry,
+                              isGrid: true,
+                              displayColor: color,
+                              onTap: () => _openEntry(context, entry.id),
+                            );
+                          },
                         );
                       },
                     ),

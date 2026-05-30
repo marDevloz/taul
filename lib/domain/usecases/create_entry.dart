@@ -23,6 +23,7 @@ class CreateEntry {
     String? cipherNonce,
     String? cipherTag,
     List<String> tags = const [],
+    Map<String, String> tagsColors = const {},
     Map<String, String> metadata = const {},
   }) async {
     final now = DateTime.now();
@@ -32,6 +33,7 @@ class CreateEntry {
       title: title.trim(),
       content: content.trim(),
       tags: tags,
+      tagsColors: tagsColors,
       secret: secret,
       requiresAuth: requiresAuth,
       encryptedSecret: encryptedSecret,

@@ -17,6 +17,7 @@ import 'package:taul/core/constants.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
 import 'package:taul/ui/widgets/master_password_recovery_dialog.dart';
@@ -145,9 +146,21 @@ class EntryDetailView extends ConsumerWidget {
           ],
         ),
         body: entryAsync.when(
-        data: (entry) => entry.type == EntryType.credential
-            ? _CredentialContent(entry: entry)
-            : _NoteContent(entry: entry),
+        data: (entry) {
+          final displayColor = ref.watch(entryDisplayColorProvider(entry.id));
+          final content = entry.type == EntryType.credential
+              ? _CredentialContent(entry: entry)
+              : _NoteContent(entry: entry);
+          return Row(
+            children: [
+              Container(
+                width: 4,
+                color: displayColor ?? Colors.transparent,
+              ),
+              Expanded(child: content),
+            ],
+          );
+        },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error: $err')),
       ),
@@ -409,16 +422,22 @@ class _NoteContent extends ConsumerWidget {
           ),
           if (entry.tags.isNotEmpty) ...[
             const SizedBox(height: 16),
-            Wrap(spacing: 6, children: entry.tags.map((t) => ActionChip(
-              label: Text(t, style: const TextStyle(fontSize: 12)),
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              onPressed: () {
-                ref.read(selectedTagFilterProvider.notifier).state = t;
-                context.pop();
-              },
-            )).toList()),
+            Wrap(spacing: 6, children: entry.tags.map((t) {
+              final tagColor = ref.watch(
+                tagColorForEntryProvider((entry.id, t)),
+              );
+              return ActionChip(
+                label: Text(t, style: const TextStyle(fontSize: 12)),
+                backgroundColor: tagColor,
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onPressed: () {
+                  ref.read(selectedTagFilterProvider.notifier).state = t;
+                  context.pop();
+                },
+              );
+            }).toList()),
           ],
           const SizedBox(height: 24),
           Text('Creado: ${_formatDate(entry.createdAt)}', style: theme.textTheme.bodySmall),
@@ -531,16 +550,22 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
           ],
           if (entry.tags.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Wrap(spacing: 6, children: entry.tags.map((t) => ActionChip(
-              label: Text(t),
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              onPressed: () {
-                ref.read(selectedTagFilterProvider.notifier).state = t;
-                context.pop();
-              },
-            )).toList()),
+            Wrap(spacing: 6, children: entry.tags.map((t) {
+              final tagColor = ref.watch(
+                tagColorForEntryProvider((entry.id, t)),
+              );
+              return ActionChip(
+                label: Text(t),
+                backgroundColor: tagColor,
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onPressed: () {
+                  ref.read(selectedTagFilterProvider.notifier).state = t;
+                  context.pop();
+                },
+              );
+            }).toList()),
           ],
           const SizedBox(height: 24),
           Text('Creado: ${_formatDate(entry.createdAt)}', style: theme.textTheme.bodySmall),
