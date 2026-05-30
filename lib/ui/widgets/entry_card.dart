@@ -50,6 +50,8 @@ class EntryCard extends StatelessWidget {
     return entry.content;
   }
 
+  bool get _isExpandable => entry.type != EntryType.credential;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -60,7 +62,7 @@ class EntryCard extends StatelessWidget {
   Widget _buildListCard(ThemeData theme) {
     final radius = BorderRadius.circular(12);
     return GestureDetector(
-      onTap: isSecure ? null : onToggle,
+      onTap: !_isExpandable ? onTap : (isSecure ? null : onToggle),
       onDoubleTap: onTap,
       onLongPress: onLongPress,
       child: Card(
@@ -120,16 +122,7 @@ class EntryCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(_typeIcon, color: theme.colorScheme.primary),
-                      if (isSecure) ...[
-                        const SizedBox(width: 4),
-                        const Icon(Icons.lock, size: 14, color: Colors.amber),
-                      ],
-                    ],
-                  ),
+                  leading: Icon(_typeIcon, color: theme.colorScheme.primary),
                   title: Text(
                     entry.title.isNotEmpty ? entry.title : '(sin título)',
                     maxLines: 1,
@@ -241,10 +234,6 @@ class EntryCard extends StatelessWidget {
                   Row(
                     children: [
                       Icon(_typeIcon, size: 16, color: theme.colorScheme.primary),
-                      if (isSecure) ...[
-                        const SizedBox(width: 4),
-                        const Icon(Icons.lock, size: 12, color: Colors.amber),
-                      ],
                       const SizedBox(width: 6),
                       Text(
                         entry.type.label,
