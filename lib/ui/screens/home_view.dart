@@ -13,6 +13,7 @@ import 'package:taul/ui/screens/quick_add_sheet.dart';
 import 'package:taul/ui/widgets/empty_states.dart';
 import 'package:taul/ui/widgets/entry_card.dart';
 import 'package:taul/ui/widgets/filter_chips.dart';
+import 'package:taul/ui/widgets/master_password_gate.dart';
 import 'package:taul/ui/widgets/search_bar_widget.dart';
 
 class HomeView extends ConsumerStatefulWidget {
@@ -78,7 +79,24 @@ class _HomeViewState extends ConsumerState<HomeView> {
                                           _expandedEntryId = _expandedEntryId == entry.id ? null : entry.id;
                                         });
                                       },
-                                onUnlock: () => _openEntry(context, entry.id),
+                                onTapGated: _isSelectMode
+                                    ? null
+                                    : () async {
+                                        final ok = await showMasterPasswordGate(context: context, ref: ref);
+                                        if (ok && context.mounted) {
+                                          setState(() {
+                                            _expandedEntryId = _expandedEntryId == entry.id ? null : entry.id;
+                                          });
+                                        }
+                                      },
+                                onDoubleTapGated: _isSelectMode
+                                    ? null
+                                    : () async {
+                                        final ok = await showMasterPasswordGate(context: context, ref: ref);
+                                        if (ok && context.mounted) {
+                                          _openEntry(context, entry.id);
+                                        }
+                                      },
                                 onTap: _isSelectMode ? null : () => _openEntry(context, entry.id),
                               );
                             },
@@ -107,6 +125,22 @@ class _HomeViewState extends ConsumerState<HomeView> {
                               isSecure: isSecure,
                               isSelected: _selectedEntryIds.contains(entry.id),
                               onLongPress: () => _enterSelectMode(entry.id),
+                              onTapGated: _isSelectMode
+                                  ? null
+                                  : () async {
+                                      final ok = await showMasterPasswordGate(context: context, ref: ref);
+                                      if (ok && context.mounted) {
+                                        _openEntry(context, entry.id);
+                                      }
+                                    },
+                              onDoubleTapGated: _isSelectMode
+                                  ? null
+                                  : () async {
+                                      final ok = await showMasterPasswordGate(context: context, ref: ref);
+                                      if (ok && context.mounted) {
+                                        _openEntry(context, entry.id);
+                                      }
+                                    },
                               onTap: _isSelectMode
                                   ? () => _toggleSelection(entry.id)
                                   : () => _openEntry(context, entry.id),

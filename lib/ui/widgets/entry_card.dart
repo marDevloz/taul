@@ -14,7 +14,8 @@ class EntryCard extends StatelessWidget {
   final bool isExpanded;
   final VoidCallback? onToggle;
   final bool isSecure;
-  final VoidCallback? onUnlock;
+  final VoidCallback? onTapGated;
+  final VoidCallback? onDoubleTapGated;
   final bool isSelected;
   final VoidCallback? onLongPress;
 
@@ -29,7 +30,8 @@ class EntryCard extends StatelessWidget {
     this.isExpanded = false,
     this.onToggle,
     this.isSecure = false,
-    this.onUnlock,
+    this.onTapGated,
+    this.onDoubleTapGated,
     this.isSelected = false,
     this.onLongPress,
   });
@@ -62,8 +64,8 @@ class EntryCard extends StatelessWidget {
   Widget _buildListCard(ThemeData theme) {
     final radius = BorderRadius.circular(12);
     return GestureDetector(
-      onTap: !_isExpandable ? onTap : (isSecure ? null : onToggle),
-      onDoubleTap: onTap,
+      onTap: isSecure ? onTapGated : (!_isExpandable ? onTap : onToggle),
+      onDoubleTap: isSecure ? onDoubleTapGated ?? onTap : onTap,
       onLongPress: onLongPress,
       child: Card(
         margin: const EdgeInsets.symmetric(vertical: 4),
@@ -157,9 +159,27 @@ class EntryCard extends StatelessWidget {
                       ? EntryExpandedContent(
                           entry: entry,
                           isSecure: isSecure,
-                          onUnlock: onUnlock,
                         )
-                      : const SizedBox.shrink(),
+                      : isSecure
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.lock_outline, size: 14, color: theme.colorScheme.primary),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Esta entrada está protegida',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : const SizedBox.shrink(),
                 ),
               ],
             ),
