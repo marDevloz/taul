@@ -475,11 +475,11 @@ class _NoteContent extends ConsumerWidget {
 
     final selectedHex = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: Text('Color for "$tagName"'),
         content: PalettePicker(
           initialColor: initialColor,
-          onColorSelected: (hex) => Navigator.pop(context, hex),
+          onColorSelected: (hex) => Navigator.pop(ctx, hex),
         ),
       ),
     );
@@ -495,10 +495,20 @@ class _NoteContent extends ConsumerWidget {
         tagsColors: newTagsColors,
       );
 
-      // Invalidate providers to refresh UI
-      ref.invalidate(entryDetailProvider(entry.id));
+      // Propagate color to ALL entries sharing this tag
+      final allEntries = ref.read(entryListProvider).valueOrNull ?? [];
+      for (final other in allEntries) {
+        if (!other.tags.contains(tagName)) continue;
+        final otherColors = Map<String, String>.from(other.tagsColors);
+        if (otherColors[tagName] != selectedHex) {
+          otherColors[tagName] = selectedHex;
+          await ref.read(updateEntryProvider).call(other, tagsColors: otherColors);
+        }
+      }
+
+      // Invalidate ALL providers so home_view cards rebuild immediately
       ref.invalidate(entryListProvider);
-      ref.invalidate(entryDisplayColorProvider(entry.id));
+      ref.invalidate(entryDetailProvider);
       ref.invalidate(entryDisplayColorProvider);
       ref.invalidate(tagColorMapProvider);
     }
@@ -995,11 +1005,11 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
 
     final selectedHex = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: Text('Color for "$tagName"'),
         content: PalettePicker(
           initialColor: initialColor,
-          onColorSelected: (hex) => Navigator.pop(context, hex),
+          onColorSelected: (hex) => Navigator.pop(ctx, hex),
         ),
       ),
     );
@@ -1015,10 +1025,20 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
         tagsColors: newTagsColors,
       );
 
-      // Invalidate providers to refresh UI
-      ref.invalidate(entryDetailProvider(entry.id));
+      // Propagate color to ALL entries sharing this tag
+      final allEntries = ref.read(entryListProvider).valueOrNull ?? [];
+      for (final other in allEntries) {
+        if (!other.tags.contains(tagName)) continue;
+        final otherColors = Map<String, String>.from(other.tagsColors);
+        if (otherColors[tagName] != selectedHex) {
+          otherColors[tagName] = selectedHex;
+          await ref.read(updateEntryProvider).call(other, tagsColors: otherColors);
+        }
+      }
+
+      // Invalidate ALL providers so home_view cards rebuild immediately
       ref.invalidate(entryListProvider);
-      ref.invalidate(entryDisplayColorProvider(entry.id));
+      ref.invalidate(entryDetailProvider);
       ref.invalidate(entryDisplayColorProvider);
       ref.invalidate(tagColorMapProvider);
     }
