@@ -83,12 +83,12 @@ PR 1 and PR 2 are independent (no ordering constraint). PR 3–5 are order-const
 
 ### PR 3a: Foundation (table + DAO + UC + migration) (~350 lines)
 
-- [ ] 3a.1 Create `lib/infrastructure/database/tag_settings_table.dart` — Drift `TagSettings` table (name PK, color nullable, isSecure default false, createdAt)
-- [ ] 3a.2 Register table in `app_database.dart` — add to `@DriftDatabase(tables: [...])` list
-- [ ] 3a.3 Add v6→v7 migration in `onUpgrade`: CREATE TABLE, scan entries for unique {tag→color}, INSERT into tag_settings
-- [ ] 3a.4 Create `TagSettingsDao` — getAll, getByName, upsert, delete with in-memory Drift tests
-- [ ] 3a.5 Create `ITagSettingsRepository` interface + `TagSettingsRepositoryImpl`
-- [ ] 3a.6 Create use cases: `GetTagSettings`, `SaveTagSetting`, `DeleteTagSetting` with mock tests
+- [x] 3a.1 Create `lib/infrastructure/database/tag_settings_table.dart` — Drift `TagSettings` table (name PK, color nullable, isSecure default false, createdAt)
+- [x] 3a.2 Register table in `app_database.dart` — add to `@DriftDatabase(tables: [...])` list
+- [x] 3a.3 Add v6→v7 migration in `onUpgrade`: CREATE TABLE, scan entries for unique {tag→color}, INSERT into tag_settings
+- [x] 3a.4 Create `TagSettingsDao` — getAll, getByName, upsert, delete with in-memory Drift tests
+- [x] 3a.5 Create `ITagSettingsRepository` interface + `TagSettingsRepositoryImpl`
+- [x] 3a.6 Create use cases: `GetTagSettings`, `SaveTagSetting`, `DeleteTagSetting` with mock tests
 - [ ] 3a.7 Migration test: create DB at v6 with entries having tags+colors, upgrade to v7, verify tag_settings populated
 
 ### PR 3b: UI + providers (~400 lines)

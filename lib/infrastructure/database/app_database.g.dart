@@ -1641,12 +1641,324 @@ class MasterPasswordConfigCompanion
   }
 }
 
+class $TagSettingsTable extends TagSettings
+    with TableInfo<$TagSettingsTable, TagSetting> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TagSettingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _colorMeta = const VerificationMeta('color');
+  @override
+  late final GeneratedColumn<String> color = GeneratedColumn<String>(
+    'color',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isSecureMeta = const VerificationMeta(
+    'isSecure',
+  );
+  @override
+  late final GeneratedColumn<bool> isSecure = GeneratedColumn<bool>(
+    'is_secure',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_secure" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [name, color, isSecure, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'tag_settings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TagSetting> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('color')) {
+      context.handle(
+        _colorMeta,
+        color.isAcceptableOrUnknown(data['color']!, _colorMeta),
+      );
+    }
+    if (data.containsKey('is_secure')) {
+      context.handle(
+        _isSecureMeta,
+        isSecure.isAcceptableOrUnknown(data['is_secure']!, _isSecureMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {name};
+  @override
+  TagSetting map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TagSetting(
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      color: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}color'],
+      ),
+      isSecure: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_secure'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $TagSettingsTable createAlias(String alias) {
+    return $TagSettingsTable(attachedDatabase, alias);
+  }
+}
+
+class TagSetting extends DataClass implements Insertable<TagSetting> {
+  final String name;
+  final String? color;
+  final bool isSecure;
+  final DateTime createdAt;
+  const TagSetting({
+    required this.name,
+    this.color,
+    required this.isSecure,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || color != null) {
+      map['color'] = Variable<String>(color);
+    }
+    map['is_secure'] = Variable<bool>(isSecure);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  TagSettingsCompanion toCompanion(bool nullToAbsent) {
+    return TagSettingsCompanion(
+      name: Value(name),
+      color: color == null && nullToAbsent
+          ? const Value.absent()
+          : Value(color),
+      isSecure: Value(isSecure),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory TagSetting.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TagSetting(
+      name: serializer.fromJson<String>(json['name']),
+      color: serializer.fromJson<String?>(json['color']),
+      isSecure: serializer.fromJson<bool>(json['isSecure']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'name': serializer.toJson<String>(name),
+      'color': serializer.toJson<String?>(color),
+      'isSecure': serializer.toJson<bool>(isSecure),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  TagSetting copyWith({
+    String? name,
+    Value<String?> color = const Value.absent(),
+    bool? isSecure,
+    DateTime? createdAt,
+  }) => TagSetting(
+    name: name ?? this.name,
+    color: color.present ? color.value : this.color,
+    isSecure: isSecure ?? this.isSecure,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  TagSetting copyWithCompanion(TagSettingsCompanion data) {
+    return TagSetting(
+      name: data.name.present ? data.name.value : this.name,
+      color: data.color.present ? data.color.value : this.color,
+      isSecure: data.isSecure.present ? data.isSecure.value : this.isSecure,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TagSetting(')
+          ..write('name: $name, ')
+          ..write('color: $color, ')
+          ..write('isSecure: $isSecure, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(name, color, isSecure, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TagSetting &&
+          other.name == this.name &&
+          other.color == this.color &&
+          other.isSecure == this.isSecure &&
+          other.createdAt == this.createdAt);
+}
+
+class TagSettingsCompanion extends UpdateCompanion<TagSetting> {
+  final Value<String> name;
+  final Value<String?> color;
+  final Value<bool> isSecure;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const TagSettingsCompanion({
+    this.name = const Value.absent(),
+    this.color = const Value.absent(),
+    this.isSecure = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TagSettingsCompanion.insert({
+    required String name,
+    this.color = const Value.absent(),
+    this.isSecure = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : name = Value(name);
+  static Insertable<TagSetting> custom({
+    Expression<String>? name,
+    Expression<String>? color,
+    Expression<bool>? isSecure,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (name != null) 'name': name,
+      if (color != null) 'color': color,
+      if (isSecure != null) 'is_secure': isSecure,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TagSettingsCompanion copyWith({
+    Value<String>? name,
+    Value<String?>? color,
+    Value<bool>? isSecure,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return TagSettingsCompanion(
+      name: name ?? this.name,
+      color: color ?? this.color,
+      isSecure: isSecure ?? this.isSecure,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (color.present) {
+      map['color'] = Variable<String>(color.value);
+    }
+    if (isSecure.present) {
+      map['is_secure'] = Variable<bool>(isSecure.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TagSettingsCompanion(')
+          ..write('name: $name, ')
+          ..write('color: $color, ')
+          ..write('isSecure: $isSecure, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $EntriesTable entries = $EntriesTable(this);
   late final $MasterPasswordConfigTable masterPasswordConfig =
       $MasterPasswordConfigTable(this);
+  late final $TagSettingsTable tagSettings = $TagSettingsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1654,6 +1966,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     entries,
     masterPasswordConfig,
+    tagSettings,
   ];
 }
 
@@ -2404,6 +2717,187 @@ typedef $$MasterPasswordConfigTableProcessedTableManager =
       MasterPasswordConfigData,
       PrefetchHooks Function()
     >;
+typedef $$TagSettingsTableCreateCompanionBuilder =
+    TagSettingsCompanion Function({
+      required String name,
+      Value<String?> color,
+      Value<bool> isSecure,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$TagSettingsTableUpdateCompanionBuilder =
+    TagSettingsCompanion Function({
+      Value<String> name,
+      Value<String?> color,
+      Value<bool> isSecure,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+class $$TagSettingsTableFilterComposer
+    extends Composer<_$AppDatabase, $TagSettingsTable> {
+  $$TagSettingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isSecure => $composableBuilder(
+    column: $table.isSecure,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TagSettingsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TagSettingsTable> {
+  $$TagSettingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isSecure => $composableBuilder(
+    column: $table.isSecure,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TagSettingsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TagSettingsTable> {
+  $$TagSettingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get color =>
+      $composableBuilder(column: $table.color, builder: (column) => column);
+
+  GeneratedColumn<bool> get isSecure =>
+      $composableBuilder(column: $table.isSecure, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$TagSettingsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TagSettingsTable,
+          TagSetting,
+          $$TagSettingsTableFilterComposer,
+          $$TagSettingsTableOrderingComposer,
+          $$TagSettingsTableAnnotationComposer,
+          $$TagSettingsTableCreateCompanionBuilder,
+          $$TagSettingsTableUpdateCompanionBuilder,
+          (
+            TagSetting,
+            BaseReferences<_$AppDatabase, $TagSettingsTable, TagSetting>,
+          ),
+          TagSetting,
+          PrefetchHooks Function()
+        > {
+  $$TagSettingsTableTableManager(_$AppDatabase db, $TagSettingsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TagSettingsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TagSettingsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TagSettingsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> name = const Value.absent(),
+                Value<String?> color = const Value.absent(),
+                Value<bool> isSecure = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TagSettingsCompanion(
+                name: name,
+                color: color,
+                isSecure: isSecure,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String name,
+                Value<String?> color = const Value.absent(),
+                Value<bool> isSecure = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TagSettingsCompanion.insert(
+                name: name,
+                color: color,
+                isSecure: isSecure,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TagSettingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TagSettingsTable,
+      TagSetting,
+      $$TagSettingsTableFilterComposer,
+      $$TagSettingsTableOrderingComposer,
+      $$TagSettingsTableAnnotationComposer,
+      $$TagSettingsTableCreateCompanionBuilder,
+      $$TagSettingsTableUpdateCompanionBuilder,
+      (
+        TagSetting,
+        BaseReferences<_$AppDatabase, $TagSettingsTable, TagSetting>,
+      ),
+      TagSetting,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2412,4 +2906,6 @@ class $AppDatabaseManager {
       $$EntriesTableTableManager(_db, _db.entries);
   $$MasterPasswordConfigTableTableManager get masterPasswordConfig =>
       $$MasterPasswordConfigTableTableManager(_db, _db.masterPasswordConfig);
+  $$TagSettingsTableTableManager get tagSettings =>
+      $$TagSettingsTableTableManager(_db, _db.tagSettings);
 }

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -7,10 +8,11 @@ import 'package:taul/core/constants.dart';
 
 import 'entries_table.dart';
 import 'master_password_config_table.dart';
+import 'tag_settings_table.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Entries, MasterPasswordConfig])
+@DriftDatabase(tables: [Entries, MasterPasswordConfig, TagSettings])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -21,7 +23,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.custom(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -69,6 +71,43 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 6) {
             await m.addColumn(entries, entries.tagsColor);
+          }
+          if (from < 7) {
+            // Create tag_settings table
+            await m.createTable(tagSettings);
+
+            // Copy existing per-entry tag colors into tag_settings
+            final entriesRows = await select(entries).get();
+            final seenTags = <String, String?>{}; // tag name → color
+            for (final entry in entriesRows) {
+              final tagsList =
+                  List<String>.from(jsonDecode(entry.tags) as List);
+              if (entry.tagsColor != null) {
+                final colors = Map<String, String>.from(
+                  Map<String, dynamic>.from(
+                    jsonDecode(entry.tagsColor!) as Map,
+                  ).map((k, v) => MapEntry(k, v as String)),
+                );
+                for (final tag in tagsList) {
+                  if (!seenTags.containsKey(tag)) {
+                    seenTags[tag] = colors[tag];
+                  }
+                }
+              } else {
+                for (final tag in tagsList) {
+                  seenTags.putIfAbsent(tag, () => null);
+                }
+              }
+            }
+            // Insert into tag_settings
+            for (final entry in seenTags.entries) {
+              await into(tagSettings).insertOnConflictUpdate(
+                TagSettingsCompanion.insert(
+                  name: entry.key,
+                  color: Value.absentIfNull(entry.value),
+                ),
+              );
+            }
           }
         },
         beforeOpen: (_) async {
