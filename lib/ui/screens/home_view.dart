@@ -64,7 +64,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                             itemBuilder: (context, index) {
                               final entry = entries[index];
                               final color = ref.watch(entryDisplayColorProvider(entry.id));
-                              final isSecure = ref.watch(effectiveAuthProvider(entry.id));
+                              final isSecure = ref.watch(hasSecureTagProvider(entry.id));
                               return EntryCard(
                                 entry: entry,
                                 displayColor: color,
@@ -117,7 +117,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                           itemBuilder: (context, index) {
                             final entry = entries[index];
                             final color = ref.watch(entryDisplayColorProvider(entry.id));
-                            final isSecure = ref.watch(effectiveAuthProvider(entry.id));
+                            final isSecure = ref.watch(hasSecureTagProvider(entry.id));
                             return EntryCard(
                               entry: entry,
                               isGrid: true,
