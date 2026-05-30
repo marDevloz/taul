@@ -33,47 +33,41 @@ class _PalettePickerState extends State<PalettePicker> {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-      ),
-      itemCount: TagPalette.colors.length,
-      itemBuilder: (context, index) {
-        final paletteColor = TagPalette.colors[index];
-        final isSelected = _selectedColor == paletteColor.color;
-
-        return GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedColor = paletteColor.color;
-            });
-            widget.onColorSelected(paletteColor.hex);
-          },
-          child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: paletteColor.color,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isSelected ? Colors.white : Colors.transparent,
-                width: 2,
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        for (final paletteColor in TagPalette.colors)
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedColor = paletteColor.color;
+              });
+              widget.onColorSelected(paletteColor.hex);
+            },
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: paletteColor.color,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _selectedColor == paletteColor.color
+                      ? Colors.white
+                      : Colors.transparent,
+                  width: 2,
+                ),
               ),
+              child: _selectedColor == paletteColor.color
+                  ? const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 24,
+                    )
+                  : null,
             ),
-            child: isSelected
-                ? const Icon(
-                    Icons.check,
-                    color: Colors.white,
-                    size: 24,
-                  )
-                : null,
           ),
-        );
-      },
+      ],
     );
   }
 }
