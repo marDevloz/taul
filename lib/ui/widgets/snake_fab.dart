@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
 /// Data model for a single item inside a [SnakeFab].
@@ -159,19 +160,32 @@ class _SnakeFabState extends State<SnakeFab> {
   }
 
   Widget _buildExpandedPanel(ThemeData theme) {
-    return Container(
-      constraints: BoxConstraints(maxHeight: widget.maxHeight),
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      child: SingleChildScrollView(
-        controller: _scrollController,
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (var i = 0; i < widget.items.length; i++)
-              _buildRevealItem(i, theme),
-          ],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          constraints: BoxConstraints(maxHeight: widget.maxHeight),
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (var i = 0; i < widget.items.length; i++)
+                  _buildRevealItem(i, theme),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -240,28 +254,41 @@ class _FabItemPill extends StatelessWidget {
             ? theme.colorScheme.onSecondaryContainer
             : theme.colorScheme.onSurfaceVariant;
 
-    return Material(
-      color: bgColor,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
+    return Container(
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 15, color: fgColor),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: fgColor,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        boxShadow: [
+          BoxShadow(
+            color: (hasColor ? color! : theme.colorScheme.shadow).withValues(alpha: 0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+            spreadRadius: -1,
+          ),
+        ],
+      ),
+      child: Material(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 15, color: fgColor),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: fgColor,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
