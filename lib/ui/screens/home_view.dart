@@ -217,13 +217,19 @@ class _HomeViewState extends ConsumerState<HomeView> {
   Widget _buildTypeFilterFab() {
     final selectedType = ref.watch(selectedTypeFilterProvider);
     final isExpanded = _expandedFabId == 'type';
+    final hasFilter = selectedType != null;
 
     return SnakeFab(
       isExpanded: isExpanded,
       onTap: () {
-        setState(() {
-          _expandedFabId = isExpanded ? null : 'type';
-        });
+        if (hasFilter && !isExpanded) {
+          // Toggle off: clear filter directly
+          ref.read(selectedTypeFilterProvider.notifier).state = null;
+        } else {
+          setState(() {
+            _expandedFabId = isExpanded ? null : 'type';
+          });
+        }
       },
       collapsedIcon: Icon(_iconForEntryType(selectedType)),
       items: const [
@@ -255,9 +261,10 @@ class _HomeViewState extends ConsumerState<HomeView> {
     final selectedTag = ref.watch(selectedTagFilterProvider);
     final tagColors = ref.watch(tagColorMapProvider);
     final isExpanded = _expandedFabId == 'tag';
+    final hasFilter = selectedTag != null && selectedTag.isNotEmpty;
 
     final items = <SnakeFabItem>[
-      if (selectedTag != null && selectedTag.isNotEmpty)
+      if (hasFilter)
         const SnakeFabItem(value: '', label: 'Todas', icon: Icons.all_inclusive),
       for (final tag in tags)
         SnakeFabItem(
@@ -271,9 +278,14 @@ class _HomeViewState extends ConsumerState<HomeView> {
     return SnakeFab(
       isExpanded: isExpanded,
       onTap: () {
-        setState(() {
-          _expandedFabId = isExpanded ? null : 'tag';
-        });
+        if (hasFilter && !isExpanded) {
+          // Toggle off: clear filter directly
+          ref.read(selectedTagFilterProvider.notifier).state = null;
+        } else {
+          setState(() {
+            _expandedFabId = isExpanded ? null : 'tag';
+          });
+        }
       },
       collapsedIcon: selectedTag != null && selectedTag.isNotEmpty
           ? Icon(Icons.sell, color: tagColors[selectedTag])
