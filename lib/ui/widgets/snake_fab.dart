@@ -17,11 +17,11 @@ class SnakeFabItem {
   });
 }
 
-/// A FAB that snake-expands into a train of filter pills.
+/// A FAB that snake-expands upward into a scrollable list of filter pills.
 ///
-/// Pills slide in from the right one by one, like a train emerging
-/// from the FAB. Each pill follows the previous with a short delay.
-/// The panel is transparent with a subtle blur.
+/// Items appear one-by-one as the user scrolls (scroll-driven reveal).
+/// The panel is transparent — no background color.
+/// Collapsed state shows icon + label for clear identification.
 class SnakeFab extends StatefulWidget {
   final bool isExpanded;
   final VoidCallback onTap;
@@ -31,7 +31,6 @@ class SnakeFab extends StatefulWidget {
   final String? selectedValue;
   final ValueChanged<String?> onItemSelected;
   final double maxHeight;
-  final int itemsPerRow;
 
   const SnakeFab({
     super.key,
@@ -42,8 +41,7 @@ class SnakeFab extends StatefulWidget {
     required this.items,
     this.selectedValue,
     required this.onItemSelected,
-    this.maxHeight = 200,
-    this.itemsPerRow = 3,
+    this.maxHeight = 80,
   });
 
   @override
@@ -83,8 +81,8 @@ class _SnakeFabState extends State<SnakeFab> {
     super.dispose();
   }
 
-  /// Snake reveal: pills appear one by one with a short delay,
-  /// like a train emerging from the FAB.
+  /// Staggered reveal: first [initialCount] items appear one by one.
+  /// Remaining items are revealed by scroll via [_onScroll].
   void _startRevealAnimation({int initialCount = 3}) {
     _revealTimer?.cancel();
     var index = 0;
@@ -93,7 +91,7 @@ class _SnakeFabState extends State<SnakeFab> {
       setState(() => _revealedIndices.add(index));
       index++;
       if (index < initialCount && index < widget.items.length) {
-        Timer(const Duration(milliseconds: 80), revealNext);
+        Timer(const Duration(milliseconds: 60), revealNext);
       }
     }
     _revealTimer = Timer(const Duration(milliseconds: 100), revealNext);
@@ -102,9 +100,10 @@ class _SnakeFabState extends State<SnakeFab> {
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     final pixel = _scrollController.offset;
+    final itemsPerRow = _estimateItemsPerRow();
     const rowHeight = 44.0;
     final visibleRows = (pixel / rowHeight).floor();
-    final visibleIndex = (visibleRows + 1) * widget.itemsPerRow;
+    final visibleIndex = (visibleRows + 1) * itemsPerRow;
     var changed = false;
     for (var i = 0; i < visibleIndex && i < widget.items.length; i++) {
       if (!_revealedIndices.contains(i)) {
@@ -115,14 +114,9 @@ class _SnakeFabState extends State<SnakeFab> {
     if (changed) setState(() {});
   }
 
-  /// Build rows of pills (3 per row) for the snake layout.
-  List<List<int>> _buildRows() {
-    final rows = <List<int>>[];
-    for (var i = 0; i < widget.items.length; i += widget.itemsPerRow) {
-      final end = (i + widget.itemsPerRow).clamp(0, widget.items.length);
-      rows.add(List.generate(end - i, (j) => i + j));
-    }
-    return rows;
+  int _estimateItemsPerRow() {
+    // Rough estimate: pills are ~100px wide, container ~280px wide
+    return 3;
   }
 
   @override
@@ -143,7 +137,7 @@ class _SnakeFabState extends State<SnakeFab> {
               : const SizedBox.shrink(),
         ),
         const SizedBox(height: 8),
-        // Collapsed trigger FAB
+        // Collapsed trigger FAB with label
         _buildCollapsedFab(theme),
       ],
     );
@@ -180,8 +174,6 @@ class _SnakeFabState extends State<SnakeFab> {
   }
 
   Widget _buildExpandedPanel(ThemeData theme) {
-    final rows = _buildRows();
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
@@ -199,12 +191,12 @@ class _SnakeFabState extends State<SnakeFab> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: SingleChildScrollView(
             controller: _scrollController,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                for (var rowIdx = 0; rowIdx < rows.length; rowIdx++)
-                  _buildSnakeRow(rows[rowIdx], rowIdx, theme),
+                for (var i = 0; i < widget.items.length; i++)
+                  _buildRevealItem(i, theme),
               ],
             ),
           ),
@@ -213,47 +205,26 @@ class _SnakeFabState extends State<SnakeFab> {
     );
   }
 
-  /// A single row of pills that slides in from the right like a train car.
-  Widget _buildSnakeRow(List<int> indices, int rowIndex, ThemeData theme) {
-    // Each row starts after the previous row's pills have appeared
-    final baseDelay = rowIndex * widget.itemsPerRow * 80;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var i = 0; i < indices.length; i++)
-            _buildTrainItem(indices[i], i, baseDelay, theme),
-        ],
-      ),
-    );
-  }
-
-  /// A single pill that slides in from the right with staggered delay.
-  Widget _buildTrainItem(int index, int posInRow, int baseDelay, ThemeData theme) {
+  Widget _buildRevealItem(int index, ThemeData theme) {
     final item = widget.items[index];
     final isSelected = widget.selectedValue == item.value;
     final isRevealed = _revealedIndices.contains(index);
 
     return AnimatedOpacity(
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 250),
       curve: Curves.easeOut,
       opacity: isRevealed ? 1.0 : 0.0,
       child: AnimatedSlide(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
-        offset: isRevealed ? Offset.zero : const Offset(1.5, 0),
-        child: Padding(
-          padding: EdgeInsets.only(right: posInRow < 2 ? 8 : 0),
-          child: _FabItemPill(
-            label: item.label,
-            icon: item.icon,
-            color: item.color,
-            selected: isSelected,
-            onTap: () => widget.onItemSelected(
-              isSelected ? null : item.value,
-            ),
+        offset: isRevealed ? Offset.zero : const Offset(0, 0.4),
+        child: _FabItemPill(
+          label: item.label,
+          icon: item.icon,
+          color: item.color,
+          selected: isSelected,
+          onTap: () => widget.onItemSelected(
+            isSelected ? null : item.value,
           ),
         ),
       ),
