@@ -277,8 +277,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
         });
       },
       collapsedIcon: selectedTag != null && selectedTag.isNotEmpty
-          ? Icon(Icons.label, color: tagColors[selectedTag])
-          : const Icon(Icons.filter_list),
+          ? Icon(Icons.sell, color: tagColors[selectedTag])
+          : const Icon(Icons.sell_outlined),
       collapsedLabel: 'Tag',
       items: items,
       selectedValue: selectedTag ?? '',

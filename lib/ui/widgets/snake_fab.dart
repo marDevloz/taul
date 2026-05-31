@@ -259,7 +259,7 @@ class _FabItemPill extends StatelessWidget {
     final theme = Theme.of(context);
     final hasColor = color != null;
     final bgColor = hasColor
-        ? color!.withValues(alpha: selected ? 0.9 : 0.25)
+        ? color!.withValues(alpha: selected ? 1.0 : 0.5)
         : selected
             ? theme.colorScheme.secondaryContainer
             : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6);
