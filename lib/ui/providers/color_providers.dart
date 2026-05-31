@@ -54,7 +54,7 @@ final tagColorMapProvider = Provider.autoDispose<Map<String, Color>>((ref) {
   final result = <String, Color>{};
   for (final entry in tagMap.entries) {
     if (entry.value.color != null) {
-      result[entry.key] = _parseHex(entry.value.color!);
+      result[entry.key.toLowerCase()] = _parseHex(entry.value.color!);
     }
   }
   return result;

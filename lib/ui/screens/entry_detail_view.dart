@@ -543,7 +543,7 @@ class _NoteContent extends ConsumerWidget {
       // Propagate color to ALL entries sharing this tag
       final allEntries = ref.read(entryListProvider).valueOrNull ?? [];
       for (final other in allEntries) {
-        if (!other.tags.contains(tagName)) continue;
+        if (!other.tags.any((t) => t.toLowerCase() == tagName.toLowerCase())) continue;
         final otherColors = Map<String, String>.from(other.tagsColors);
         if (otherColors[tagName] != selectedHex) {
           otherColors[tagName] = selectedHex;
@@ -1073,7 +1073,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
       // Propagate color to ALL entries sharing this tag
       final allEntries = ref.read(entryListProvider).valueOrNull ?? [];
       for (final other in allEntries) {
-        if (!other.tags.contains(tagName)) continue;
+        if (!other.tags.any((t) => t.toLowerCase() == tagName.toLowerCase())) continue;
         final otherColors = Map<String, String>.from(other.tagsColors);
         if (otherColors[tagName] != selectedHex) {
           otherColors[tagName] = selectedHex;

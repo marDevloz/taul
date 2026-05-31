@@ -216,7 +216,8 @@ final tagsListProvider = Provider<List<String>>((ref) {
   final freq = <String, int>{};
   for (final e in entries) {
     for (final tag in e.tags) {
-      freq[tag] = (freq[tag] ?? 0) + 1;
+      final lower = tag.toLowerCase();
+      freq[lower] = (freq[lower] ?? 0) + 1;
     }
   }
   final sorted = freq.entries.toList()
@@ -233,7 +234,7 @@ final filteredEntriesProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
     result = result.where((e) => e.type == type).toList();
   }
   if (tag != null && tag.isNotEmpty) {
-    result = result.where((e) => e.tags.contains(tag)).toList();
+    result = result.where((e) => e.tags.any((t) => t.toLowerCase() == tag.toLowerCase())).toList();
   }
   return result;
 });
