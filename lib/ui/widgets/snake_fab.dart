@@ -168,7 +168,7 @@ class _SnakeFabState extends State<SnakeFab> {
           constraints: BoxConstraints(maxHeight: widget.maxHeight),
           margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: Colors.black.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.1),
@@ -259,10 +259,10 @@ class _FabItemPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: (hasColor ? color! : theme.colorScheme.shadow).withValues(alpha: 0.4),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-            spreadRadius: -1,
+            color: Colors.black.withValues(alpha: 0.6),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+            spreadRadius: -2,
           ),
         ],
       ),
