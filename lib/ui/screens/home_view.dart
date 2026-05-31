@@ -226,7 +226,6 @@ class _HomeViewState extends ConsumerState<HomeView> {
         });
       },
       collapsedIcon: Icon(_iconForEntryType(selectedType)),
-      collapsedLabel: 'Tipo',
       items: const [
         SnakeFabItem(value: '', label: 'Todas', icon: Icons.all_inclusive),
         SnakeFabItem(value: 'glossary', label: 'Glosario', icon: Icons.book),
@@ -279,7 +278,6 @@ class _HomeViewState extends ConsumerState<HomeView> {
       collapsedIcon: selectedTag != null && selectedTag.isNotEmpty
           ? Icon(Icons.sell, color: tagColors[selectedTag])
           : const Icon(Icons.sell_outlined),
-      collapsedLabel: 'Tag',
       items: items,
       selectedValue: selectedTag ?? '',
       onItemSelected: (value) {

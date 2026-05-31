@@ -144,51 +144,17 @@ class _SnakeFabState extends State<SnakeFab> {
     final hasFilter =
         widget.selectedValue != null && widget.selectedValue!.isNotEmpty;
 
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (widget.collapsedLabel != null) ...[
-            AnimatedOpacity(
-              duration: const Duration(milliseconds: 200),
-              opacity: widget.isExpanded ? 0.0 : 1.0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: hasFilter
-                      ? theme.colorScheme.secondaryContainer
-                      : theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  widget.collapsedLabel!,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: hasFilter
-                        ? theme.colorScheme.onSecondaryContainer
-                        : theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-          ],
-          FloatingActionButton.small(
-            heroTag: null,
-            onPressed: widget.onTap,
-            backgroundColor: hasFilter
-                ? theme.colorScheme.secondaryContainer
-                : theme.colorScheme.surfaceContainerHigh,
-            foregroundColor: hasFilter
-                ? theme.colorScheme.onSecondaryContainer
-                : theme.colorScheme.onSurfaceVariant,
-            elevation: hasFilter ? 2 : 1,
-            child: widget.collapsedIcon,
-          ),
-        ],
-      ),
+    return FloatingActionButton.small(
+      heroTag: null,
+      onPressed: widget.onTap,
+      backgroundColor: hasFilter
+          ? theme.colorScheme.secondaryContainer
+          : theme.colorScheme.surfaceContainerHigh,
+      foregroundColor: hasFilter
+          ? theme.colorScheme.onSecondaryContainer
+          : theme.colorScheme.onSurfaceVariant,
+      elevation: hasFilter ? 2 : 1,
+      child: widget.collapsedIcon,
     );
   }
 
@@ -259,10 +225,10 @@ class _FabItemPill extends StatelessWidget {
     final theme = Theme.of(context);
     final hasColor = color != null;
     final bgColor = hasColor
-        ? color!.withValues(alpha: selected ? 1.0 : 0.5)
+        ? color!
         : selected
             ? theme.colorScheme.secondaryContainer
-            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6);
+            : theme.colorScheme.surfaceContainerHighest;
     final fgColor = hasColor
         ? selected
             ? Colors.white
