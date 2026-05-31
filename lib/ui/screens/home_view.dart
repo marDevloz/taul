@@ -206,6 +206,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
           FloatingActionButton(
             heroTag: null,
             onPressed: () => _showQuickAdd(context),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.7),
             child: const Icon(Icons.add),
           ),
         ],

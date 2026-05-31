@@ -306,13 +306,9 @@ class EntryDetailView extends ConsumerWidget {
                   maxLines: 5,
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                _TagsAutocompleteField(
                   controller: tagsCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Tags (opcional)',
-                    hintText: 'separados por coma: dev, personal',
-                    border: OutlineInputBorder(),
-                  ),
+                  ref: ref,
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -1094,3 +1090,91 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
   }
 }
 
+/// Autocomplete field for tags inside the entry edit bottom sheet.
+///
+/// Provides real-time tag suggestions from [tagsListProvider] with a 300ms
+/// debounce, minimum 1-char threshold, and max 6 visible suggestions.
+class _TagsAutocompleteField extends StatefulWidget {
+  final TextEditingController controller;
+  final WidgetRef ref;
+
+  const _TagsAutocompleteField({
+    required this.controller,
+    required this.ref,
+  });
+
+  @override
+  State<_TagsAutocompleteField> createState() => _TagsAutocompleteFieldState();
+}
+
+class _TagsAutocompleteFieldState extends State<_TagsAutocompleteField> {
+  List<String> _suggestions = [];
+  Timer? _debounceTimer;
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onChanged(String value) {
+    _debounceTimer?.cancel();
+    setState(() => _suggestions = []);
+    if (value.trim().isEmpty) return;
+
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      final allTags = widget.ref.read(tagsListProvider);
+      final filtered = allTags
+          .where((t) => t.toLowerCase().contains(value.toLowerCase()))
+          .take(6)
+          .toList();
+      setState(() => _suggestions = filtered);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Autocomplete<String>(
+      optionsBuilder: (TextEditingValue value) {
+        return _suggestions;
+      },
+      fieldViewBuilder: (
+        BuildContext context,
+        TextEditingController autocompleteController,
+        FocusNode focusNode,
+        VoidCallback onFieldSubmitted,
+      ) {
+        return TextField(
+          controller: widget.controller,
+          focusNode: focusNode,
+          onChanged: (String text) {
+            _onChanged(text);
+            // Keep the Autocomplete's own controller in sync so its
+            // internal listener triggers optionsBuilder.
+            autocompleteController.text = text;
+            autocompleteController.selection =
+                TextSelection.collapsed(offset: text.length);
+          },
+          decoration: const InputDecoration(
+            labelText: 'Tags (opcional)',
+            hintText: 'separados por coma: dev, personal',
+            border: OutlineInputBorder(),
+          ),
+        );
+      },
+      onSelected: (String value) {
+        _debounceTimer?.cancel();
+        _suggestions = [];
+        final currentText = widget.controller.text;
+        final newText = currentText.isNotEmpty &&
+                !currentText.endsWith(', ') &&
+                !currentText.endsWith(',')
+            ? '$currentText, $value, '
+            : '$currentText$value, ';
+        widget.controller.text = newText;
+        widget.controller.selection =
+            TextSelection.collapsed(offset: newText.length);
+      },
+    );
+  }
+}
