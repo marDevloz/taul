@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 /// Data model for a single item inside a [SnakeFab].
@@ -15,38 +16,19 @@ class SnakeFabItem {
   });
 }
 
-/// A FAB that snake-expands upward into a grid of filter pills.
+/// A FAB that snake-expands upward into a scrollable list of filter pills.
 ///
-/// When [isExpanded] is true, items slide in one-by-one with a staggered
-/// [SlideTransition] inside a scrollable panel. When collapsed, only the
-/// FAB trigger button is visible, showing the [collapsedIcon].
-///
-/// The parent is responsible for mutual exclusion via [isExpanded].
+/// Items appear one-by-one as the user scrolls (scroll-driven reveal).
+/// The panel is transparent — no background color.
+/// Collapsed state shows icon + label for clear identification.
 class SnakeFab extends StatefulWidget {
-  /// Whether this FAB is currently expanded.
   final bool isExpanded;
-
-  /// Called when the collapsed FAB is tapped (expand/collapse).
   final VoidCallback onTap;
-
-  /// Icon shown on the collapsed FAB button.
   final Widget collapsedIcon;
-
-  /// Label shown next to the collapsed icon (optional).
   final String? collapsedLabel;
-
-  /// Items to display when expanded.
   final List<SnakeFabItem> items;
-
-  /// The currently selected value. Used to highlight the matching item and
-  /// to toggle it off on re-tap.
   final String? selectedValue;
-
-  /// Called when a filter item is tapped.
-  /// `null` value means the item was already selected (toggle off).
   final ValueChanged<String?> onItemSelected;
-
-  /// Max height of the expanded panel before it becomes scrollable.
   final double maxHeight;
 
   const SnakeFab({
@@ -58,45 +40,80 @@ class SnakeFab extends StatefulWidget {
     required this.items,
     this.selectedValue,
     required this.onItemSelected,
-    this.maxHeight = 200,
+    this.maxHeight = 240,
   });
 
   @override
   State<SnakeFab> createState() => _SnakeFabState();
 }
 
-class _SnakeFabState extends State<SnakeFab>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+class _SnakeFabState extends State<SnakeFab> {
+  final ScrollController _scrollController = ScrollController();
+  final Set<int> _revealedIndices = {};
+  Timer? _revealTimer;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 250),
-    );
+    _scrollController.addListener(_onScroll);
     if (widget.isExpanded) {
-      _controller.value = 1.0;
+      _startRevealAnimation();
     }
   }
 
   @override
   void didUpdateWidget(SnakeFab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.isExpanded != oldWidget.isExpanded) {
-      if (widget.isExpanded) {
-        _controller.forward();
-      } else {
-        _controller.reverse();
-      }
+    if (widget.isExpanded && !oldWidget.isExpanded) {
+      _revealedIndices.clear();
+      _startRevealAnimation();
+    } else if (!widget.isExpanded) {
+      _revealTimer?.cancel();
+      _revealedIndices.clear();
     }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _revealTimer?.cancel();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Staggered reveal: items appear one by one with a short delay.
+  void _startRevealAnimation() {
+    _revealTimer?.cancel();
+    var index = 0;
+    void revealNext() {
+      if (!widget.isExpanded || index >= widget.items.length) return;
+      setState(() => _revealedIndices.add(index));
+      index++;
+      if (index < widget.items.length) {
+        Timer(const Duration(milliseconds: 60), revealNext);
+      }
+    }
+    // Small initial delay so the panel opening is visible first
+    _revealTimer = Timer(const Duration(milliseconds: 100), revealNext);
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    // As user scrolls down, reveal items that come into view
+    final pixel = _scrollController.offset;
+    final itemsPerRow = _estimateItemsPerRow();
+    const rowHeight = 44.0; // approx pill height + spacing
+    final visibleRows = (pixel / rowHeight).floor();
+    final visibleIndex = (visibleRows + 1) * itemsPerRow;
+    for (var i = 0; i < visibleIndex && i < widget.items.length; i++) {
+      if (!_revealedIndices.contains(i)) {
+        setState(() => _revealedIndices.add(i));
+      }
+    }
+  }
+
+  int _estimateItemsPerRow() {
+    // Rough estimate: pills are ~100px wide, container ~280px wide
+    return 3;
   }
 
   @override
@@ -107,76 +124,114 @@ class _SnakeFabState extends State<SnakeFab>
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        // Expandable panel with staggered animation
+        // Expandable panel — transparent background
         AnimatedSize(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeInOut,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
           alignment: Alignment.bottomCenter,
           child: widget.isExpanded
               ? _buildExpandedPanel(theme)
               : const SizedBox.shrink(),
         ),
-        const SizedBox(height: 4),
-        // Collapsed trigger FAB
-        FloatingActionButton.small(
-          heroTag: null,
-          onPressed: widget.onTap,
-          backgroundColor:
-              widget.selectedValue != null && widget.selectedValue!.isNotEmpty
-                  ? theme.colorScheme.secondaryContainer
-                  : null,
-          child: widget.collapsedIcon,
-        ),
+        const SizedBox(height: 8),
+        // Collapsed trigger FAB with label
+        _buildCollapsedFab(theme),
       ],
+    );
+  }
+
+  Widget _buildCollapsedFab(ThemeData theme) {
+    final hasFilter =
+        widget.selectedValue != null && widget.selectedValue!.isNotEmpty;
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (widget.collapsedLabel != null) ...[
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: widget.isExpanded ? 0.0 : 1.0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: hasFilter
+                      ? theme.colorScheme.secondaryContainer
+                      : theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  widget.collapsedLabel!,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: hasFilter
+                        ? theme.colorScheme.onSecondaryContainer
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
+          FloatingActionButton.small(
+            heroTag: null,
+            onPressed: widget.onTap,
+            backgroundColor: hasFilter
+                ? theme.colorScheme.secondaryContainer
+                : theme.colorScheme.surfaceContainerHigh,
+            foregroundColor: hasFilter
+                ? theme.colorScheme.onSecondaryContainer
+                : theme.colorScheme.onSurfaceVariant,
+            elevation: hasFilter ? 2 : 1,
+            child: widget.collapsedIcon,
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildExpandedPanel(ThemeData theme) {
     return Container(
       constraints: BoxConstraints(maxHeight: widget.maxHeight),
-      margin: const EdgeInsets.only(bottom: 4),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       child: SingleChildScrollView(
+        controller: _scrollController,
         child: Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             for (var i = 0; i < widget.items.length; i++)
-              _buildAnimatedItem(i),
+              _buildRevealItem(i, theme),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAnimatedItem(int index) {
+  Widget _buildRevealItem(int index, ThemeData theme) {
     final item = widget.items[index];
     final isSelected = widget.selectedValue == item.value;
-    final count = widget.items.length;
-    final staggerFraction = count > 1 ? 1.0 / count : 1.0;
-    final start = index * staggerFraction * 0.5;
-    final end = (start + 0.5).clamp(0.01, 1.0);
+    final isRevealed = _revealedIndices.contains(index);
 
-    return SlideTransition(
-      position: _controller.drive(
-        CurveTween(curve: Interval(start.clamp(0.0, 0.99), end)),
-      ).drive(
-        Tween<Offset>(
-          begin: const Offset(0, 0.6),
-          end: Offset.zero,
-        ),
-      ),
-      child: _FabItemPill(
-        label: item.label,
-        icon: item.icon,
-        color: item.color,
-        selected: isSelected,
-        onTap: () => widget.onItemSelected(
-          isSelected ? null : item.value,
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      opacity: isRevealed ? 1.0 : 0.0,
+      child: AnimatedSlide(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        offset: isRevealed ? Offset.zero : const Offset(0, 0.4),
+        child: _FabItemPill(
+          label: item.label,
+          icon: item.icon,
+          color: item.color,
+          selected: isSelected,
+          onTap: () => widget.onItemSelected(
+            isSelected ? null : item.value,
+          ),
         ),
       ),
     );
@@ -202,13 +257,19 @@ class _FabItemPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bgColor = color ??
-        (selected
+    final hasColor = color != null;
+    final bgColor = hasColor
+        ? color!.withValues(alpha: selected ? 0.9 : 0.25)
+        : selected
             ? theme.colorScheme.secondaryContainer
-            : theme.colorScheme.surfaceContainerHighest);
-    final fgColor = selected
-        ? theme.colorScheme.onSecondaryContainer
-        : theme.colorScheme.onSurfaceVariant;
+            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6);
+    final fgColor = hasColor
+        ? selected
+            ? Colors.white
+            : color!
+        : selected
+            ? theme.colorScheme.onSecondaryContainer
+            : theme.colorScheme.onSurfaceVariant;
 
     return Material(
       color: bgColor,
@@ -221,18 +282,16 @@ class _FabItemPill extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 16, color: fgColor),
-              if (label.isNotEmpty) ...[
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: fgColor,
-                    fontWeight: FontWeight.w500,
-                  ),
+              Icon(icon, size: 15, color: fgColor),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: fgColor,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
-              ],
+              ),
             ],
           ),
         ),
