@@ -204,6 +204,11 @@ class _SnakeFabState extends State<SnakeFab> {
   }
 }
 
+/// Returns black or white depending on the luminance of [color].
+Color _contrastColor(Color color) {
+  return color.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+}
+
 /// A single pill/chip inside an expanded [SnakeFab] panel.
 class _FabItemPill extends StatelessWidget {
   final String label;
@@ -230,9 +235,7 @@ class _FabItemPill extends StatelessWidget {
             ? theme.colorScheme.secondaryContainer
             : theme.colorScheme.surfaceContainerHighest;
     final fgColor = hasColor
-        ? selected
-            ? Colors.white
-            : color!
+        ? _contrastColor(color!)
         : selected
             ? theme.colorScheme.onSecondaryContainer
             : theme.colorScheme.onSurfaceVariant;
