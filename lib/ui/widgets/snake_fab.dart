@@ -41,7 +41,7 @@ class SnakeFab extends StatefulWidget {
     required this.items,
     this.selectedValue,
     required this.onItemSelected,
-    this.maxHeight = 240,
+    this.maxHeight = 80,
   });
 
   @override
@@ -81,35 +81,37 @@ class _SnakeFabState extends State<SnakeFab> {
     super.dispose();
   }
 
-  /// Staggered reveal: items appear one by one with a short delay.
-  void _startRevealAnimation() {
+  /// Staggered reveal: first [initialCount] items appear one by one.
+  /// Remaining items are revealed by scroll via [_onScroll].
+  void _startRevealAnimation({int initialCount = 3}) {
     _revealTimer?.cancel();
     var index = 0;
     void revealNext() {
-      if (!widget.isExpanded || index >= widget.items.length) return;
+      if (!widget.isExpanded || index >= widget.items.length || index >= initialCount) return;
       setState(() => _revealedIndices.add(index));
       index++;
-      if (index < widget.items.length) {
+      if (index < initialCount && index < widget.items.length) {
         Timer(const Duration(milliseconds: 60), revealNext);
       }
     }
-    // Small initial delay so the panel opening is visible first
     _revealTimer = Timer(const Duration(milliseconds: 100), revealNext);
   }
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
-    // As user scrolls down, reveal items that come into view
     final pixel = _scrollController.offset;
     final itemsPerRow = _estimateItemsPerRow();
-    const rowHeight = 44.0; // approx pill height + spacing
+    const rowHeight = 44.0;
     final visibleRows = (pixel / rowHeight).floor();
     final visibleIndex = (visibleRows + 1) * itemsPerRow;
+    var changed = false;
     for (var i = 0; i < visibleIndex && i < widget.items.length; i++) {
       if (!_revealedIndices.contains(i)) {
-        setState(() => _revealedIndices.add(i));
+        _revealedIndices.add(i);
+        changed = true;
       }
     }
+    if (changed) setState(() {});
   }
 
   int _estimateItemsPerRow() {
