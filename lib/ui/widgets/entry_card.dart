@@ -161,39 +161,34 @@ class EntryCard extends StatelessWidget {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall,
-                        )
-                      else
-                        Row(
-                          children: [
-                            Icon(Icons.copy, size: 14, color: theme.colorScheme.primary),
-                            const SizedBox(width: 6),
-                            GestureDetector(
-                              onTap: () {
-                                final text = '${entry.title}\n\n${entry.content}';
-                                Clipboard.setData(ClipboardData(text: text));
-                                ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Contenido copiado'),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              },
-                              child: Text(
-                                'Copiar todo',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.primary,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ),
-                          ],
                         ),
                     ],
                   ),
-                  trailing: trailingAction ?? Text(
-                    _formatDate(entry.updatedAt),
-                    style: theme.textTheme.labelSmall,
-                  ),
+                  trailing: trailingAction ??
+                      (isExpanded
+                          ? SizedBox(
+                              width: 32,
+                              height: 32,
+                              child: IconButton(
+                                icon: Icon(Icons.copy, size: 16, color: theme.colorScheme.primary),
+                                onPressed: () {
+                                  final text = '${entry.title}\n\n${entry.content}';
+                                  Clipboard.setData(ClipboardData(text: text));
+                                  ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Contenido copiado'),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                                padding: EdgeInsets.zero,
+                                tooltip: 'Copiar título y contenido',
+                              ),
+                            )
+                          : Text(
+                              _formatDate(entry.updatedAt),
+                              style: theme.textTheme.labelSmall,
+                            )),
                 ),
                 AnimatedSize(
                   duration: const Duration(milliseconds: 200),
