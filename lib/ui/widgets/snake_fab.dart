@@ -168,10 +168,10 @@ class _SnakeFabState extends State<SnakeFab> {
           constraints: BoxConstraints(maxHeight: widget.maxHeight),
           margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface.withValues(alpha: 0.7),
+            color: Colors.black.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+              color: Colors.white.withValues(alpha: 0.1),
             ),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
