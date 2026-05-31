@@ -163,7 +163,7 @@ class _SnakeFabState extends State<SnakeFab> {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
         child: Container(
           constraints: BoxConstraints(maxHeight: widget.maxHeight),
           margin: const EdgeInsets.only(bottom: 8),
