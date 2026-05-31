@@ -120,6 +120,13 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: 'Crear, editar y eliminar etiquetas',
             onTap: () => context.push('/settings/tags'),
           ),
+          _actionTile(
+            context,
+            icon: Icons.menu_book,
+            title: 'Manual de usuario',
+            subtitle: 'Guía rápida y referencia de funciones',
+            onTap: () => context.push('/settings/manual'),
+          ),
           const Divider(),
           // Danger Zone
           _sectionHeader(context, 'Zona de Peligro'),
