@@ -28,7 +28,7 @@ class FilterChipsRow extends ConsumerWidget {
               4 => (EntryType.credential, 'Credencial', Icons.lock, selectedType == EntryType.credential),
               _ => throw StateError('unreachable'),
             };
-            return _TinyPill(
+            return FilterTypePill(
               icon: icon,
               label: label,
               selected: active,
@@ -80,7 +80,7 @@ class _TagFilterRowState extends ConsumerState<TagFilterRow> {
             scrollDirection: Axis.horizontal,
             children: [
               if (hasFilter)
-                _TagPill(
+                FilterTagPill(
                   label: '✕ Todas',
                   selected: false,
                   color: Theme.of(context).colorScheme.errorContainer,
@@ -90,11 +90,11 @@ class _TagFilterRowState extends ConsumerState<TagFilterRow> {
                   },
                 )
               else
-                const _TagPill(label: '🏷', selected: false, onTap: null),
+                const FilterTagPill(label: '🏷', selected: false, onTap: null),
               const SizedBox(width: 4),
               ...visible.map((tag) => Padding(
                 padding: const EdgeInsets.only(right: 4),
-                child: _TagPill(
+                child:                 FilterTagPill(
                   label: tag,
                   selected: selectedTag == tag,
                   color: tagColors[tag],
@@ -104,7 +104,7 @@ class _TagFilterRowState extends ConsumerState<TagFilterRow> {
                 ),
               )),
               if (hiddenCount > 0)
-                _TagPill(
+                FilterTagPill(
                   label: '+$hiddenCount',
                   selected: false,
                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -118,13 +118,14 @@ class _TagFilterRowState extends ConsumerState<TagFilterRow> {
   }
 }
 
-class _TinyPill extends StatelessWidget {
+class FilterTypePill extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
 
-  const _TinyPill({
+  const FilterTypePill({
+    super.key,
     required this.icon,
     required this.label,
     required this.selected,
@@ -156,13 +157,14 @@ class _TinyPill extends StatelessWidget {
   }
 }
 
-class _TagPill extends StatelessWidget {
+class FilterTagPill extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback? onTap;
   final Color? color;
 
-  const _TagPill({
+  const FilterTagPill({
+    super.key,
     required this.label,
     required this.selected,
     this.onTap,

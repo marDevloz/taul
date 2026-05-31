@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/constants.dart';
 import 'package:taul/domain/services/merge_service.dart';
+import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/effective_auth_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
@@ -14,8 +15,8 @@ import 'package:taul/ui/screens/merge_editor_screen.dart';
 import 'package:taul/ui/screens/quick_add_sheet.dart';
 import 'package:taul/ui/widgets/empty_states.dart';
 import 'package:taul/ui/widgets/entry_card.dart';
-import 'package:taul/ui/widgets/filter_chips.dart';
 import 'package:taul/ui/widgets/master_password_gate.dart';
+import 'package:taul/ui/widgets/snake_fab.dart';
 import 'package:taul/ui/widgets/search_bar_widget.dart';
 
 class HomeView extends ConsumerStatefulWidget {
@@ -31,6 +32,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
   final Set<String> _selectedEntryIds = {};
   final Set<String> _unlockedEntryIds = {};
   final Map<String, DateTime> _unlockTimestamps = {};
+  String? _expandedFabId;
 
   @override
   void initState() {
@@ -83,8 +85,6 @@ class _HomeViewState extends ConsumerState<HomeView> {
       body: Column(
         children: [
           const TaulSearchBar(),
-          const FilterChipsRow(),
-          const TagFilterRow(),
           const SizedBox(height: 8),
           Expanded(
             child: entriesAsync.when(
@@ -195,11 +195,109 @@ class _HomeViewState extends ConsumerState<HomeView> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showQuickAdd(context),
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _buildTypeFilterFab(),
+          const SizedBox(height: 8),
+          _buildTagFilterFab(),
+          const SizedBox(height: 8),
+          FloatingActionButton(
+            heroTag: null,
+            onPressed: () => _showQuickAdd(context),
+            child: const Icon(Icons.add),
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildTypeFilterFab() {
+    final selectedType = ref.watch(selectedTypeFilterProvider);
+    final isExpanded = _expandedFabId == 'type';
+
+    return SnakeFab(
+      isExpanded: isExpanded,
+      onTap: () {
+        setState(() {
+          _expandedFabId = isExpanded ? null : 'type';
+        });
+      },
+      collapsedIcon: Icon(_iconForEntryType(selectedType)),
+      items: const [
+        SnakeFabItem(value: '', label: 'Todas', icon: Icons.all_inclusive),
+        SnakeFabItem(value: 'glossary', label: 'Glosario', icon: Icons.book),
+        SnakeFabItem(value: 'note', label: 'Nota', icon: Icons.description),
+        SnakeFabItem(value: 'idea', label: 'Idea', icon: Icons.lightbulb),
+        SnakeFabItem(
+          value: 'credential',
+          label: 'Credencial',
+          icon: Icons.lock,
+        ),
+      ],
+      selectedValue: selectedType?.name ?? '',
+      onItemSelected: (value) {
+        if (value == null || value.isEmpty) {
+          ref.read(selectedTypeFilterProvider.notifier).state = null;
+        } else {
+          ref.read(selectedTypeFilterProvider.notifier).state =
+              EntryType.values.firstWhere((e) => e.name == value);
+        }
+        setState(() => _expandedFabId = null);
+      },
+    );
+  }
+
+  Widget _buildTagFilterFab() {
+    final tags = ref.watch(tagsListProvider);
+    final selectedTag = ref.watch(selectedTagFilterProvider);
+    final tagColors = ref.watch(tagColorMapProvider);
+    final isExpanded = _expandedFabId == 'tag';
+
+    final items = <SnakeFabItem>[
+      if (selectedTag != null && selectedTag.isNotEmpty)
+        const SnakeFabItem(value: '', label: 'Todas', icon: Icons.all_inclusive),
+      for (final tag in tags)
+        SnakeFabItem(
+          value: tag,
+          label: tag,
+          icon: Icons.label,
+          color: tagColors[tag],
+        ),
+    ];
+
+    return SnakeFab(
+      isExpanded: isExpanded,
+      onTap: () {
+        setState(() {
+          _expandedFabId = isExpanded ? null : 'tag';
+        });
+      },
+      collapsedIcon: selectedTag != null && selectedTag.isNotEmpty
+          ? Icon(Icons.label, color: tagColors[selectedTag])
+          : const Icon(Icons.filter_list),
+      items: items,
+      selectedValue: selectedTag ?? '',
+      onItemSelected: (value) {
+        if (value == null || value.isEmpty) {
+          ref.read(selectedTagFilterProvider.notifier).state = null;
+        } else {
+          ref.read(selectedTagFilterProvider.notifier).state = value;
+        }
+        setState(() => _expandedFabId = null);
+      },
+    );
+  }
+
+  IconData _iconForEntryType(EntryType? type) {
+    if (type == null) return Icons.filter_list;
+    return switch (type) {
+      EntryType.glossary => Icons.book,
+      EntryType.note => Icons.description,
+      EntryType.idea => Icons.lightbulb,
+      EntryType.credential => Icons.lock,
+    };
   }
 
   Widget _buildEmptyState(BuildContext context, WidgetRef ref, String searchQuery) {
