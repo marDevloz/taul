@@ -145,17 +145,29 @@ class _SnakeFabState extends State<SnakeFab> {
     final hasFilter =
         widget.selectedValue != null && widget.selectedValue!.isNotEmpty;
 
-    return FloatingActionButton.small(
-      heroTag: null,
-      onPressed: widget.onTap,
-      backgroundColor: hasFilter
-          ? theme.colorScheme.secondaryContainer
-          : theme.colorScheme.surfaceContainerHigh,
-      foregroundColor: hasFilter
-          ? theme.colorScheme.onSecondaryContainer
-          : theme.colorScheme.onSurfaceVariant,
-      elevation: hasFilter ? 2 : 1,
-      child: widget.collapsedIcon,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: FloatingActionButton.small(
+        heroTag: null,
+        onPressed: widget.onTap,
+        backgroundColor: hasFilter
+            ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.85)
+            : theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.8),
+        foregroundColor: hasFilter
+            ? theme.colorScheme.onSecondaryContainer
+            : theme.colorScheme.onSurfaceVariant,
+        elevation: 0,
+        child: widget.collapsedIcon,
+      ),
     );
   }
 
@@ -253,6 +265,11 @@ class _FabItemPill extends StatelessWidget {
         : selected
             ? theme.colorScheme.onSecondaryContainer
             : theme.colorScheme.onSurfaceVariant;
+    final borderColor = hasColor
+        ? _contrastColor(color!).withValues(alpha: 0.2)
+        : selected
+            ? theme.colorScheme.primary.withValues(alpha: 0.4)
+            : theme.colorScheme.outlineVariant.withValues(alpha: 0.3);
 
     return Container(
       decoration: BoxDecoration(
@@ -269,25 +286,31 @@ class _FabItemPill extends StatelessWidget {
       child: Material(
         color: bgColor,
         borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 15, color: fgColor),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: fgColor,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: borderColor, width: 1),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 15, color: fgColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: fgColor,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
