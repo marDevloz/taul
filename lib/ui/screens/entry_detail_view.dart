@@ -136,6 +136,24 @@ class EntryDetailView extends ConsumerWidget {
                   : null,
             ),
             const SizedBox(width: 8),
+            if (entryAsync.valueOrNull?.type != EntryType.credential)
+              IconButton(
+                icon: const Icon(Icons.copy),
+                tooltip: 'Copiar título y contenido',
+                onPressed: () {
+                  final entry = entryAsync.valueOrNull;
+                  if (entry != null) {
+                    final text = '${entry.title}\n\n${entry.content}';
+                    Clipboard.setData(ClipboardData(text: text));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Contenido copiado'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+              ),
             IconButton(
               icon: const Icon(Icons.edit),
               onPressed: () => _showEdit(context, ref),
