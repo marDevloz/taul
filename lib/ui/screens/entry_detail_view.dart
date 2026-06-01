@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -62,6 +62,7 @@ class EntryDetailView extends ConsumerWidget {
     final currentIndex = entryIds.indexOf(entryId);
     final hasPrevious = currentIndex > 0;
     final hasNext = currentIndex < entryIds.length - 1;
+    final displayColor = ref.watch(entryDisplayColorProvider(entryId));
 
     return Focus(
       autofocus: true,
@@ -70,10 +71,12 @@ class EntryDetailView extends ConsumerWidget {
         if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
         final ctrl =
-            HardwareKeyboard.instance
-                    .isLogicalKeyPressed(LogicalKeyboardKey.controlLeft) ||
-                HardwareKeyboard.instance
-                    .isLogicalKeyPressed(LogicalKeyboardKey.controlRight);
+            HardwareKeyboard.instance.isLogicalKeyPressed(
+              LogicalKeyboardKey.controlLeft,
+            ) ||
+            HardwareKeyboard.instance.isLogicalKeyPressed(
+              LogicalKeyboardKey.controlRight,
+            );
 
         // Ctrl+E → editar entrada
         if (ctrl && event.logicalKey == LogicalKeyboardKey.keyE) {
@@ -102,10 +105,12 @@ class EntryDetailView extends ConsumerWidget {
         // Ctrl+Tab → siguiente, Ctrl+Shift+Tab → anterior
         if (ctrl && event.logicalKey == LogicalKeyboardKey.tab) {
           final shift =
-              HardwareKeyboard.instance
-                      .isLogicalKeyPressed(LogicalKeyboardKey.shiftLeft) ||
-                  HardwareKeyboard.instance
-                      .isLogicalKeyPressed(LogicalKeyboardKey.shiftRight);
+              HardwareKeyboard.instance.isLogicalKeyPressed(
+                LogicalKeyboardKey.shiftLeft,
+              ) ||
+              HardwareKeyboard.instance.isLogicalKeyPressed(
+                LogicalKeyboardKey.shiftRight,
+              );
           _goToAdjacent(entryIds, currentIndex, context, shift ? -1 : 1);
           return KeyEventResult.handled;
         }
@@ -165,57 +170,57 @@ class EntryDetailView extends ConsumerWidget {
           ],
         ),
         body: entryAsync.when(
-        data: (entry) {
-          final displayColor = ref.watch(entryDisplayColorProvider(entry.id));
-          final theme = Theme.of(context);
-          final content = entry.type == EntryType.credential
-              ? _CredentialContent(entry: entry)
-              : _NoteContent(entry: entry);
-          return Card(
-            margin: EdgeInsets.zero,
-            color: Colors.transparent,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: ColoredBox(
-                    color: displayColor?.withValues(alpha: 0.15) ??
-                        theme.colorScheme.surface,
+          data: (entry) {
+            final theme = Theme.of(context);
+            final content = entry.type == EntryType.credential
+                ? _CredentialContent(entry: entry)
+                : _NoteContent(entry: entry);
+            return Card(
+              margin: EdgeInsets.zero,
+              color: Colors.transparent,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: ColoredBox(
+                      color:
+                          displayColor?.withValues(alpha: 0.15) ??
+                          theme.colorScheme.surface,
+                    ),
                   ),
-                ),
-                if (displayColor != null)
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: 6,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            displayColor,
-                            displayColor.withValues(alpha: 0.4),
-                          ],
+                  if (displayColor != null)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 6,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              displayColor,
+                              displayColor.withValues(alpha: 0.4),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                content,
-              ],
-            ),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+                  content,
+                ],
+              ),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (err, _) => Center(child: Text('Error: $err')),
+        ),
       ),
-    ),
-  );
+    );
   }
 
   static void _goToAdjacent(
@@ -287,7 +292,10 @@ class EntryDetailView extends ConsumerWidget {
                   children: [
                     const Icon(Icons.edit_note, size: 20),
                     const SizedBox(width: 8),
-                    Text('Editar entrada', style: Theme.of(ctx).textTheme.titleMedium),
+                    Text(
+                      'Editar entrada',
+                      style: Theme.of(ctx).textTheme.titleMedium,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -308,10 +316,7 @@ class EntryDetailView extends ConsumerWidget {
                   maxLines: 5,
                 ),
                 const SizedBox(height: 12),
-                _TagsAutocompleteField(
-                  controller: tagsCtrl,
-                  ref: ref,
-                ),
+                _TagsAutocompleteField(controller: tagsCtrl, ref: ref),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -320,9 +325,14 @@ class EntryDetailView extends ConsumerWidget {
                     PopupMenuButton<EntryType>(
                       onSelected: (t) => setLocalState(() => selectedType = t),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                          color: Theme.of(
+                            ctx,
+                          ).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -330,9 +340,16 @@ class EntryDetailView extends ConsumerWidget {
                           children: [
                             Icon(_iconForType(selectedType), size: 14),
                             const SizedBox(width: 4),
-                            Text(_labelForType(selectedType), style: const TextStyle(fontSize: 11)),
+                            Text(
+                              _labelForType(selectedType),
+                              style: const TextStyle(fontSize: 11),
+                            ),
                             const SizedBox(width: 2),
-                            Icon(Icons.arrow_drop_down, size: 14, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+                            Icon(
+                              Icons.arrow_drop_down,
+                              size: 14,
+                              color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                            ),
                           ],
                         ),
                       ),
@@ -344,9 +361,18 @@ class EntryDetailView extends ConsumerWidget {
                               child: ListTile(
                                 dense: true,
                                 leading: Icon(_iconForType(t), size: 18),
-                                title: Text(_labelForType(t), style: const TextStyle(fontSize: 13)),
+                                title: Text(
+                                  _labelForType(t),
+                                  style: const TextStyle(fontSize: 13),
+                                ),
                                 trailing: selectedType == t
-                                    ? Icon(Icons.check, size: 16, color: Theme.of(ctx).colorScheme.primary)
+                                    ? Icon(
+                                        Icons.check,
+                                        size: 16,
+                                        color: Theme.of(
+                                          ctx,
+                                        ).colorScheme.primary,
+                                      )
                                     : null,
                               ),
                             ),
@@ -375,13 +401,15 @@ class EntryDetailView extends ConsumerWidget {
                                     .map((t) => t.trim())
                                     .where((t) => t.isNotEmpty)
                                     .toList();
-                                await ref.read(updateEntryProvider).call(
-                                  entry,
-                                  title: titleCtrl.text,
-                                  content: contentCtrl.text,
-                                  tags: tags,
-                                  type: selectedType,
-                                );
+                                await ref
+                                    .read(updateEntryProvider)
+                                    .call(
+                                      entry,
+                                      title: titleCtrl.text,
+                                      content: contentCtrl.text,
+                                      tags: tags,
+                                      type: selectedType,
+                                    );
                                 ref.invalidate(entryDetailProvider(entryId));
                                 ref.invalidate(entryListProvider);
                                 if (ctx.mounted) Navigator.pop(ctx);
@@ -389,7 +417,9 @@ class EntryDetailView extends ConsumerWidget {
                                 setLocalState(() => isSaving = false);
                                 if (ctx.mounted) {
                                   ScaffoldMessenger.of(ctx).showSnackBar(
-                                    SnackBar(content: Text('Error al guardar: $e')),
+                                    SnackBar(
+                                      content: Text('Error al guardar: $e'),
+                                    ),
                                   );
                                 }
                               }
@@ -421,7 +451,10 @@ class EntryDetailView extends ConsumerWidget {
         title: const Text('Eliminar entrada'),
         content: const Text('¿Mover a la papelera? Podés restaurarla después.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
           FilledButton(
             onPressed: () async {
               Navigator.pop(ctx);
@@ -459,43 +492,56 @@ class _NoteContent extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           entry.title.isNotEmpty
-              ? SelectableText(entry.title,
-                  style: theme.textTheme.headlineSmall)
-              : Text('(sin título)',
+              ? SelectableText(
+                  entry.title,
+                  style: theme.textTheme.headlineSmall,
+                )
+              : Text(
+                  '(sin título)',
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontStyle: FontStyle.italic,
                     color: theme.colorScheme.onSurfaceVariant,
-                  )),
+                  ),
+                ),
           const SizedBox(height: 16),
-          MarkdownBody(
-            data: entry.content,
-            selectable: true,
-          ),
+          MarkdownBody(data: entry.content, selectable: true),
           if (entry.tags.isNotEmpty) ...[
             const SizedBox(height: 16),
-            Wrap(spacing: 6, children: entry.tags.map((t) {
-              final tagColor = ref.watch(
-                tagColorForEntryProvider((entry.id, t)),
-              );
-              return GestureDetector(
-                onLongPress: () => _showPalettePicker(context, ref, entry, t),
-                child: ActionChip(
-                  label: Text(t, style: const TextStyle(fontSize: 12)),
-                  backgroundColor: tagColor,
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  onPressed: () {
-                    ref.read(selectedTagFilterProvider.notifier).state = t;
-                    context.pop();
-                  },
-                ),
-              );
-            }).toList()),
+            Wrap(
+              spacing: 6,
+              children: entry.tags.map((t) {
+                final tagColor = ref.watch(
+                  tagColorForEntryProvider((entry.id, t)),
+                );
+                return GestureDetector(
+                  onLongPress: () => _showPalettePicker(context, ref, entry, t),
+                  child: ActionChip(
+                    label: Text(t, style: const TextStyle(fontSize: 12)),
+                    backgroundColor: tagColor,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 0,
+                    ),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onPressed: () {
+                      ref.read(selectedTagFilterProvider.notifier).state = t;
+                      context.pop();
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
           ],
           const SizedBox(height: 24),
-          Text('Creado: ${_formatDate(entry.createdAt)}', style: theme.textTheme.bodySmall),
-          Text('Actualizado: ${_formatDate(entry.updatedAt)}', style: theme.textTheme.bodySmall),
+          Text(
+            'Creado: ${_formatDate(entry.createdAt)}',
+            style: theme.textTheme.bodySmall,
+          ),
+          Text(
+            'Actualizado: ${_formatDate(entry.updatedAt)}',
+            style: theme.textTheme.bodySmall,
+          ),
           Text('Versión: ${entry.version}', style: theme.textTheme.bodySmall),
         ],
       ),
@@ -517,7 +563,12 @@ class _NoteContent extends ConsumerWidget {
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
-  void _showPalettePicker(BuildContext context, WidgetRef ref, Entry entry, String tagName) async {
+  void _showPalettePicker(
+    BuildContext context,
+    WidgetRef ref,
+    Entry entry,
+    String tagName,
+  ) async {
     final currentHex = entry.tagsColors[tagName];
     final initialColor = currentHex != null
         ? Color(int.parse(currentHex.substring(1), radix: 16) + 0xFF000000)
@@ -545,11 +596,14 @@ class _NoteContent extends ConsumerWidget {
       // Propagate color to ALL entries sharing this tag
       final allEntries = ref.read(entryListProvider).valueOrNull ?? [];
       for (final other in allEntries) {
-        if (!other.tags.any((t) => t.toLowerCase() == tagName.toLowerCase())) continue;
+        if (!other.tags.any((t) => t.toLowerCase() == tagName.toLowerCase()))
+          continue;
         final otherColors = Map<String, String>.from(other.tagsColors);
         if (otherColors[tagName] != selectedHex) {
           otherColors[tagName] = selectedHex;
-          await ref.read(updateEntryTagsColorsProvider).call(other, otherColors);
+          await ref
+              .read(updateEntryTagsColorsProvider)
+              .call(other, otherColors);
         }
       }
 
@@ -587,7 +641,9 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
     final entry = widget.entry;
     final username = entry.metadata['username'] ?? '';
     final url = entry.metadata['url'] ?? '';
-    final displayedSecret = entry.requiresAuth ? (_revealedSecret ?? '') : (entry.secret ?? '');
+    final displayedSecret = entry.requiresAuth
+        ? (_revealedSecret ?? '')
+        : (entry.secret ?? '');
     final isWide = MediaQuery.of(context).size.width >= Breakpoints.tablet;
 
     final body = SingleChildScrollView(
@@ -600,14 +656,18 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
               children: [
                 const Icon(Icons.lock, size: 40, color: Colors.amber),
                 const SizedBox(height: 8),
-          entry.title.isNotEmpty
-              ? SelectableText(entry.title,
-                  style: theme.textTheme.headlineSmall)
-              : Text('(sin título)',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontStyle: FontStyle.italic,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  )),
+                entry.title.isNotEmpty
+                    ? SelectableText(
+                        entry.title,
+                        style: theme.textTheme.headlineSmall,
+                      )
+                    : Text(
+                        '(sin título)',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontStyle: FontStyle.italic,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
               ],
             ),
           ),
@@ -629,14 +689,19 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
             onCopy: displayedSecret.isEmpty
                 ? null
                 : () => Clipboard.setData(ClipboardData(text: displayedSecret)),
-            onToggleObscure: () => setState(() => _showPassword = !_showPassword),
+            onToggleObscure: () =>
+                setState(() => _showPassword = !_showPassword),
           ),
           if (entry.requiresAuth) ...[
             const SizedBox(height: 8),
             FilledButton.icon(
               onPressed: _revealProtectedSecret,
               icon: const Icon(Icons.lock_open),
-              label: Text(_revealedSecret == null ? 'Revelar Secreto' : 'Revelar de Nuevo'),
+              label: Text(
+                _revealedSecret == null
+                    ? 'Revelar Secreto'
+                    : 'Revelar de Nuevo',
+              ),
             ),
           ],
           const SizedBox(height: 12),
@@ -651,29 +716,41 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
           ],
           if (entry.tags.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Wrap(spacing: 6, children: entry.tags.map((t) {
-              final tagColor = ref.watch(
-                tagColorForEntryProvider((entry.id, t)),
-              );
-              return GestureDetector(
-                onLongPress: () => _showPalettePicker(context, ref, entry, t),
-                child: ActionChip(
-                  label: Text(t),
-                  backgroundColor: tagColor,
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  onPressed: () {
-                    ref.read(selectedTagFilterProvider.notifier).state = t;
-                    context.pop();
-                  },
-                ),
-              );
-            }).toList()),
+            Wrap(
+              spacing: 6,
+              children: entry.tags.map((t) {
+                final tagColor = ref.watch(
+                  tagColorForEntryProvider((entry.id, t)),
+                );
+                return GestureDetector(
+                  onLongPress: () => _showPalettePicker(context, ref, entry, t),
+                  child: ActionChip(
+                    label: Text(t),
+                    backgroundColor: tagColor,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 0,
+                    ),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onPressed: () {
+                      ref.read(selectedTagFilterProvider.notifier).state = t;
+                      context.pop();
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
           ],
           const SizedBox(height: 24),
-          Text('Creado: ${_formatDate(entry.createdAt)}', style: theme.textTheme.bodySmall),
-          Text('Actualizado: ${_formatDate(entry.updatedAt)}', style: theme.textTheme.bodySmall),
+          Text(
+            'Creado: ${_formatDate(entry.createdAt)}',
+            style: theme.textTheme.bodySmall,
+          ),
+          Text(
+            'Actualizado: ${_formatDate(entry.updatedAt)}',
+            style: theme.textTheme.bodySmall,
+          ),
           Text('Versión: ${entry.version}', style: theme.textTheme.bodySmall),
         ],
       ),
@@ -781,10 +858,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
           );
         } else {
           // Pre-migration: derive key directly from password.
-          key = await auth.deriveMasterKey(
-            password: password,
-            salt: salt,
-          );
+          key = await auth.deriveMasterKey(password: password, salt: salt);
         }
         masterKeyNotifier.setMasterPassword(key);
       }
@@ -888,7 +962,9 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
                 obscureText: obscurePassword,
                 autofocus: true,
                 textInputAction: TextInputAction.done,
-                onSubmitted: loading ? null : (_) => verifyAndPop(ctx, setLocalState),
+                onSubmitted: loading
+                    ? null
+                    : (_) => verifyAndPop(ctx, setLocalState),
                 decoration: InputDecoration(
                   labelText: 'Ingresá tu contraseña maestra',
                   errorText: error,
@@ -916,8 +992,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  onPressed: () =>
-                      setLocalState(() => showHint = !showHint),
+                  onPressed: () => setLocalState(() => showHint = !showHint),
                 ),
                 if (showHint) ...[
                   const SizedBox(height: 4),
@@ -928,7 +1003,8 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
                       color: Theme.of(ctx).colorScheme.tertiaryContainer,
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                          color: Theme.of(ctx).colorScheme.tertiary),
+                        color: Theme.of(ctx).colorScheme.tertiary,
+                      ),
                     ),
                     child: Text(
                       'Pista: $hint',
@@ -944,20 +1020,16 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
                     : () async {
                         final recoveryResult =
                             await Navigator.push<RecoveryResult>(
-                          ctx,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                const MasterPasswordRecoveryDialog(),
-                            fullscreenDialog: true,
-                          ),
-                        );
-                        if (recoveryResult != null &&
-                            recoveryResult.success) {
-                          if (ctx.mounted) {
-                            Navigator.pop(
                               ctx,
-                              _RevealDialogResult.recovery(),
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const MasterPasswordRecoveryDialog(),
+                                fullscreenDialog: true,
+                              ),
                             );
+                        if (recoveryResult != null && recoveryResult.success) {
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx, _RevealDialogResult.recovery());
                           }
                         }
                       },
@@ -972,8 +1044,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
             TextButton(
               onPressed: loading
                   ? null
-                  : () =>
-                      Navigator.pop(ctx, _RevealDialogResult.cancelled()),
+                  : () => Navigator.pop(ctx, _RevealDialogResult.cancelled()),
               child: const Text('Cancelar'),
             ),
             FilledButton(
@@ -1009,17 +1080,32 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            Icon(
+              icon,
+              size: 20,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                   const SizedBox(height: 2),
                   Text(
-                    obscure ? '?' * (value.length.clamp(6, 20)) : (value.isNotEmpty ? value : '(vacío)'),
-                    style: const TextStyle(fontSize: 15, fontFamily: 'monospace'),
+                    obscure
+                        ? '?' * (value.length.clamp(6, 20))
+                        : (value.isNotEmpty ? value : '(vacío)'),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontFamily: 'monospace',
+                    ),
                   ),
                 ],
               ),
@@ -1032,7 +1118,10 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
               ),
             if (onToggleObscure != null)
               IconButton(
-                icon: Icon(obscure ? Icons.visibility : Icons.visibility_off, size: 18),
+                icon: Icon(
+                  obscure ? Icons.visibility : Icons.visibility_off,
+                  size: 18,
+                ),
                 tooltip: obscure ? 'Mostrar' : 'Ocultar',
                 onPressed: onToggleObscure,
               ),
@@ -1047,7 +1136,12 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
-  void _showPalettePicker(BuildContext context, WidgetRef ref, Entry entry, String tagName) async {
+  void _showPalettePicker(
+    BuildContext context,
+    WidgetRef ref,
+    Entry entry,
+    String tagName,
+  ) async {
     final currentHex = entry.tagsColors[tagName];
     final initialColor = currentHex != null
         ? Color(int.parse(currentHex.substring(1), radix: 16) + 0xFF000000)
@@ -1075,11 +1169,14 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
       // Propagate color to ALL entries sharing this tag
       final allEntries = ref.read(entryListProvider).valueOrNull ?? [];
       for (final other in allEntries) {
-        if (!other.tags.any((t) => t.toLowerCase() == tagName.toLowerCase())) continue;
+        if (!other.tags.any((t) => t.toLowerCase() == tagName.toLowerCase()))
+          continue;
         final otherColors = Map<String, String>.from(other.tagsColors);
         if (otherColors[tagName] != selectedHex) {
           otherColors[tagName] = selectedHex;
-          await ref.read(updateEntryTagsColorsProvider).call(other, otherColors);
+          await ref
+              .read(updateEntryTagsColorsProvider)
+              .call(other, otherColors);
         }
       }
 
@@ -1100,10 +1197,7 @@ class _TagsAutocompleteField extends StatefulWidget {
   final TextEditingController controller;
   final WidgetRef ref;
 
-  const _TagsAutocompleteField({
-    required this.controller,
-    required this.ref,
-  });
+  const _TagsAutocompleteField({required this.controller, required this.ref});
 
   @override
   State<_TagsAutocompleteField> createState() => _TagsAutocompleteFieldState();
@@ -1140,42 +1234,46 @@ class _TagsAutocompleteFieldState extends State<_TagsAutocompleteField> {
       optionsBuilder: (TextEditingValue value) {
         return _suggestions;
       },
-      fieldViewBuilder: (
-        BuildContext context,
-        TextEditingController autocompleteController,
-        FocusNode focusNode,
-        VoidCallback onFieldSubmitted,
-      ) {
-        return TextField(
-          controller: widget.controller,
-          focusNode: focusNode,
-          onChanged: (String text) {
-            _onChanged(text);
-            // Keep the Autocomplete's own controller in sync so its
-            // internal listener triggers optionsBuilder.
-            autocompleteController.text = text;
-            autocompleteController.selection =
-                TextSelection.collapsed(offset: text.length);
+      fieldViewBuilder:
+          (
+            BuildContext context,
+            TextEditingController autocompleteController,
+            FocusNode focusNode,
+            VoidCallback onFieldSubmitted,
+          ) {
+            return TextField(
+              controller: widget.controller,
+              focusNode: focusNode,
+              onChanged: (String text) {
+                _onChanged(text);
+                // Keep the Autocomplete's own controller in sync so its
+                // internal listener triggers optionsBuilder.
+                autocompleteController.text = text;
+                autocompleteController.selection = TextSelection.collapsed(
+                  offset: text.length,
+                );
+              },
+              decoration: const InputDecoration(
+                labelText: 'Tags (opcional)',
+                hintText: 'separados por coma: dev, personal',
+                border: OutlineInputBorder(),
+              ),
+            );
           },
-          decoration: const InputDecoration(
-            labelText: 'Tags (opcional)',
-            hintText: 'separados por coma: dev, personal',
-            border: OutlineInputBorder(),
-          ),
-        );
-      },
       onSelected: (String value) {
         _debounceTimer?.cancel();
         _suggestions = [];
         final currentText = widget.controller.text;
-        final newText = currentText.isNotEmpty &&
+        final newText =
+            currentText.isNotEmpty &&
                 !currentText.endsWith(', ') &&
                 !currentText.endsWith(',')
             ? '$currentText, $value, '
             : '$currentText$value, ';
         widget.controller.text = newText;
-        widget.controller.selection =
-            TextSelection.collapsed(offset: newText.length);
+        widget.controller.selection = TextSelection.collapsed(
+          offset: newText.length,
+        );
       },
     );
   }
