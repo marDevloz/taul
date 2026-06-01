@@ -13,8 +13,10 @@ import 'package:taul/ui/providers/tag_settings_providers.dart';
 ///
 /// Uses [TagColorMixer.mix] for HSL circular-mean averaging when there
 /// are multiple colored tags.
-final entryDisplayColorProvider =
-    Provider.autoDispose.family<Color?, String>((ref, entryId) {
+final entryDisplayColorProvider = Provider.autoDispose.family<Color?, String>((
+  ref,
+  entryId,
+) {
   final entry = ref.watch(entryDetailProvider(entryId)).valueOrNull;
   if (entry == null || entry.tags.isEmpty) return null;
 
@@ -22,6 +24,7 @@ final entryDisplayColorProvider =
       .map((t) => entry.tagsColors[t])
       .whereType<String>()
       .map(_parseHex)
+      .whereType<Color>()
       .toList();
 
   if (matched.isEmpty) return TagPalette.defaultGrey;
@@ -32,17 +35,15 @@ final entryDisplayColorProvider =
 ///
 /// Parameters: (entryId, tag).
 /// Returns null if the tag has no color assigned in that entry.
-final tagColorForEntryProvider =
-    Provider.autoDispose.family<Color?, (String entryId, String tag)>(
-  (ref, params) {
-    final (entryId, tag) = params;
-    final entry = ref.watch(entryDetailProvider(entryId)).valueOrNull;
-    if (entry == null) return null;
-    final hex = entry.tagsColors[tag];
-    if (hex == null) return null;
-    return _parseHex(hex);
-  },
-);
+final tagColorForEntryProvider = Provider.autoDispose
+    .family<Color?, (String entryId, String tag)>((ref, params) {
+      final (entryId, tag) = params;
+      final entry = ref.watch(entryDetailProvider(entryId)).valueOrNull;
+      if (entry == null) return null;
+      final hex = entry.tagsColors[tag];
+      if (hex == null) return null;
+      return _parseHex(hex);
+    });
 
 /// Builds a global map of tag → Color from the tag_settings table as the
 /// canonical source of truth. Used by the filter row to show colored tag pills.
@@ -54,12 +55,16 @@ final tagColorMapProvider = Provider.autoDispose<Map<String, Color>>((ref) {
   final result = <String, Color>{};
   for (final entry in tagMap.entries) {
     if (entry.value.color != null) {
-      result[entry.key.toLowerCase()] = _parseHex(entry.value.color!);
+      final color = _parseHex(entry.value.color!);
+      if (color != null) {
+        result[entry.key.toLowerCase()] = color;
+      }
     }
   }
   return result;
 });
 
-Color _parseHex(String hex) {
+Color? _parseHex(String hex) {
+  if (hex.length < 2 || hex[0] != '#') return null;
   return Color(int.parse(hex.substring(1), radix: 16) + 0xFF000000);
 }
