@@ -212,7 +212,9 @@ class EntryDetailView extends ConsumerWidget {
                         ),
                       ),
                     ),
-                  content,
+                  // Force full width even when content text is short,
+                  // so the background ColoredBox fills the whole card.
+                  SizedBox(width: double.infinity, child: content),
                 ],
               ),
             );
