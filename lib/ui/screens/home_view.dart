@@ -33,6 +33,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
   final Set<String> _unlockedEntryIds = {};
   final Map<String, DateTime> _unlockTimestamps = {};
   String? _expandedFabId;
+  Timer? _autoLockTimer;
 
   @override
   void initState() {
@@ -40,8 +41,14 @@ class _HomeViewState extends ConsumerState<HomeView> {
     _startAutoLockTimer();
   }
 
+  @override
+  void dispose() {
+    _autoLockTimer?.cancel();
+    super.dispose();
+  }
+
   void _startAutoLockTimer() {
-    Timer.periodic(const Duration(seconds: 30), (_) {
+    _autoLockTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted) return;
       final now = DateTime.now();
       final expired = _unlockTimestamps.entries
