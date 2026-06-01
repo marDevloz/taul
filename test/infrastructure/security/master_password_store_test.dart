@@ -209,8 +209,8 @@ void main() {
   });
 
   group('Schema version', () {
-    test('schema_version_should_be_6', () {
-      expect(database.schemaVersion, 6);
+    test('schema_version_should_be_8', () {
+      expect(database.schemaVersion, 8);
     });
 
     test('should_have_backup_code_data_column_available', () async {
