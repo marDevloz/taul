@@ -7,7 +7,15 @@ class ListEntries {
 
   ListEntries({required IEntryRepository repository}) : _repository = repository;
 
-  Future<List<Entry>> call({EntryType? type, bool includeDeleted = false}) {
-    return _repository.list(type: type, includeDeleted: includeDeleted);
+  Future<List<Entry>> call({
+    EntryType? type,
+    bool includeDeleted = false,
+    bool excludeArchived = false,
+  }) {
+    return _repository.list(
+      type: type,
+      includeDeleted: includeDeleted,
+      excludeArchived: excludeArchived,
+    );
   }
 }

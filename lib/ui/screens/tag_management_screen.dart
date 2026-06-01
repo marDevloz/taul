@@ -55,16 +55,50 @@ class TagManagementScreen extends ConsumerWidget {
               ),
             );
           }
-          return ListView.builder(
-            itemCount: tags.length,
-            itemBuilder: (_, index) => _TagSettingTile(
-              setting: tags[index],
-              ref: ref,
-            ),
+
+          final systemTags = tags.where((t) => t.isSystem).toList();
+          final userTags = tags.where((t) => !t.isSystem).toList();
+
+          return ListView(
+            children: [
+              // System tags section
+              if (systemTags.isNotEmpty) ...[
+                _buildSectionHeader(context, 'Tags del sistema'),
+                for (final tag in systemTags)
+                  _TagSettingTile(
+                    setting: tag,
+                    ref: ref,
+                    isSystem: true,
+                  ),
+              ],
+              // User tags section
+              if (userTags.isNotEmpty) ...[
+                _buildSectionHeader(context, 'Tags personalizados'),
+                for (final tag in userTags)
+                  _TagSettingTile(
+                    setting: tag,
+                    ref: ref,
+                    isSystem: false,
+                  ),
+              ],
+            ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error: $err')),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -101,7 +135,7 @@ class TagManagementScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 PalettePicker(
                   onColorSelected: (hex) {
-                    setLocalState(() => selectedColor = hex);
+                    setLocalState(() => selectedColor = hex.isEmpty ? null : hex);
                   },
                 ),
               ],
@@ -136,10 +170,12 @@ class TagManagementScreen extends ConsumerWidget {
 class _TagSettingTile extends ConsumerWidget {
   final TagSetting setting;
   final WidgetRef ref;
+  final bool isSystem;
 
   const _TagSettingTile({
     required this.setting,
     required this.ref,
+    this.isSystem = false,
   });
 
   @override
@@ -148,6 +184,23 @@ class _TagSettingTile extends ConsumerWidget {
         ? Color(int.parse(setting.color!.substring(1), radix: 16) + 0xFF000000)
         : TagPalette.defaultGrey;
 
+    if (isSystem) {
+      // System tag: lock icon, no delete, no rename, no secure toggle
+      return ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color,
+          radius: 16,
+          child: const Icon(Icons.lock, size: 16, color: Colors.white),
+        ),
+        title: Text(setting.name),
+        subtitle: const Text('Tag del sistema'),
+        // No trailing actions — system tags are immutable
+        onTap: null, // Disable tap (no rename)
+        onLongPress: null, // Disable long press (no delete)
+      );
+    }
+
+    // User tag: full CRUD as before
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: color,

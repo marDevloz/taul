@@ -26,3 +26,15 @@ final tagSettingsMapProvider = Provider.autoDispose<Map<String, TagSetting>>((re
   final tags = ref.watch(tagSettingsListProvider).valueOrNull ?? [];
   return {for (final t in tags) t.name: t};
 });
+
+/// System tags from tag_settings table.
+final systemTagsProvider = FutureProvider.autoDispose<List<TagSetting>>((ref) {
+  ref.watch(tagSettingsListProvider);
+  return ref.watch(tagSettingsRepositoryProvider).getSystemTags();
+});
+
+/// User tags from tag_settings table.
+final userTagsProvider = FutureProvider.autoDispose<List<TagSetting>>((ref) {
+  ref.watch(tagSettingsListProvider);
+  return ref.watch(tagSettingsRepositoryProvider).getUserTags();
+});

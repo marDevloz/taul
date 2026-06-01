@@ -246,6 +246,7 @@ class EntryDetailView extends ConsumerWidget {
       EntryType.idea => Icons.lightbulb,
       EntryType.glossary => Icons.book,
       EntryType.credential => Icons.lock,
+      EntryType.task => Icons.checklist,
     };
   }
 
@@ -255,6 +256,7 @@ class EntryDetailView extends ConsumerWidget {
       EntryType.idea => 'Idea',
       EntryType.glossary => 'Glosario',
       EntryType.credential => 'Credencial',
+      EntryType.task => 'Tarea',
     };
   }
 

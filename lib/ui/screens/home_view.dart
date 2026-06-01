@@ -237,11 +237,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
         SnakeFabItem(value: 'glossary', label: 'Glosario', icon: Icons.book),
         SnakeFabItem(value: 'note', label: 'Nota', icon: Icons.description),
         SnakeFabItem(value: 'idea', label: 'Idea', icon: Icons.lightbulb),
-        SnakeFabItem(
-          value: 'credential',
-          label: 'Credencial',
-          icon: Icons.lock,
-        ),
+        SnakeFabItem(value: 'credential', label: 'Credencial', icon: Icons.lock),
+        SnakeFabItem(value: 'task', label: 'Tarea', icon: Icons.checklist),
       ],
       selectedValue: selectedType?.name ?? '',
       onItemSelected: (value) {
@@ -310,6 +307,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
       EntryType.note => Icons.description,
       EntryType.idea => Icons.lightbulb,
       EntryType.credential => Icons.lock,
+      EntryType.task => Icons.checklist,
     };
   }
 

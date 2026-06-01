@@ -19,6 +19,10 @@ class EntryCard extends StatelessWidget {
   final VoidCallback? onDoubleTapGated;
   final bool isSelected;
   final VoidCallback? onLongPress;
+  final VoidCallback? onToggleFavorito;
+  final VoidCallback? onToggleArchivado;
+  final bool isFavorito;
+  final bool isArchivado;
 
   const EntryCard({
     super.key,
@@ -35,6 +39,10 @@ class EntryCard extends StatelessWidget {
     this.onDoubleTapGated,
     this.isSelected = false,
     this.onLongPress,
+    this.onToggleFavorito,
+    this.onToggleArchivado,
+    this.isFavorito = false,
+    this.isArchivado = false,
   });
 
   IconData get _typeIcon {
@@ -43,6 +51,7 @@ class EntryCard extends StatelessWidget {
       EntryType.note => Icons.description,
       EntryType.idea => Icons.lightbulb,
       EntryType.credential => Icons.lock,
+      EntryType.task => Icons.checklist,
     };
   }
 
@@ -162,33 +171,72 @@ class EntryCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall,
                         ),
+                      // Show completedAt timestamp if present
+                      if (entry.completedAt != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Completada: ${_formatDate(entry.completedAt!)}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
-                  trailing: trailingAction ??
-                      (isExpanded
-                          ? SizedBox(
-                              width: 32,
-                              height: 32,
-                              child: IconButton(
-                                icon: Icon(Icons.copy, size: 16, color: theme.colorScheme.primary),
-                                onPressed: () {
-                                  final text = '${entry.title}\n\n${entry.content}';
-                                  Clipboard.setData(ClipboardData(text: text));
-                                  ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Contenido copiado'),
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                                padding: EdgeInsets.zero,
-                                tooltip: 'Copiar título y contenido',
-                              ),
-                            )
-                          : Text(
-                              _formatDate(entry.updatedAt),
-                              style: theme.textTheme.labelSmall,
-                            )),
+                  trailing: trailingAction ?? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Favorito toggle
+                      if (onToggleFavorito != null)
+                        GestureDetector(
+                          onTap: onToggleFavorito,
+                          child: Icon(
+                            isFavorito ? Icons.star : Icons.star_border,
+                            size: 20,
+                            color: isFavorito ? Colors.amber : theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      const SizedBox(width: 4),
+                      // Archivado toggle
+                      if (onToggleArchivado != null)
+                        GestureDetector(
+                          onTap: onToggleArchivado,
+                          child: Icon(
+                            isArchivado ? Icons.archive : Icons.archive_outlined,
+                            size: 20,
+                            color: isArchivado ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      const SizedBox(width: 4),
+                      if (isExpanded)
+                        SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: IconButton(
+                            icon: Icon(Icons.copy, size: 16, color: theme.colorScheme.primary),
+                            onPressed: () {
+                              final text = '${entry.title}\n\n${entry.content}';
+                              Clipboard.setData(ClipboardData(text: text));
+                              ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                                const SnackBar(
+                                  content: Text('Contenido copiado'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            padding: EdgeInsets.zero,
+                            tooltip: 'Copiar título y contenido',
+                          ),
+                        )
+                      else
+                        Text(
+                          _formatDate(entry.updatedAt),
+                          style: theme.textTheme.labelSmall,
+                        ),
+                    ],
+                  ),
                 ),
                 AnimatedSize(
                   duration: const Duration(milliseconds: 200),

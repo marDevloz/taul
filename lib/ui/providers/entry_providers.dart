@@ -10,8 +10,10 @@ import 'package:taul/domain/usecases/delete_entry.dart';
 import 'package:taul/domain/usecases/empty_trash.dart';
 import 'package:taul/domain/usecases/get_entry.dart';
 import 'package:taul/domain/usecases/list_entries.dart';
+import 'package:taul/domain/usecases/mark_as_completed.dart';
 import 'package:taul/domain/usecases/restore_entry.dart';
 import 'package:taul/domain/usecases/search_entries.dart';
+import 'package:taul/domain/usecases/toggle_entry_tag.dart';
 import 'package:taul/domain/usecases/update_entry.dart';
 import 'package:taul/domain/usecases/update_entry_tags_colors.dart';
 import 'package:taul/infrastructure/database/app_database.dart' as db;
@@ -177,10 +179,19 @@ final searchEntriesProvider = Provider<SearchEntries>((ref) {
   return SearchEntries(repository: ref.watch(entryRepositoryProvider));
 });
 
+final markAsCompletedProvider = Provider<MarkAsCompleted>((ref) {
+  return MarkAsCompleted(repository: ref.watch(entryRepositoryProvider));
+});
+
+final toggleEntryTagProvider = Provider<ToggleEntryTag>((ref) {
+  return ToggleEntryTag(repository: ref.watch(entryRepositoryProvider));
+});
+
 // --- State providers ---
 
 final entryListProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
-  return ref.watch(listEntriesProvider).call();
+  final excludeArchived = ref.watch(excludeArchivedProvider);
+  return ref.watch(listEntriesProvider).call(excludeArchived: excludeArchived);
 });
 
 /// Lista ordenada de IDs de entradas visibles, para navegación
@@ -208,6 +219,9 @@ final selectedTypeFilterProvider = StateProvider<EntryType?>((ref) => null);
 
 /// Tag seleccionado para filtrar. `null` = mostrar todos.
 final selectedTagFilterProvider = StateProvider<String?>((ref) => null);
+
+/// Whether to exclude archived entries from the main list.
+final excludeArchivedProvider = StateProvider<bool>((ref) => false);
 
 /// Todos los tags únicos de entradas no eliminadas.
 /// Ordenados por frecuencia de uso (más usado primero).
