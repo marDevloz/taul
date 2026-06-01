@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:taul/shared/tag_palette.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
-import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:taul/ui/screens/home_view.dart';
 import 'package:taul/infrastructure/database/app_database.dart';
+import 'package:taul/infrastructure/database/tag_settings_dao.dart';
 
 void main() {
   late AppDatabase database;
@@ -64,13 +63,14 @@ void main() {
 
   group('SnakeFab system tags in filter', () {
     testWidgets('should include system tags in tag filter', (tester) async {
-      final tags = ['pendiente', 'completada', 'favorito', 'archivado', 'work'];
+      // Insert a user tag so we also test that user + system show up
+      final dao = TagSettingsDao(database);
+      await dao.upsert('work', color: null);
 
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             databaseProvider.overrideWithValue(database),
-            tagsListProvider.overrideWith((ref) => tags),
           ],
           child: const MaterialApp(home: HomeView()),
         ),
@@ -84,7 +84,7 @@ void main() {
       await tester.tap(tagFab);
       await tester.pumpAndSettle();
 
-      // System tags should appear in the filter
+      // System tags (seeded by migration) + user tag should appear
       expect(find.text('pendiente'), findsOneWidget);
       expect(find.text('completada'), findsOneWidget);
       expect(find.text('favorito'), findsOneWidget);

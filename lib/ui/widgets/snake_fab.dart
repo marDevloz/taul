@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 /// Data model for a single item inside a [SnakeFab].
 class SnakeFabItem {
@@ -85,6 +86,9 @@ class _SnakeFabState extends State<SnakeFab> {
 
   /// Snake reveal: pills appear one by one with a short delay,
   /// like a train emerging from the FAB.
+  ///
+  /// After the initial burst, if the panel fits without scrolling,
+  /// all remaining items are revealed so no pills stay hidden.
   void _startRevealAnimation({int initialCount = 3}) {
     _revealTimer?.cancel();
     var index = 0;
@@ -96,7 +100,21 @@ class _SnakeFabState extends State<SnakeFab> {
         Timer(const Duration(milliseconds: 80), revealNext);
       }
     }
-    _revealTimer = Timer(const Duration(milliseconds: 100), revealNext);
+    _revealTimer = Timer(const Duration(milliseconds: 100), () {
+      revealNext();
+      // After the initial burst, reveal any items that fit
+      // without scrolling (no scroll → _onScroll never fires).
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !widget.isExpanded || !_scrollController.hasClients) return;
+        if (_scrollController.position.maxScrollExtent <= 0) {
+          setState(() {
+            for (var i = 0; i < widget.items.length; i++) {
+              _revealedIndices.add(i);
+            }
+          });
+        }
+      });
+    });
   }
 
   void _onScroll() {

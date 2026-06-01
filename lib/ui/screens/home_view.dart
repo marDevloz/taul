@@ -8,6 +8,7 @@ import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/effective_auth_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:go_router/go_router.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
 import 'package:taul/ui/screens/entry_detail_view.dart';
@@ -315,7 +316,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
   }
 
   Widget _buildTagFilterFab() {
-    final tags = ref.watch(tagsListProvider);
+    final tagSettingsAsync = ref.watch(tagSettingsListProvider);
+    final tagSettings = tagSettingsAsync.valueOrNull ?? [];
     final selectedTag = ref.watch(selectedTagFilterProvider);
     final tagColors = ref.watch(tagColorMapProvider);
     final isExpanded = _expandedFabId == 'tag';
@@ -328,12 +330,12 @@ class _HomeViewState extends ConsumerState<HomeView> {
           label: 'Todas',
           icon: Icons.all_inclusive,
         ),
-      for (final tag in tags)
+      for (final tagSetting in tagSettings)
         SnakeFabItem(
-          value: tag,
-          label: tag,
+          value: tagSetting.name,
+          label: tagSetting.name,
           icon: Icons.label,
-          color: tagColors[tag],
+          color: tagColors[tagSetting.name.toLowerCase()],
         ),
     ];
 
