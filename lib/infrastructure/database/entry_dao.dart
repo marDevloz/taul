@@ -48,13 +48,16 @@ class EntryDao {
     return _fromDbEntry(row);
   }
 
-  Future<List<Entry>> list({String? type, bool includeDeleted = false}) async {
+  Future<List<Entry>> list({String? type, bool includeDeleted = false, bool excludeArchived = false}) async {
     var query = _database.select(_database.entries);
     if (type != null) {
       query = query..where((t) => t.type.equals(type));
     }
     if (!includeDeleted) {
       query = query..where((t) => t.deletedAt.isNull());
+    }
+    if (excludeArchived) {
+      query = query..where((t) => t.tags.like('%"archivado"%').not());
     }
     query = query
       ..orderBy([
@@ -130,6 +133,7 @@ class EntryDao {
       updatedAt: Value(entry.updatedAt),
       version: Value(entry.version),
       deletedAt: Value(entry.deletedAt),
+      completedAt: Value(entry.completedAt),
     );
   }
 
@@ -151,6 +155,7 @@ class EntryDao {
       'updatedAt': row.updatedAt.toIso8601String(),
       'version': row.version,
       'deletedAt': row.deletedAt?.toIso8601String(),
+      'completedAt': row.completedAt?.toIso8601String(),
     });
   }
 
@@ -212,6 +217,7 @@ class EntryDao {
       updatedAt: _dateTime(data, 'updatedAt', 'updated_at'),
       version: _val<int>(data, 'version', 'version') ?? 1,
       deletedAt: _dateTimeOrNull(data, 'deletedAt', 'deleted_at'),
+      completedAt: _dateTimeOrNull(data, 'completedAt', 'completed_at'),
     );
   }
 }

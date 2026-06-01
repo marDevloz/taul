@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart' show Variable;
+import 'package:drift/drift.dart' show Value, Variable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
@@ -130,6 +130,195 @@ void main() {
 
       expect(retrieved, isNotNull);
       expect(retrieved!.tagsColors, updatedColors);
+    });
+  });
+
+  group('EntryDao completedAt', () {
+    test('should persist completedAt as null for new entry', () async {
+      final entry = Entry(
+        id: 'task-1',
+        type: EntryType.task,
+        title: 'New task',
+        content: 'Task content',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await dao.insert(entry);
+      final retrieved = await dao.get('task-1');
+
+      expect(retrieved, isNotNull);
+      expect(retrieved!.completedAt, isNull);
+    });
+
+    test('should round-trip completedAt when set', () async {
+      final completedTime = DateTime(2026, 5, 31, 12, 0, 0);
+      final entry = Entry(
+        id: 'task-2',
+        type: EntryType.task,
+        title: 'Completed task',
+        content: 'Done',
+        completedAt: completedTime,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await dao.insert(entry);
+      final retrieved = await dao.get('task-2');
+
+      expect(retrieved, isNotNull);
+      expect(retrieved!.completedAt, completedTime);
+    });
+
+    test('should persist completedAt after update', () async {
+      final entry = Entry(
+        id: 'task-3',
+        type: EntryType.task,
+        title: 'Task to complete',
+        content: 'Pending',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await dao.insert(entry);
+
+      final completedTime = DateTime(2026, 5, 31, 14, 30, 0);
+      final updated = entry.copyWith(
+        completedAt: completedTime,
+        updatedAt: DateTime.now(),
+      );
+      await dao.update(updated);
+
+      final retrieved = await dao.get('task-3');
+      expect(retrieved!.completedAt, completedTime);
+    });
+  });
+
+  group('EntryDao excludeArchived', () {
+    test('should include all entries when excludeArchived is false', () async {
+      // Insert entries with and without archivado tag
+      await dao.insert(Entry(
+        id: 'entry-1',
+        type: EntryType.note,
+        title: 'Normal entry',
+        content: 'Content',
+        tags: ['work'],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+      await dao.insert(Entry(
+        id: 'entry-2',
+        type: EntryType.note,
+        title: 'Archived entry',
+        content: 'Content',
+        tags: ['archivado'],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+
+      final entries = await dao.list(excludeArchived: false);
+      expect(entries, hasLength(2));
+    });
+
+    test('should exclude entries with archivado tag when excludeArchived is true', () async {
+      await dao.insert(Entry(
+        id: 'entry-3',
+        type: EntryType.note,
+        title: 'Normal entry',
+        content: 'Content',
+        tags: ['work'],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+      await dao.insert(Entry(
+        id: 'entry-4',
+        type: EntryType.note,
+        title: 'Archived entry',
+        content: 'Content',
+        tags: ['archivado'],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+
+      final entries = await dao.list(excludeArchived: true);
+      expect(entries, hasLength(1));
+      expect(entries.first.id, 'entry-3');
+    });
+
+    test('should exclude entries with archivado among multiple tags', () async {
+      await dao.insert(Entry(
+        id: 'entry-5',
+        type: EntryType.note,
+        title: 'Multi-tag archived',
+        content: 'Content',
+        tags: ['work', 'archivado', 'urgent'],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+      await dao.insert(Entry(
+        id: 'entry-6',
+        type: EntryType.note,
+        title: 'Not archived',
+        content: 'Content',
+        tags: ['work', 'urgent'],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+
+      final entries = await dao.list(excludeArchived: true);
+      expect(entries, hasLength(1));
+      expect(entries.first.id, 'entry-6');
+    });
+  });
+
+  group('Migration 7→8', () {
+    test('should have completed_at column in entries table', () async {
+      final columns = await database.customSelect(
+        "PRAGMA table_info(entries)",
+      ).get();
+      final columnNames = columns.map((c) => c.data['name'] as String).toList();
+      expect(columnNames, contains('completed_at'));
+    });
+
+    test('should have is_system column in tag_settings table', () async {
+      final columns = await database.customSelect(
+        "PRAGMA table_info(tag_settings)",
+      ).get();
+      final columnNames = columns.map((c) => c.data['name'] as String).toList();
+      expect(columnNames, contains('is_system'));
+    });
+
+    test('should seed 4 system tags on database creation', () async {
+      final tags = await database.select(database.tagSettings).get();
+      final systemTags = tags.where((t) => t.isSystem).toList();
+      expect(systemTags, hasLength(4));
+
+      final names = systemTags.map((t) => t.name).toSet();
+      expect(names, containsAll(['pendiente', 'completada', 'favorito', 'archivado']));
+    });
+
+    test('should set isSystem true for system tags', () async {
+      final pendiente = await (database.select(database.tagSettings)
+            ..where((t) => t.name.equals('pendiente')))
+          .getSingleOrNull();
+      expect(pendiente, isNotNull);
+      expect(pendiente!.isSystem, true);
+    });
+
+    test('should set isSystem false for user-created tags', () async {
+      // Insert a user tag via DAO
+      await database.into(database.tagSettings).insert(
+        TagSettingsCompanion.insert(
+          name: 'mytag',
+          color: const Value('#FF0000'),
+        ),
+      );
+
+      final mytag = await (database.select(database.tagSettings)
+            ..where((t) => t.name.equals('mytag')))
+          .getSingleOrNull();
+      expect(mytag, isNotNull);
+      expect(mytag!.isSystem, false);
     });
   });
 }

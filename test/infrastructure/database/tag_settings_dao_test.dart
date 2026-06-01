@@ -59,7 +59,8 @@ void main() {
       await dao.upsert('gamma');
 
       final all = await dao.getAllTags();
-      expect(all, hasLength(3));
+      // 4 system tags seeded in onCreate + 3 user tags
+      expect(all, hasLength(7));
 
       final names = all.map((t) => t.name).toSet();
       expect(names, containsAll(['alpha', 'beta', 'gamma']));
@@ -108,6 +109,67 @@ void main() {
       expect(result!.name, 'nocolor');
       expect(result.color, isNull);
       expect(result.isSecure, false);
+    });
+  });
+
+  group('TagSettingsDao - isSystem', () {
+    test('should default isSystem to false for user tags', () async {
+      await dao.upsert('usertag', color: '#FF0000');
+      final result = await dao.getByName('usertag');
+      expect(result!.isSystem, false);
+    });
+
+    test('should persist isSystem when set to true', () async {
+      await dao.upsert('pendiente', isSystem: true);
+      final result = await dao.getByName('pendiente');
+      expect(result!.isSystem, true);
+    });
+
+    test('should return only system tags from getSystemTags', () async {
+      // System tags are seeded in onCreate (pendiente, completada, favorito, archivado)
+      await dao.upsert('usertag', isSystem: false);
+
+      final systemTags = await dao.getSystemTags();
+      expect(systemTags, hasLength(4));
+      final names = systemTags.map((t) => t.name).toSet();
+      expect(names, containsAll(['pendiente', 'completada', 'favorito', 'archivado']));
+    });
+
+    test('should return only user tags from getUserTags', () async {
+      await dao.upsert('work', isSystem: false);
+      await dao.upsert('personal', isSystem: false);
+
+      final userTags = await dao.getUserTags();
+      expect(userTags, hasLength(2));
+      final names = userTags.map((t) => t.name).toSet();
+      expect(names, containsAll(['work', 'personal']));
+    });
+
+    test('seedSystemTags should create 4 system tags with default colors', () async {
+      await dao.seedSystemTags();
+
+      final systemTags = await dao.getSystemTags();
+      expect(systemTags, hasLength(4));
+
+      final names = systemTags.map((t) => t.name).toSet();
+      expect(names, containsAll(['pendiente', 'completada', 'favorito', 'archivado']));
+
+      // All should have isSystem true
+      for (final tag in systemTags) {
+        expect(tag.isSystem, true);
+      }
+    });
+
+    test('seedSystemTags should not duplicate existing system tags', () async {
+      await dao.upsert('pendiente', isSystem: true, color: '#CUSTOM');
+      await dao.seedSystemTags();
+
+      final systemTags = await dao.getSystemTags();
+      expect(systemTags, hasLength(4));
+
+      // The custom color should be preserved (insertOrIgnore)
+      final pendiente = await dao.getByName('pendiente');
+      expect(pendiente!.color, '#CUSTOM');
     });
   });
 }

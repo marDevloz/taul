@@ -17,6 +17,7 @@ class Entries extends Table {
   DateTimeColumn get updatedAt => dateTime()();
   IntColumn get version => integer().withDefault(const Constant(1))();
   DateTimeColumn? get deletedAt => dateTime().nullable()();
+  DateTimeColumn? get completedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
