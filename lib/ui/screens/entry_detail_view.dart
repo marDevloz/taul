@@ -570,7 +570,8 @@ class _NoteContent extends ConsumerWidget {
     String tagName,
   ) async {
     final currentHex = entry.tagsColors[tagName];
-    final initialColor = currentHex != null
+    final initialColor =
+        (currentHex != null && currentHex.length >= 2 && currentHex[0] == '#')
         ? Color(int.parse(currentHex.substring(1), radix: 16) + 0xFF000000)
         : null;
 
@@ -1151,7 +1152,8 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
     String tagName,
   ) async {
     final currentHex = entry.tagsColors[tagName];
-    final initialColor = currentHex != null
+    final initialColor =
+        (currentHex != null && currentHex.length >= 2 && currentHex[0] == '#')
         ? Color(int.parse(currentHex.substring(1), radix: 16) + 0xFF000000)
         : null;
 
