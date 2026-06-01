@@ -3,16 +3,20 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/infrastructure/database/tag_settings_dao.dart';
 
 import 'app_database.dart' as db;
 
 class EntryDao {
   final db.AppDatabase _database;
+  final TagSettingsDao _tagSettingsDao;
 
-  const EntryDao(this._database);
+  EntryDao(this._database)
+      : _tagSettingsDao = TagSettingsDao(_database);
 
   Future<Entry> insert(Entry entry) async {
     await _database.into(_database.entries).insert(_toCompanion(entry));
+    await _syncTags(entry);
     await _syncFts(entry);
     return entry;
   }
@@ -22,6 +26,7 @@ class EntryDao {
     await (_database.update(_database.entries)
       ..where((t) => t.id.equals(entry.id)))
         .write(companion);
+    await _syncTags(entry);
     await _syncFts(entry);
     return entry;
   }
@@ -90,6 +95,14 @@ class EntryDao {
       final data = Map<String, dynamic>.from(row.data);
       return _fromMap(data);
     }).toList();
+  }
+
+  /// Sincroniza los tags de un entry a TagSettings para que aparezcan
+  /// en la pantalla de Gestión de etiquetas.
+  Future<void> _syncTags(Entry entry) async {
+    for (final tag in entry.tags) {
+      await _tagSettingsDao.upsert(tag);
+    }
   }
 
   Future<void> _syncFts(Entry entry) async {
