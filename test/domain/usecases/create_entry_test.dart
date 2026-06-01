@@ -65,7 +65,7 @@ void main() {
         (i) => Future.value(i.positionalArguments[0] as Entry),
       );
 
-      final result = await useCase.call(title: 'Idea', content: '! great idea');
+      final result = await useCase.call(title: 'Idea', content: '!great idea');
 
       expect(result.type, EntryType.idea);
     });
@@ -75,7 +75,7 @@ void main() {
         (i) => Future.value(i.positionalArguments[0] as Entry),
       );
 
-      final result = await useCase.call(title: 'Term', content: 'Término: definición');
+      final result = await useCase.call(title: 'Term', content: 'Término:definición');
 
       expect(result.type, EntryType.glossary);
     });
