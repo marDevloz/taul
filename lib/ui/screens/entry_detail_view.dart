@@ -548,14 +548,6 @@ class _NoteContent extends ConsumerWidget {
       ),
     );
 
-    if (isWide) {
-      return Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: body,
-        ),
-      );
-    }
     return body;
   }
 
@@ -779,14 +771,6 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
       ),
     );
 
-    if (isWide) {
-      return Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: body,
-        ),
-      );
-    }
     return body;
   }
 
