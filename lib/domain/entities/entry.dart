@@ -24,6 +24,7 @@ class Entry with _$Entry {
     required DateTime updatedAt,
     @Default(1) int version,
     DateTime? deletedAt,
+    DateTime? completedAt,
   }) = _Entry;
 
   factory Entry.fromJson(Map<String, dynamic> json) => _$EntryFromJson(json);

@@ -2,7 +2,8 @@ enum EntryType {
   glossary('GLOSARIO'),
   note('NOTA'),
   idea('IDEA'),
-  credential('CREDENCIAL');
+  credential('CREDENCIAL'),
+  task('TAREA');
 
   final String label;
   const EntryType(this.label);
