@@ -18,21 +18,50 @@ Taúl es una aplicación local y minimalista diseñada para almacenar informaci�
 
 ## Stack
 
-- **Flutter** — multiplataforma
-- **SQLite FTS5** — búsqueda instantánea
-- **AES-256-GCM + Argon2id** — cifrado
+- **Flutter** — multiplataforma (Windows, Linux, Android, iOS)
+- **SQLite FTS5** — búsqueda instantánea full-text
+- **AES-256-GCM + Argon2id** — cifrado de credenciales
 - **go_router** — navegación
+- **flutter_quill** — editor de texto enriquecido
+- **Drift** — ORM para SQLite
 
-## Features
+## Tipos de entrada
 
-### Master Password Protection
+| Tipo     | Sintaxis                  | Descripción                              |
+| -------- | ------------------------- | ---------------------------------------- |
+| Nota     | —                         | Texto enriquecido libre                  |
+| Idea     | `!idea`                   | Destacada visualmente, se saca el `!`    |
+| Glosario | `término:definición`      | Término en negrita, definición en cursiva|
+| Credencial | `servicio*user*pass`    | Cifrada, solo visible con contraseña maestra |
 
-Credentials can be protected with a master password:
+**Auto-detección**: el tipo se detecta desde el contenido al escribir. No se activa si hay espacio después del marcador (`! texto` no es idea, `* texto` no es credencial, `término : def` no es glosario).
 
-- **Transparent encryption**: once unlocked, encrypt/decrypt happens
-  silently using a cached Data Encryption Key (DEK).
-- **Offline recovery**: 10 single-use backup codes (Argon2id-hashed)
-  allow self-recovery without network.
-- **KEK/DEK wrapping**: changing your master password is instant — no
-  entry re-encryption needed.
-- See [SECURITY.md](SECURITY.md) for detailed architecture.
+**Título inline**: `Título# contenido` — todo antes de `# ` se convierte en el título.
+
+**Tags inline**: `-#etiqueta` en el contenido agrega una etiqueta.
+
+## Funcionalidades
+
+- **Creación rápida**: botón + o Ctrl+N → formulario con editor rich text, título, tags y selector de tipo.
+- **Editor de texto enriquecido**: negrita, cursiva para notas y glosarios.
+- **Búsqueda en tiempo real**: FTS5, resultados mientras escribís, coincidencias parciales.
+- **Filtros**: por tipo (nota/idea/glosario/credencial) y por etiqueta, desde FABs expansibles.
+- **Etiquetas**: con colores asignables globalmente (long-press → paleta), etiquetas seguras que requieren contraseña maestra.
+- **Combinar entradas**: selección múltiple → fusionar contenido y etiquetas en una nueva entrada.
+- **Papelera**: entradas eliminadas con opción de restaurar o vaciar.
+- **Exportar/Importar**: formato JSON completo.
+- **Atajos de teclado**: navegación completa sin mouse (Ctrl+N/F/E/,/Shift+T, ←/→, Tab).
+
+## Seguridad
+
+### Protección con Contraseña Maestra
+
+Las credenciales se protegen con una contraseña maestra:
+
+- **Cifrado transparente**: una vez desbloqueado, el cifrado/descifrado ocurre silenciosamente usando una clave de cifrado de datos (DEK) en caché.
+- **Recuperación offline**: 10 códigos de respaldo de un solo uso (hasheados con Argon2id) permiten la recuperación sin conexión.
+- **KEK/DEK wrapping**: cambiar la contraseña maestra es instantáneo — no requiere recifrado de entradas.
+- **Bloqueo automático**: por inactividad (1/5/15/30 min) o al iniciar la app.
+- **Etiquetas seguras**: las entradas con etiquetas marcadas como seguras también se ocultan tras la contraseña maestra.
+
+Ver [SECURITY.md](SECURITY.md) para la arquitectura detallada.

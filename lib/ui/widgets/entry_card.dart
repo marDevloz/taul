@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:taul/core/credential_parser.dart';
+import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/widgets/entry_expanded_content.dart';
@@ -59,7 +60,9 @@ class EntryCard extends StatelessWidget {
     if (entry.type == EntryType.credential && entry.metadata.containsKey('username')) {
       return CredentialParser.maskUsername(entry.metadata['username']!);
     }
-    return entry.content;
+    if (entry.content.isEmpty) return '';
+    final doc = RichTextHelper.getDocument(entry.content);
+    return RichTextHelper.documentToPlainText(doc);
   }
 
   bool get _isExpandable => entry.type != EntryType.credential;
@@ -136,13 +139,10 @@ class EntryCard extends StatelessWidget {
                 ListTile(
                   leading: Icon(_typeIcon, color: theme.colorScheme.primary),
                   title: Text(
-                    entry.title.isNotEmpty ? entry.title : '(sin título)',
+                    entry.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
-                      color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
-                    ),
+                    style: theme.textTheme.titleSmall,
                   ),
                   subtitle: subtitle ?? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,7 +217,10 @@ class EntryCard extends StatelessWidget {
                           child: IconButton(
                             icon: Icon(Icons.copy, size: 16, color: theme.colorScheme.primary),
                             onPressed: () {
-                              final text = '${entry.title}\n\n${entry.content}';
+                              final plainContent = RichTextHelper.documentToPlainText(
+                                RichTextHelper.getDocument(entry.content),
+                              );
+                              final text = '${entry.title}\n\n$plainContent';
                               Clipboard.setData(ClipboardData(text: text));
                               ScaffoldMessenger.maybeOf(context)?.showSnackBar(
                                 const SnackBar(
@@ -336,13 +339,10 @@ class EntryCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    entry.title.isNotEmpty ? entry.title : '(sin título)',
+                    entry.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
-                      color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
-                    ),
+                    style: theme.textTheme.titleSmall,
                   ),
                   const SizedBox(height: 4),
                   if (isSecure)

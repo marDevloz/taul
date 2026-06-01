@@ -10,10 +10,9 @@ import 'package:taul/ui/providers/effective_auth_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:go_router/go_router.dart';
-import 'package:taul/ui/screens/credential_form_sheet.dart';
+import 'package:taul/ui/screens/create_entry_sheet.dart';
 import 'package:taul/ui/screens/entry_detail_view.dart';
 import 'package:taul/ui/screens/merge_editor_screen.dart';
-import 'package:taul/ui/screens/quick_add_sheet.dart';
 import 'package:taul/ui/widgets/empty_states.dart';
 import 'package:taul/ui/widgets/entry_card.dart';
 import 'package:taul/ui/widgets/master_password_gate.dart';
@@ -405,18 +404,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => QuickAddSheet(
-        onCredentialRequested: () => _showCredentialForm(context),
-      ),
-    );
-  }
-
-  Future<void> _showCredentialForm(BuildContext context) async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) =>
-          CredentialFormSheet(onGoBack: () => _showQuickAdd(context)),
+      builder: (_) => const CreateEntrySheet(),
     );
   }
 

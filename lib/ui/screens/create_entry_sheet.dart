@@ -164,6 +164,7 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
           type = EntryType.note;
           content = _richContent;
         }
+      case EntryType.task:
       case EntryType.note:
         content = _richContent;
     }
@@ -341,6 +342,7 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
       EntryType.idea => Icons.lightbulb,
       EntryType.glossary => Icons.book,
       EntryType.credential => Icons.lock,
+      EntryType.task => Icons.checklist,
     };
   }
 
@@ -350,6 +352,7 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
       EntryType.idea => 'Idea',
       EntryType.glossary => 'Glosario',
       EntryType.credential => 'Credencial',
+      EntryType.task => 'Tarea',
     };
   }
 }

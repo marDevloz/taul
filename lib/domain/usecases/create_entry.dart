@@ -50,9 +50,11 @@ class CreateEntry {
   }
 
   EntryType _inferType(String title, String content) {
-    if (content.startsWith('!')) return EntryType.idea;
-    if (content.contains(':')) return EntryType.glossary;
-    if (content.startsWith('+')) return EntryType.credential;
+    if (content.startsWith('!') && content.length > 1 && content[1] != ' ') {
+      return EntryType.idea;
+    }
+    if (RegExp(r'\S\*\S').hasMatch(content)) return EntryType.credential;
+    if (RegExp(r'\w:\S').hasMatch(content)) return EntryType.glossary;
     return EntryType.note;
   }
 

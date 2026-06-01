@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:taul/core/credential_parser.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/ui/widgets/rich_text_display.dart';
 
 class EntryExpandedContent extends StatelessWidget {
   final Entry entry;
@@ -75,13 +76,9 @@ class EntryExpandedContent extends StatelessWidget {
   }
 
   Widget _buildTextContent(BuildContext context) {
-    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: SelectableText(
-        entry.content,
-        style: theme.textTheme.bodySmall,
-      ),
+      child: RichTextDisplay(content: entry.content),
     );
   }
 }

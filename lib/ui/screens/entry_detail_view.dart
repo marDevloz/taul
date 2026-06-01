@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter/services.dart'
     show
         Clipboard,
@@ -14,6 +13,7 @@ import 'package:flutter/services.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:taul/core/constants.dart';
+import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
@@ -23,6 +23,8 @@ import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
 import 'package:taul/ui/widgets/master_password_recovery_dialog.dart';
 import 'package:taul/ui/widgets/palette_picker.dart';
+import 'package:taul/ui/widgets/rich_text_display.dart';
+import 'package:taul/ui/widgets/rich_text_editor.dart';
 
 /// Result of the master password reveal dialog.
 ///
@@ -149,7 +151,7 @@ class EntryDetailView extends ConsumerWidget {
                 onPressed: () {
                   final entry = entryAsync.valueOrNull;
                   if (entry != null) {
-                    final text = '${entry.title}\n\n${entry.content}';
+                    final text = '${entry.title}\n\n${RichTextHelper.documentToPlainText(RichTextHelper.getDocument(entry.content))}';
                     Clipboard.setData(ClipboardData(text: text));
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -270,7 +272,6 @@ class EntryDetailView extends ConsumerWidget {
 
   void _showNoteEdit(BuildContext context, WidgetRef ref, Entry entry) {
     final titleCtrl = TextEditingController(text: entry.title);
-    final contentCtrl = TextEditingController(text: entry.content);
     final tagsCtrl = TextEditingController(text: entry.tags.join(', '));
     showModalBottomSheet(
       context: context,
@@ -278,6 +279,7 @@ class EntryDetailView extends ConsumerWidget {
       builder: (ctx) {
         var selectedType = entry.type;
         var isSaving = false;
+        var richContent = entry.content;
 
         return StatefulBuilder(
           builder: (context, setLocalState) => Padding(
@@ -310,13 +312,9 @@ class EntryDetailView extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: contentCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Contenido',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 5,
+                RichTextEditor(
+                  initialContent: entry.content,
+                  onChanged: (v) => setLocalState(() => richContent = v),
                 ),
                 const SizedBox(height: 12),
                 _TagsAutocompleteField(controller: tagsCtrl, ref: ref),
@@ -409,7 +407,7 @@ class EntryDetailView extends ConsumerWidget {
                                     .call(
                                       entry,
                                       title: titleCtrl.text,
-                                      content: contentCtrl.text,
+                                      content: richContent,
                                       tags: tags,
                                       type: selectedType,
                                     );
@@ -494,20 +492,13 @@ class _NoteContent extends ConsumerWidget {
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           const SizedBox(height: 8),
-          entry.title.isNotEmpty
-              ? SelectableText(
-                  entry.title,
-                  style: theme.textTheme.headlineSmall,
-                )
-              : Text(
-                  '(sin título)',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontStyle: FontStyle.italic,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
+          if (entry.title.isNotEmpty)
+            SelectableText(
+              entry.title,
+              style: theme.textTheme.headlineSmall,
+            ),
           const SizedBox(height: 16),
-          MarkdownBody(data: entry.content, selectable: true),
+          RichTextDisplay(content: entry.content),
           if (entry.tags.isNotEmpty) ...[
             const SizedBox(height: 16),
             Wrap(
@@ -673,18 +664,11 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
               children: [
                 const Icon(Icons.lock, size: 40, color: Colors.amber),
                 const SizedBox(height: 8),
-                entry.title.isNotEmpty
-                    ? SelectableText(
-                        entry.title,
-                        style: theme.textTheme.headlineSmall,
-                      )
-                    : Text(
-                        '(sin título)',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontStyle: FontStyle.italic,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                if (entry.title.isNotEmpty)
+                  SelectableText(
+                    entry.title,
+                    style: theme.textTheme.headlineSmall,
+                  ),
               ],
             ),
           ),
