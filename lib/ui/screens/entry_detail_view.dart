@@ -17,6 +17,7 @@ import 'package:taul/core/constants.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:taul/shared/tag_palette.dart';
 import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
@@ -590,7 +591,14 @@ class _NoteContent extends ConsumerWidget {
       // Update entry's tagsColors map
       final newTagsColors = Map<String, String>.from(entry.tagsColors);
       if (selectedHex.isEmpty) {
-        newTagsColors.remove(tagName);
+        // "Sin color" for system tags reverts to its reserved default
+        final systemDefault =
+            TagPalette.systemTagDefaults[tagName.toLowerCase()];
+        if (systemDefault != null) {
+          newTagsColors[tagName] = systemDefault.hex;
+        } else {
+          newTagsColors.remove(tagName);
+        }
       } else {
         newTagsColors[tagName] = selectedHex;
       }
@@ -606,7 +614,13 @@ class _NoteContent extends ConsumerWidget {
         final otherColors = Map<String, String>.from(other.tagsColors);
         if (otherColors[tagName] != selectedHex) {
           if (selectedHex.isEmpty) {
-            otherColors.remove(tagName);
+            final systemDefault =
+                TagPalette.systemTagDefaults[tagName.toLowerCase()];
+            if (systemDefault != null) {
+              otherColors[tagName] = systemDefault.hex;
+            } else {
+              otherColors.remove(tagName);
+            }
           } else {
             otherColors[tagName] = selectedHex;
           }
@@ -1172,7 +1186,14 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
       // Update entry's tagsColors map
       final newTagsColors = Map<String, String>.from(entry.tagsColors);
       if (selectedHex.isEmpty) {
-        newTagsColors.remove(tagName);
+        // "Sin color" for system tags reverts to its reserved default
+        final systemDefault =
+            TagPalette.systemTagDefaults[tagName.toLowerCase()];
+        if (systemDefault != null) {
+          newTagsColors[tagName] = systemDefault.hex;
+        } else {
+          newTagsColors.remove(tagName);
+        }
       } else {
         newTagsColors[tagName] = selectedHex;
       }
@@ -1188,7 +1209,13 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
         final otherColors = Map<String, String>.from(other.tagsColors);
         if (otherColors[tagName] != selectedHex) {
           if (selectedHex.isEmpty) {
-            otherColors.remove(tagName);
+            final systemDefault =
+                TagPalette.systemTagDefaults[tagName.toLowerCase()];
+            if (systemDefault != null) {
+              otherColors[tagName] = systemDefault.hex;
+            } else {
+              otherColors.remove(tagName);
+            }
           } else {
             otherColors[tagName] = selectedHex;
           }
