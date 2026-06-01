@@ -588,7 +588,11 @@ class _NoteContent extends ConsumerWidget {
     if (selectedHex != null && context.mounted) {
       // Update entry's tagsColors map
       final newTagsColors = Map<String, String>.from(entry.tagsColors);
-      newTagsColors[tagName] = selectedHex;
+      if (selectedHex.isEmpty) {
+        newTagsColors.remove(tagName);
+      } else {
+        newTagsColors[tagName] = selectedHex;
+      }
 
       // Save updated entry via tagsColors-only use case (no version bump)
       await ref.read(updateEntryTagsColorsProvider).call(entry, newTagsColors);
@@ -600,7 +604,11 @@ class _NoteContent extends ConsumerWidget {
           continue;
         final otherColors = Map<String, String>.from(other.tagsColors);
         if (otherColors[tagName] != selectedHex) {
-          otherColors[tagName] = selectedHex;
+          if (selectedHex.isEmpty) {
+            otherColors.remove(tagName);
+          } else {
+            otherColors[tagName] = selectedHex;
+          }
           await ref
               .read(updateEntryTagsColorsProvider)
               .call(other, otherColors);
@@ -1161,7 +1169,11 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
     if (selectedHex != null && context.mounted) {
       // Update entry's tagsColors map
       final newTagsColors = Map<String, String>.from(entry.tagsColors);
-      newTagsColors[tagName] = selectedHex;
+      if (selectedHex.isEmpty) {
+        newTagsColors.remove(tagName);
+      } else {
+        newTagsColors[tagName] = selectedHex;
+      }
 
       // Save updated entry via tagsColors-only use case (no version bump)
       await ref.read(updateEntryTagsColorsProvider).call(entry, newTagsColors);
@@ -1173,7 +1185,11 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
           continue;
         final otherColors = Map<String, String>.from(other.tagsColors);
         if (otherColors[tagName] != selectedHex) {
-          otherColors[tagName] = selectedHex;
+          if (selectedHex.isEmpty) {
+            otherColors.remove(tagName);
+          } else {
+            otherColors[tagName] = selectedHex;
+          }
           await ref
               .read(updateEntryTagsColorsProvider)
               .call(other, otherColors);
