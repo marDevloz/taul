@@ -19,6 +19,7 @@ import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
 import 'package:taul/ui/widgets/master_password_recovery_dialog.dart';
 import 'package:taul/ui/widgets/palette_picker.dart';
@@ -516,7 +517,8 @@ class _NoteContent extends ConsumerWidget {
   }
 
   void _showPalettePicker(BuildContext context, WidgetRef ref, Entry entry, String tagName) async {
-    final currentHex = entry.tagsColors[tagName];
+    final tagMap = ref.watch(tagSettingsMapProvider);
+    final currentHex = tagMap[tagName.toLowerCase()]?.color;
     final initialColor = currentHex != null
         ? Color(int.parse(currentHex.substring(1), radix: 16) + 0xFF000000)
         : null;
@@ -533,29 +535,8 @@ class _NoteContent extends ConsumerWidget {
     );
 
     if (selectedHex != null && context.mounted) {
-      // Update entry's tagsColors map
-      final newTagsColors = Map<String, String>.from(entry.tagsColors);
-      newTagsColors[tagName] = selectedHex;
-
-      // Save updated entry via tagsColors-only use case (no version bump)
-      await ref.read(updateEntryTagsColorsProvider).call(entry, newTagsColors);
-
-      // Propagate color to ALL entries sharing this tag
-      final allEntries = ref.read(entryListProvider).valueOrNull ?? [];
-      for (final other in allEntries) {
-        if (!other.tags.any((t) => t.toLowerCase() == tagName.toLowerCase())) continue;
-        final otherColors = Map<String, String>.from(other.tagsColors);
-        if (otherColors[tagName] != selectedHex) {
-          otherColors[tagName] = selectedHex;
-          await ref.read(updateEntryTagsColorsProvider).call(other, otherColors);
-        }
-      }
-
-      // Invalidate ALL providers so home_view cards rebuild immediately
-      ref.invalidate(entryListProvider);
-      ref.invalidate(entryDetailProvider);
-      ref.invalidate(entryDisplayColorProvider);
-      ref.invalidate(tagColorMapProvider);
+      await ref.read(saveTagSettingProvider).call(tagName, color: selectedHex);
+      ref.invalidate(tagSettingsListProvider);
     }
   }
 }
@@ -1046,7 +1027,8 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
   }
 
   void _showPalettePicker(BuildContext context, WidgetRef ref, Entry entry, String tagName) async {
-    final currentHex = entry.tagsColors[tagName];
+    final tagMap = ref.watch(tagSettingsMapProvider);
+    final currentHex = tagMap[tagName.toLowerCase()]?.color;
     final initialColor = currentHex != null
         ? Color(int.parse(currentHex.substring(1), radix: 16) + 0xFF000000)
         : null;
@@ -1063,29 +1045,8 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
     );
 
     if (selectedHex != null && context.mounted) {
-      // Update entry's tagsColors map
-      final newTagsColors = Map<String, String>.from(entry.tagsColors);
-      newTagsColors[tagName] = selectedHex;
-
-      // Save updated entry via tagsColors-only use case (no version bump)
-      await ref.read(updateEntryTagsColorsProvider).call(entry, newTagsColors);
-
-      // Propagate color to ALL entries sharing this tag
-      final allEntries = ref.read(entryListProvider).valueOrNull ?? [];
-      for (final other in allEntries) {
-        if (!other.tags.any((t) => t.toLowerCase() == tagName.toLowerCase())) continue;
-        final otherColors = Map<String, String>.from(other.tagsColors);
-        if (otherColors[tagName] != selectedHex) {
-          otherColors[tagName] = selectedHex;
-          await ref.read(updateEntryTagsColorsProvider).call(other, otherColors);
-        }
-      }
-
-      // Invalidate ALL providers so home_view cards rebuild immediately
-      ref.invalidate(entryListProvider);
-      ref.invalidate(entryDetailProvider);
-      ref.invalidate(entryDisplayColorProvider);
-      ref.invalidate(tagColorMapProvider);
+      await ref.read(saveTagSettingProvider).call(tagName, color: selectedHex);
+      ref.invalidate(tagSettingsListProvider);
     }
   }
 }
