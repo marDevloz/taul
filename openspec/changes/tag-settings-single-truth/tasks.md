@@ -60,19 +60,19 @@ DB schema changes are the hardest to chain. The solution: **v9 = data-fill only*
 
 ### Phase 2.1: UI — Rewrite _NoteContent._showPalettePicker
 
-- [ ] 2.1.1 Read initial color from `tagSettingsMapProvider` instead of `entry.tagsColors[tagName]`: `final tagMap = ref.watch(tagSettingsMapProvider); final currentHex = tagMap[tagName.toLowerCase()]?.color`
-- [ ] 2.1.2 Replace `updateEntryTagsColorsProvider` call + propagation loop: call `ref.read(saveTagSettingProvider).call(TagSetting(name: tagName, color: selectedHexOrNull))` **once**
-- [ ] 2.1.3 System tag "sin color" revert: write `TagPalette.systemTagDefaults[name]` to `tag_settings.color` instead of per-entry map
-- [ ] 2.1.4 Replace invalidation block: `ref.invalidate(tagSettingsListProvider)` (cascade handles the rest). Remove `entryListProvider`, `entryDetailProvider`, `entryDisplayColorProvider`, `tagColorMapProvider` invalidations.
+- [x] 2.1.1 Read initial color from `tagSettingsMapProvider` instead of `entry.tagsColors[tagName]`: `final tagMap = ref.watch(tagSettingsMapProvider); final currentHex = tagMap[tagName.toLowerCase()]?.color`
+- [x] 2.1.2 Replace `updateEntryTagsColorsProvider` call + propagation loop: call `ref.read(saveTagSettingProvider).call(tagName, color: selectedHex)` **once**
+- [x] 2.1.3 System tag "sin color" revert: write system default to `tag_settings.color` instead of per-entry map. Note: `TagPalette.systemTagDefaults` does not exist in codebase; PalettePicker always returns a hex string, so "no color" case (null) only occurs on dialog dismiss, which is already guarded.
+- [x] 2.1.4 Replace invalidation block: `ref.invalidate(tagSettingsListProvider)` (cascade handles the rest). Removed `entryListProvider`, `entryDetailProvider`, `entryDisplayColorProvider`, `tagColorMapProvider` invalidations.
 
 ### Phase 2.2: UI — Rewrite _CredentialContent._showPalettePicker
 
-- [ ] 2.2.1 Same changes as 2.1.1–2.1.4 applied to the second `_showPalettePicker` copy (line 1132)
+- [x] 2.2.1 Same changes as 2.1.1–2.1.4 applied to the second `_showPalettePicker` copy (line 1132)
 
 ### PR 2 Verification
 
-- [ ] V2.1 `dart analyze` — zero warnings
-- [ ] V2.2 `flutter test` — no regression in entry detail widget tests
+- [x] V2.1 `dart analyze` — zero new warnings (2 pre-existing info-level use_build_context_synchronously remain, same as baseline)
+- [x] V2.2 `flutter test` — no regression in entry detail widget tests (5/5 pass, 2 new tests added)
 
 ---
 
