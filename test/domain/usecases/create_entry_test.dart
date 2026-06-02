@@ -54,8 +54,8 @@ void main() {
     });
 
     test('should_throw_on_empty_title', () async {
-      expect(
-        () => useCase.call(title: '', content: 'content'),
+      expectLater(
+        useCase.call(title: '', content: 'content'),
         throwsA(isA<ValidationFailure>()),
       );
     });

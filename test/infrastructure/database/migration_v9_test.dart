@@ -126,7 +126,8 @@ void main() {
         'SELECT name, color FROM tag_settings ORDER BY name',
       ).get();
 
-      expect(tagRows, hasLength(3));
+      // 4 system tags from v8 migration + 3 from v9 data-fill
+      expect(tagRows, hasLength(7));
 
       final tagMap = {
         for (final row in tagRows)
@@ -137,6 +138,11 @@ void main() {
       expect(tagMap['urgent'], '#E06C75');
       expect(tagMap['work'], '#61AFEF');
       expect(tagMap['personal'], '#98C379');
+      // System tags seeded by v8 migration
+      expect(tagMap['pendiente'], '#FFC107');
+      expect(tagMap['completada'], '#4CAF50');
+      expect(tagMap['favorito'], '#E53935');
+      expect(tagMap['archivado'], '#9E9E9E');
 
       await database.close();
     });
