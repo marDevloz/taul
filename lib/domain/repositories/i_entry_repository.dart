@@ -10,7 +10,6 @@ abstract class IEntryRepository {
   });
   Future<List<Entry>> search(String query, {int limit = 100});
   Future<Entry> update(Entry entry);
-  Future<void> updateTagsColors(String id, Map<String, String> tagsColors);
   Future<void> softDelete(String id);
   Future<void> hardDelete(String id);
 }

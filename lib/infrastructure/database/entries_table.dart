@@ -7,7 +7,6 @@ class Entries extends Table {
   TextColumn get content => text()();
   TextColumn get metadata => text()();
   TextColumn get tags => text()();
-  TextColumn? get tagsColor => text().nullable()();
   TextColumn? get secret => text().nullable()();
   BoolColumn get requiresAuth => boolean().withDefault(const Constant(false))();
   TextColumn? get encryptedSecret => text().nullable()();
