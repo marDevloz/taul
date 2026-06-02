@@ -2,7 +2,6 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter/services.dart'
     show
         Clipboard,
@@ -17,10 +16,13 @@ import 'package:taul/core/constants.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
+import 'package:taul/ui/widgets/rich_text_display.dart';
+import 'package:taul/ui/widgets/rich_text_editor.dart';
 import 'package:taul/ui/widgets/master_password_recovery_dialog.dart';
 import 'package:taul/ui/widgets/palette_picker.dart';
 
@@ -144,7 +146,10 @@ class EntryDetailView extends ConsumerWidget {
                 onPressed: () {
                   final entry = entryAsync.valueOrNull;
                   if (entry != null) {
-                    final text = '${entry.title}\n\n${entry.content}';
+                    final plainContent = RichTextHelper.documentToPlainText(
+                      RichTextHelper.getDocument(entry.content),
+                    );
+                    final text = '${entry.title}\n\n$plainContent';
                     Clipboard.setData(ClipboardData(text: text));
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -265,7 +270,6 @@ class EntryDetailView extends ConsumerWidget {
 
   void _showNoteEdit(BuildContext context, WidgetRef ref, Entry entry) {
     final titleCtrl = TextEditingController(text: entry.title);
-    final contentCtrl = TextEditingController(text: entry.content);
     final tagsCtrl = TextEditingController(text: entry.tags.join(', '));
     showModalBottomSheet(
       context: context,
@@ -273,6 +277,7 @@ class EntryDetailView extends ConsumerWidget {
       builder: (ctx) {
         var selectedType = entry.type;
         var isSaving = false;
+        var richContent = entry.content;
 
         return StatefulBuilder(
           builder: (context, setLocalState) => Padding(
@@ -302,13 +307,9 @@ class EntryDetailView extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: contentCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Contenido',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 5,
+                RichTextEditor(
+                  initialContent: entry.content,
+                  onChanged: (v) => setLocalState(() => richContent = v),
                 ),
                 const SizedBox(height: 12),
                 _TagsAutocompleteField(
@@ -381,7 +382,7 @@ class EntryDetailView extends ConsumerWidget {
                                 await ref.read(updateEntryProvider).call(
                                   entry,
                                   title: titleCtrl.text,
-                                  content: contentCtrl.text,
+                                  content: richContent,
                                   tags: tags,
                                   type: selectedType,
                                 );
@@ -470,10 +471,7 @@ class _NoteContent extends ConsumerWidget {
                     color: theme.colorScheme.onSurfaceVariant,
                   )),
           const SizedBox(height: 16),
-          MarkdownBody(
-            data: entry.content,
-            selectable: true,
-          ),
+          RichTextDisplay(content: entry.content),
           if (entry.tags.isNotEmpty) ...[
             const SizedBox(height: 16),
             Wrap(spacing: 6, children: entry.tags.map((t) {
