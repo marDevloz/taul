@@ -529,7 +529,10 @@ class _NoteContent extends ConsumerWidget {
     );
 
     if (selectedHex != null && context.mounted) {
-      await ref.read(saveTagSettingProvider).call(tagName, color: selectedHex);
+      await ref.read(saveTagSettingProvider).call(
+        tagName,
+        color: selectedHex.isEmpty ? null : selectedHex,
+      );
       ref.invalidate(tagSettingsListProvider);
     }
   }
@@ -1031,7 +1034,10 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
     );
 
     if (selectedHex != null && context.mounted) {
-      await ref.read(saveTagSettingProvider).call(tagName, color: selectedHex);
+      await ref.read(saveTagSettingProvider).call(
+        tagName,
+        color: selectedHex.isEmpty ? null : selectedHex,
+      );
       ref.invalidate(tagSettingsListProvider);
     }
   }

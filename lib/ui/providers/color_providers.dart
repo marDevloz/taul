@@ -63,5 +63,8 @@ final tagColorMapProvider = Provider.autoDispose<Map<String, Color>>((ref) {
 });
 
 Color _parseHex(String hex) {
+  if (hex.length < 2 || hex[0] != '#') {
+    return TagPalette.defaultGrey;
+  }
   return Color(int.parse(hex.substring(1), radix: 16) + 0xFF000000);
 }
