@@ -56,12 +56,12 @@ void main() {
         await tester.pumpWidget(createTestApp(isChange: false));
         await openDialog(tester);
 
-        expect(find.text('Set Up Master Password'), findsOneWidget);
-        expect(find.text('Master password'), findsOneWidget);
-        expect(find.text('Confirm password'), findsOneWidget);
-        expect(find.text('Hint (optional)'), findsOneWidget);
-        expect(find.text('Next'), findsOneWidget);
-        expect(find.text('Cancel'), findsOneWidget);
+        expect(find.text('Configurar Contraseña Maestra'), findsOneWidget);
+        expect(find.text('Contraseña maestra'), findsOneWidget);
+        expect(find.text('Confirmar contraseña'), findsOneWidget);
+        expect(find.text('Pista (opcional)'), findsOneWidget);
+        expect(find.text('Siguiente'), findsOneWidget);
+        expect(find.text('Cancelar'), findsOneWidget);
       });
 
       testWidgets('should_show_validation_error_for_short_password',
@@ -71,19 +71,19 @@ void main() {
 
         // Enter a short password
         await tester.enterText(
-          find.widgetWithText(TextField, 'Master password'),
+          find.widgetWithText(TextField, 'Contraseña maestra'),
           '1234567',
         );
         await tester.enterText(
-          find.widgetWithText(TextField, 'Confirm password'),
+          find.widgetWithText(TextField, 'Confirmar contraseña'),
           '1234567',
         );
 
         // Tap Next
-        await tester.tap(find.text('Next'));
+        await tester.tap(find.text('Siguiente'));
         await tester.pump();
 
-        expect(find.text('Minimum 8 characters'), findsWidgets);
+        expect(find.text('Mínimo 8 caracteres'), findsWidgets);
       });
 
       testWidgets('should_show_error_when_passwords_do_not_match',
@@ -92,18 +92,18 @@ void main() {
         await openDialog(tester);
 
         await tester.enterText(
-          find.widgetWithText(TextField, 'Master password'),
+          find.widgetWithText(TextField, 'Contraseña maestra'),
           'password123',
         );
         await tester.enterText(
-          find.widgetWithText(TextField, 'Confirm password'),
+          find.widgetWithText(TextField, 'Confirmar contraseña'),
           'different123',
         );
 
-        await tester.tap(find.text('Next'));
+        await tester.tap(find.text('Siguiente'));
         await tester.pump();
 
-        expect(find.text('Passwords do not match'), findsOneWidget);
+        expect(find.text('Las contraseñas no coinciden'), findsOneWidget);
       });
 
       testWidgets('should_advance_to_codes_step_after_valid_password',
@@ -113,16 +113,16 @@ void main() {
 
         // Fill in valid password
         await tester.enterText(
-          find.widgetWithText(TextField, 'Master password'),
+          find.widgetWithText(TextField, 'Contraseña maestra'),
           'validpass123',
         );
         await tester.enterText(
-          find.widgetWithText(TextField, 'Confirm password'),
+          find.widgetWithText(TextField, 'Confirmar contraseña'),
           'validpass123',
         );
 
         // Tap Next — this triggers generateBackupCodes
-        await tester.tap(find.text('Next'));
+        await tester.tap(find.text('Siguiente'));
         await tester.pump();
 
         // Wait for async backup code generation (fake auth is instant)
@@ -136,14 +136,14 @@ void main() {
         // Should now show backup codes step
         expect(
           find.text(
-            'Save these codes in a secure place. '
-            'They are your ONLY way to recover access if you forget your master password.',
+            'Guardá estos códigos en un lugar seguro. '
+            'Son tu ÚNICA forma de recuperar el acceso si olvidás tu contraseña maestra.',
           ),
           findsOneWidget,
         );
-        expect(find.text('Copy all'), findsOneWidget);
-        expect(find.text('I saved my codes in a secure place'), findsOneWidget);
-        final confirmButton = find.text('Confirm');
+        expect(find.text('Copiar todo'), findsOneWidget);
+        expect(find.text('Guardé mis códigos en un lugar seguro'), findsOneWidget);
+        final confirmButton = find.text('Confirmar');
         expect(confirmButton, findsOneWidget);
       }, timeout: const Timeout(Duration(seconds: 30)));
 
@@ -154,14 +154,14 @@ void main() {
 
         // Fill valid password and advance to codes step
         await tester.enterText(
-          find.widgetWithText(TextField, 'Master password'),
+          find.widgetWithText(TextField, 'Contraseña maestra'),
           'validpass123',
         );
         await tester.enterText(
-          find.widgetWithText(TextField, 'Confirm password'),
+          find.widgetWithText(TextField, 'Confirmar contraseña'),
           'validpass123',
         );
-        await tester.tap(find.text('Next'));
+        await tester.tap(find.text('Siguiente'));
         await tester.pump();
 
         await tester.runAsync(() async {
@@ -171,14 +171,14 @@ void main() {
         await tester.pump(const Duration(milliseconds: 200));
 
         // Should be on codes step
-        expect(find.text('Copy all'), findsOneWidget);
+        expect(find.text('Copiar todo'), findsOneWidget);
 
         // Tap the checkbox to confirm
         await tester.tap(find.byType(Checkbox));
         await tester.pump();
 
         // Confirm button should exist after checkbox is checked
-        expect(find.text('Confirm'), findsOneWidget);
+        expect(find.text('Confirmar'), findsOneWidget);
       }, timeout: const Timeout(Duration(seconds: 30)));
 
       testWidgets('should_store_backup_code_data_after_confirmation',
@@ -188,16 +188,16 @@ void main() {
 
         // Fill valid password
         await tester.enterText(
-          find.widgetWithText(TextField, 'Master password'),
+          find.widgetWithText(TextField, 'Contraseña maestra'),
           'validpass123',
         );
         await tester.enterText(
-          find.widgetWithText(TextField, 'Confirm password'),
+          find.widgetWithText(TextField, 'Confirmar contraseña'),
           'validpass123',
         );
 
         // Tap Next — this now generates DEK + codesWithWraps
-        await tester.tap(find.text('Next'));
+        await tester.tap(find.text('Siguiente'));
         await tester.pump();
 
         await tester.runAsync(() async {
@@ -207,12 +207,12 @@ void main() {
         await tester.pump(const Duration(milliseconds: 200));
 
         // Should be on codes step
-        expect(find.text('Copy all'), findsOneWidget);
+        expect(find.text('Copiar todo'), findsOneWidget);
 
         // Check confirmation and tap Confirm
         await tester.tap(find.byType(Checkbox));
         await tester.pump();
-        await tester.tap(find.text('Confirm'));
+        await tester.tap(find.text('Confirmar'));
         await tester.pump();
 
         await tester.runAsync(() async {
@@ -234,7 +234,7 @@ void main() {
         }
 
         // Dialog should have popped
-        expect(find.text('Set Up Master Password'), findsNothing);
+        expect(find.text('Configurar Contraseña Maestra'), findsNothing);
       }, timeout: const Timeout(Duration(seconds: 60)));
     });
 
@@ -244,9 +244,9 @@ void main() {
         await tester.pumpWidget(createTestApp(isChange: true));
         await openDialog(tester);
 
-        expect(find.text('Change Master Password'), findsOneWidget);
-        expect(find.text('Current master password'), findsOneWidget);
-        expect(find.text('Verify'), findsOneWidget);
+        expect(find.text('Cambiar Contraseña Maestra'), findsOneWidget);
+        expect(find.text('Contraseña maestra actual'), findsOneWidget);
+        expect(find.text('Verificar'), findsOneWidget);
       });
 
       testWidgets('should_show_validation_error_when_current_password_empty',
@@ -255,11 +255,11 @@ void main() {
         await openDialog(tester);
 
         // Tap Verify with empty password
-        await tester.tap(find.text('Verify'));
+        await tester.tap(find.text('Verificar'));
         await tester.pump();
 
         expect(
-          find.text('Enter your current master password'),
+          find.text('Ingresá tu contraseña maestra actual'),
           findsOneWidget,
         );
       });
@@ -291,11 +291,11 @@ void main() {
 
         // Enter correct current password
         await tester.enterText(
-          find.widgetWithText(TextField, 'Current master password'),
+          find.widgetWithText(TextField, 'Contraseña maestra actual'),
           'currentPass1',
         );
 
-        await tester.tap(find.text('Verify'));
+        await tester.tap(find.text('Verificar'));
         await tester.pump();
 
         // Wait for async verification (fake auth is instant)
@@ -306,10 +306,10 @@ void main() {
         await tester.pump(const Duration(milliseconds: 200));
 
         // Should show new password form
-        expect(find.text('New master password'), findsOneWidget);
-        expect(find.text('Confirm new password'), findsOneWidget);
-        expect(find.text('Change'), findsOneWidget);
-        expect(find.text('Back'), findsOneWidget);
+        expect(find.text('Nueva contraseña maestra'), findsOneWidget);
+        expect(find.text('Confirmar nueva contraseña'), findsOneWidget);
+        expect(find.text('Cambiar'), findsOneWidget);
+        expect(find.text('Volver'), findsOneWidget);
       });
 
       testWidgets('should_show_error_on_wrong_current_password',
@@ -331,11 +331,11 @@ void main() {
         await openDialog(tester);
 
         await tester.enterText(
-          find.widgetWithText(TextField, 'Current master password'),
+          find.widgetWithText(TextField, 'Contraseña maestra actual'),
           'wrongPassword1',
         );
 
-        await tester.tap(find.text('Verify'));
+        await tester.tap(find.text('Verificar'));
         await tester.pump();
 
         await tester.runAsync(() async {
@@ -344,7 +344,7 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 200));
 
-        expect(find.text('Current password is incorrect'), findsOneWidget);
+        expect(find.text('La contraseña actual es incorrecta'), findsOneWidget);
       });
     });
   });

@@ -38,16 +38,16 @@ void main() {
       // Let the FutureProvider resolve
       await tester.pump();
 
-      expect(find.text('Not configured'), findsOneWidget);
-      expect(find.text('Set Up Master Password'), findsOneWidget);
-      expect(find.text('Master Password'), findsOneWidget);
+      expect(find.text('No configurada'), findsOneWidget);
+      expect(find.text('Configurar Contraseña Maestra'), findsOneWidget);
+      expect(find.text('Contraseña Maestra'), findsOneWidget);
     });
 
     testWidgets('should_show_setup_button_when_not_configured', (tester) async {
       await tester.pumpWidget(createTestApp());
       await tester.pump();
 
-      final setupButton = find.text('Set Up Master Password');
+      final setupButton = find.text('Configurar Contraseña Maestra');
       expect(setupButton, findsOneWidget);
 
       // Verify it's a filled button
@@ -68,8 +68,8 @@ void main() {
       await tester.pumpWidget(createTestApp());
       await tester.pump();
 
-      expect(find.text('Configured'), findsOneWidget);
-      expect(find.text('Master password is active'), findsOneWidget);
+      expect(find.text('Configurada'), findsOneWidget);
+      expect(find.text('La contraseña maestra está activa'), findsOneWidget);
     });
 
     testWidgets('should_show_hint_when_configured', (tester) async {
@@ -86,7 +86,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('my recovery hint'), findsOneWidget);
-      expect(find.text('Hint'), findsOneWidget);
+      expect(find.text('Pista'), findsOneWidget);
     });
 
     testWidgets('should_show_remaining_codes_count', (tester) async {
@@ -102,7 +102,7 @@ void main() {
       await tester.pumpWidget(createTestApp());
       await tester.pump();
 
-      expect(find.textContaining('3 codes available'), findsOneWidget);
+      expect(find.textContaining('3 códigos disponibles'), findsOneWidget);
     });
 
     testWidgets('should_show_change_mp_option_when_configured',
@@ -119,7 +119,7 @@ void main() {
       await tester.pump();
 
       expect(
-        find.text('Change Master Password'),
+        find.text('Cambiar Contraseña Maestra'),
         findsOneWidget,
       );
     });
@@ -137,7 +137,7 @@ void main() {
       await tester.pumpWidget(createTestApp());
       await tester.pump();
 
-      expect(find.text('Edit Hint'), findsOneWidget);
+      expect(find.text('Editar Pista'), findsOneWidget);
     });
 
     testWidgets('should_show_regenerate_button_when_configured',
@@ -153,7 +153,7 @@ void main() {
       await tester.pumpWidget(createTestApp());
       await tester.pump();
 
-      expect(find.text('Regenerate Backup Codes'), findsOneWidget);
+      expect(find.text('Regenerar Códigos de Respaldo'), findsOneWidget);
     });
 
     testWidgets('should_show_delete_button_when_configured', (tester) async {
@@ -168,7 +168,10 @@ void main() {
       await tester.pumpWidget(createTestApp());
       await tester.pump();
 
-      expect(find.text('Delete Master Password'), findsOneWidget);
+      // Scroll down to reveal the delete button at the bottom of the ListView
+      final deleteButton = find.text('Eliminar Contraseña Maestra');
+      await tester.scrollUntilVisible(deleteButton, 200.0);
+      expect(deleteButton, findsOneWidget);
     });
 
     testWidgets('should_show_delete_confirmation_dialog', (tester) async {
@@ -183,17 +186,21 @@ void main() {
       await tester.pumpWidget(createTestApp());
       await tester.pump();
 
+      // Scroll down to reveal the delete button at the bottom of the ListView
+      final deleteButton = find.text('Eliminar Contraseña Maestra');
+      await tester.scrollUntilVisible(deleteButton, 200.0);
+
       // Tap the "Delete Master Password" button
-      await tester.tap(find.text('Delete Master Password'));
+      await tester.tap(deleteButton);
       // Wait for the async method to read protected count
       // then show the dialog
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
       // The DeleteMpDialog should now be shown
-      expect(find.text('Delete Master Password?'), findsOneWidget);
-      expect(find.text('Cancel'), findsWidgets);
-      expect(find.text('Delete'), findsOneWidget);
+      expect(find.text('¿Eliminar Contraseña Maestra?'), findsOneWidget);
+      expect(find.text('Cancelar'), findsWidgets);
+      expect(find.text('Eliminar'), findsOneWidget);
     }, timeout: const Timeout(Duration(seconds: 10)));
 
     testWidgets('should_not_show_configured_actions_when_not_configured',
@@ -202,10 +209,10 @@ void main() {
       await tester.pump();
 
       // These should NOT exist
-      expect(find.text('Change Master Password'), findsNothing);
-      expect(find.text('Edit Hint'), findsNothing);
-      expect(find.text('Regenerate Backup Codes'), findsNothing);
-      expect(find.text('Delete Master Password'), findsNothing);
+      expect(find.text('Cambiar Contraseña Maestra'), findsNothing);
+      expect(find.text('Editar Pista'), findsNothing);
+      expect(find.text('Regenerar Códigos de Respaldo'), findsNothing);
+      expect(find.text('Eliminar Contraseña Maestra'), findsNothing);
     });
 
     testWidgets('should_navigate_back_on_back_button', (tester) async {
@@ -241,15 +248,15 @@ void main() {
       await tester.pump();
 
       // Tap regenerar
-      await tester.tap(find.text('Regenerate Backup Codes'));
+      await tester.tap(find.text('Regenerar Códigos de Respaldo'));
       await tester.pump();
 
       // Confirmation dialog
-      expect(find.text('Regenerate backup codes'), findsOneWidget);
-      expect(find.text('Regenerate'), findsOneWidget);
+      expect(find.text('Regenerar códigos de respaldo'), findsOneWidget);
+      expect(find.text('Regenerar'), findsOneWidget);
 
       // Confirm
-      await tester.tap(find.text('Regenerate'));
+      await tester.tap(find.text('Regenerar'));
       await tester.pump();
 
       // MP prompt should appear (title: 'Master password')
@@ -272,9 +279,9 @@ void main() {
       await tester.pump();
 
       // Tap regenerar → confirm → get MP prompt
-      await tester.tap(find.text('Regenerate Backup Codes'));
+      await tester.tap(find.text('Regenerar Códigos de Respaldo'));
       await tester.pump();
-      await tester.tap(find.text('Regenerate'));
+      await tester.tap(find.text('Regenerar'));
       await tester.pump();
 
       // Verify MP prompt is showing
@@ -287,7 +294,7 @@ void main() {
 
       // MP prompt should be gone, back to settings
       expect(find.text('Master password'), findsNothing);
-      expect(find.text('Regenerate Backup Codes'), findsOneWidget);
+      expect(find.text('Regenerar Códigos de Respaldo'), findsOneWidget);
     });
   });
 }

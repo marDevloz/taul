@@ -61,11 +61,11 @@ void main() {
     String code,
   ) async {
     await tester.enterText(
-      find.widgetWithText(TextField, 'Backup code'),
+      find.widgetWithText(TextField, 'Código de respaldo'),
       code,
     );
 
-    await tester.tap(find.text('Verify'));
+    await tester.tap(find.text('Verificar'));
     await tester.pump();
 
     // Wait for Argon2id verification + DB consumption
@@ -83,15 +83,15 @@ void main() {
     String password = 'new-password-123',
   }) async {
     await tester.enterText(
-      find.widgetWithText(TextField, 'New master password'),
+      find.widgetWithText(TextField, 'Nueva contraseña maestra'),
       password,
     );
     await tester.enterText(
-      find.widgetWithText(TextField, 'Confirm new password'),
+      find.widgetWithText(TextField, 'Confirmar nueva contraseña'),
       password,
     );
 
-    await tester.tap(find.text('Set Password'));
+    await tester.tap(find.text('Establecer Contraseña'));
     await tester.pump();
 
     // Wait for crypto operations + DB write
@@ -112,11 +112,11 @@ void main() {
       await tester.pumpWidget(createTestApp());
       await openDialog(tester);
 
-      expect(find.text('Recover Master Password'), findsOneWidget);
+      expect(find.text('Recuperar Contraseña Maestra'), findsOneWidget);
       expect(find.byIcon(Icons.vpn_key_outlined), findsOneWidget);
-      expect(find.text('Backup code'), findsOneWidget);
-      expect(find.text('Verify'), findsOneWidget);
-      expect(find.text('Cancel'), findsOneWidget);
+      expect(find.text('Código de respaldo'), findsOneWidget);
+      expect(find.text('Verificar'), findsOneWidget);
+      expect(find.text('Cancelar'), findsOneWidget);
     });
 
     testWidgets('should_show_remaining_codes_count', (tester) async {
@@ -128,7 +128,7 @@ void main() {
       await openDialog(tester);
 
       // Should show "3 backup codes remaining."
-      expect(find.textContaining('3 backup codes'), findsOneWidget);
+      expect(find.textContaining('3 código'), findsOneWidget);
     });
 
     testWidgets('should_show_error_for_empty_code', (tester) async {
@@ -138,10 +138,10 @@ void main() {
       await openDialog(tester);
 
       // Tap Verify with empty field
-      await tester.tap(find.text('Verify'));
+      await tester.tap(find.text('Verificar'));
       await tester.pump();
 
-      expect(find.text('Enter a backup code'), findsOneWidget);
+      expect(find.text('Ingresá un código de respaldo'), findsOneWidget);
     });
 
     testWidgets('should_show_error_for_wrong_code', (tester) async {
@@ -154,11 +154,11 @@ void main() {
 
       // Enter a wrong code
       await tester.enterText(
-        find.widgetWithText(TextField, 'Backup code'),
+        find.widgetWithText(TextField, 'Código de respaldo'),
         'ZZZZ-9999',
       );
 
-      await tester.tap(find.text('Verify'));
+      await tester.tap(find.text('Verificar'));
       await tester.pump();
 
       // Wait for Argon2id verification (10 codes to scan)
@@ -169,7 +169,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       // Should show error about invalid code
-      expect(find.textContaining('Invalid code'), findsOneWidget);
+      expect(find.textContaining('Código inválido'), findsOneWidget);
     });
 
     testWidgets('should_navigate_to_new_mp_form_on_valid_code',
@@ -184,11 +184,11 @@ void main() {
 
       // Enter a valid backup code
       await tester.enterText(
-        find.widgetWithText(TextField, 'Backup code'),
+        find.widgetWithText(TextField, 'Código de respaldo'),
         codes.plainCodes[0],
       );
 
-      await tester.tap(find.text('Verify'));
+      await tester.tap(find.text('Verificar'));
       await tester.pump();
 
       // Wait for verification (scan fast hashes) + consumption (DB write)
@@ -199,13 +199,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       // Should show new MP form
-      expect(find.text('Set New Master Password'), findsOneWidget);
-      expect(find.text('Code verified. Create your new master password.'),
+      expect(find.text('Configurar Nueva Contraseña Maestra'), findsOneWidget);
+      expect(find.text('Código verificado. Creá tu nueva contraseña maestra.'),
           findsOneWidget);
-      expect(find.text('New master password'), findsOneWidget);
-      expect(find.text('Confirm new password'), findsOneWidget);
-      expect(find.text('Hint (optional)'), findsOneWidget);
-      expect(find.text('Set Password'), findsOneWidget);
+      expect(find.text('Nueva contraseña maestra'), findsOneWidget);
+      expect(find.text('Confirmar nueva contraseña'), findsOneWidget);
+      expect(find.text('Pista (opcional)'), findsOneWidget);
+      expect(find.text('Establecer Contraseña'), findsOneWidget);
     });
 
     testWidgets('should_have_cancel_button', (tester) async {
@@ -227,9 +227,9 @@ void main() {
       await tester.pump();
 
       // The Cancel button should exist
-      expect(find.text('Cancel'), findsOneWidget);
+      expect(find.text('Cancelar'), findsOneWidget);
       // The dialog title should be visible
-      expect(find.text('Recover Master Password'), findsOneWidget);
+      expect(find.text('Recuperar Contraseña Maestra'), findsOneWidget);
     });
 
     testWidgets('should_show_error_when_no_backup_codes', (tester) async {
@@ -240,15 +240,15 @@ void main() {
       await openDialog(tester);
 
       await tester.enterText(
-        find.widgetWithText(TextField, 'Backup code'),
+        find.widgetWithText(TextField, 'Código de respaldo'),
         'ABCD-1234',
       );
 
-      await tester.tap(find.text('Verify'));
+      await tester.tap(find.text('Verificar'));
       await tester.pump();
 
       expect(
-        find.text('No backup codes remaining. Recovery is not possible.'),
+        find.text('No quedan códigos de respaldo. No es posible recuperar.'),
         findsOneWidget,
       );
     });
@@ -291,7 +291,7 @@ void main() {
 
           // ── Assert: DEK preserved ──
           // Dialog should have popped
-          expect(find.text('Recover Master Password'), findsNothing);
+          expect(find.text('Recuperar Contraseña Maestra'), findsNothing);
 
           // Check Notifier cached the preserved DEK
           final container = ProviderScope.containerOf(
@@ -328,7 +328,7 @@ void main() {
           await setNewPassword(tester);
 
           // ── Assert: new DEK generated, new backup data saved ──
-          expect(find.text('Recover Master Password'), findsNothing);
+          expect(find.text('Recuperar Contraseña Maestra'), findsNothing);
 
           // New backup_code_data should exist (freshly generated)
           final config = await store.readFull();
@@ -373,7 +373,7 @@ void main() {
 
           // ── Assert: both arrays consumed by 1 ──
           // We're on the new-password form now, so consumption has happened
-          expect(find.text('Set New Master Password'), findsOneWidget);
+          expect(find.text('Configurar Nueva Contraseña Maestra'), findsOneWidget);
 
           final hashesAfter = await store.readBackupCodeHashes();
           final dataAfter = await store.readBackupCodeData();
