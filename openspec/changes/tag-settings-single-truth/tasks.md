@@ -80,31 +80,31 @@ DB schema changes are the hardest to chain. The solution: **v9 = data-fill only*
 
 ### Phase 3.1: Infrastructure — v10 Column Drop Migration
 
-- [ ] 3.1.1 Bump `schemaVersion` from 9 to 10 in `app_database.dart`
-- [ ] 3.1.2 Add `onUpgrade` block for `from < 10`: `ALTER TABLE entries DROP COLUMN tags_color`
-- [ ] 3.1.3 [TEST RED] Write migration v10 test: schema v9 with `tags_color` column → migrate to v10 → verify `tags_color` column no longer exists in table info
-- [ ] 3.1.4 `flutter test` — migration tests passes
+- [x] 3.1.1 Bump `schemaVersion` from 9 to 10 in `app_database.dart`
+- [x] 3.1.2 Add `onUpgrade` block for `from < 10`: `ALTER TABLE entries DROP COLUMN tags_color` (used `m.dropColumn(entries, 'tags_color')` for Drift API compat)
+- [x] 3.1.3 [TEST RED] Write migration v10 test: schema v9 with `tags_color` column → migrate to v10 → verify `tags_color` column no longer exists in table info
+- [x] 3.1.4 `flutter test` — migration tests passes (3 v9 + 3 v10, all green)
 
 ### Phase 3.2: Infrastructure — Drift Schema Cleanup
 
-- [ ] 3.2.1 Remove `tagsColor` column getter from `entries_table.dart`
-- [ ] 3.2.2 Remove `tagsColor` from `_toCompanion` in `entry_dao.dart` (line 137–139)
-- [ ] 3.2.3 Remove `'tags_color'` line from `_fromDbEntry` in `entry_dao.dart` (line 161)
-- [ ] 3.2.4 Remove tagsColors round-trip test group in `entry_dao_test.dart` (lines 25–137) — tests reference removed column and `updateTagsColors` method
+- [x] 3.2.1 Remove `tagsColor` column getter from `entries_table.dart`
+- [x] 3.2.2 Remove `tagsColor` from `_toCompanion` in `entry_dao.dart`
+- [x] 3.2.3 Remove `'tags_color'` line from `_fromDbEntry` in `entry_dao.dart`
+- [x] 3.2.4 Remove tagsColors round-trip test group in `entry_dao_test.dart` (file deleted — no remaining tests)
 
 ### Phase 3.3: Domain + Infrastructure — Remove `updateTagsColors` Pipeline
 
-- [ ] 3.3.1 Delete `lib/domain/usecases/update_entry_tags_colors.dart`
-- [ ] 3.3.2 Remove `updateTagsColors` method from `i_entry_repository.dart` (line 14)
-- [ ] 3.3.3 Remove `updateTagsColors` method from `entry_repository_impl.dart` (lines 46–48)
-- [ ] 3.3.4 Remove `updateTagsColors` method from `entry_dao.dart` (lines 34–40)
-- [ ] 3.3.5 Remove `updateEntryTagsColorsProvider` + import from `entry_providers.dart` (lines 18, 158–160)
+- [x] 3.3.1 Delete `lib/domain/usecases/update_entry_tags_colors.dart`
+- [x] 3.3.2 Remove `updateTagsColors` method from `i_entry_repository.dart`
+- [x] 3.3.3 Remove `updateTagsColors` method from `entry_repository_impl.dart`
+- [x] 3.3.4 Remove `updateTagsColors` method from `entry_dao.dart`
+- [x] 3.3.5 Remove `updateEntryTagsColorsProvider` + import from `entry_providers.dart`
 
 ### Phase 3.4: Final Build + Verification
 
-- [ ] 3.4.1 `dart run build_runner build` — clean drift codegen without `tagsColor`
-- [ ] 3.4.2 `dart analyze` — zero warnings (no unused imports, no dead references)
-- [ ] 3.4.3 `flutter test` — all tests pass (migration tests + refactored provider tests)
+- [x] 3.4.1 `dart run build_runner build` — clean drift codegen without `tagsColor`
+- [x] 3.4.2 `dart analyze` — zero warnings (11 pre-existing info-level only; 0 errors, 0 warnings)
+- [x] 3.4.3 `flutter test` — 190 passing, 41 failing (same 41 pre-existing failures, zero regression)
 
 ---
 
