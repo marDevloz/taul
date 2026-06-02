@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:taul/infrastructure/database/app_database.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:taul/ui/screens/entry_detail_view.dart';
+import 'package:taul/ui/widgets/palette_picker.dart';
 import '../../helpers/test_auth.dart';
 
 void main() {
@@ -108,6 +110,93 @@ void main() {
       expect(find.text('Test Service'), findsOneWidget);
       // Password field should be present
       expect(find.text('Contraseña'), findsOneWidget);
+    });
+  });
+
+  group('T-17: EntryDetailView palette picker tests', () {
+    /// Creates a note entry with a tag for palette picker testing.
+    Future<void> createEntryWithTag({String tag = 'urgente'}) async {
+      final now = DateTime.now();
+      await database.into(database.entries).insert(
+        Entry(
+          id: testEntryId,
+          type: 'NOTA',
+          title: 'Test Note',
+          content: 'Content with a tag',
+          metadata: '{}',
+          tags: '["$tag"]',
+          requiresAuth: false,
+          createdAt: now,
+          updatedAt: now,
+          version: 1,
+        ),
+      );
+    }
+
+    testWidgets('should_show_palette_picker_on_tag_long_press',
+        (tester) async {
+      await createEntryWithTag();
+
+      await tester.pumpWidget(createTestApp());
+      await pumpAndSettle(tester);
+
+      // Verify the tag chip is displayed
+      expect(find.text('urgente'), findsOneWidget);
+
+      // Long-press the tag chip to open the palette picker
+      await tester.longPress(find.text('urgente'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Verify the palette picker dialog is shown
+      expect(find.byType(PalettePicker), findsOneWidget);
+      expect(find.textContaining('Color for'), findsOneWidget);
+
+      // Dismiss dialog by tapping outside
+      await tester.tapAt(const Offset(0, 0));
+      await tester.pumpAndSettle();
+
+      // Verify dialog is dismissed
+      expect(find.byType(PalettePicker), findsNothing);
+    });
+
+    testWidgets('should_show_palette_picker_in_credential_view',
+        (tester) async {
+      final now = DateTime.now();
+      await database.into(database.entries).insert(
+        Entry(
+          id: testEntryId,
+          type: 'CREDENCIAL',
+          title: 'Test Service',
+          content: '',
+          metadata: '{"username":"testuser","url":"https://test.com"}',
+          tags: '["urgente"]',
+          requiresAuth: false,
+          createdAt: now,
+          updatedAt: now,
+          version: 1,
+        ),
+      );
+
+      await tester.pumpWidget(createTestApp());
+      await pumpAndSettle(tester);
+
+      // Verify the tag chip is displayed
+      expect(find.text('urgente'), findsOneWidget);
+
+      // Long-press the tag chip to open the palette picker
+      await tester.longPress(find.text('urgente'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Verify the palette picker dialog is shown
+      expect(find.byType(PalettePicker), findsOneWidget);
+      expect(find.textContaining('Color for'), findsOneWidget);
+
+      // Dismiss dialog by tapping outside
+      await tester.tapAt(const Offset(0, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(PalettePicker), findsNothing);
     });
   });
 }

@@ -26,14 +26,6 @@ class EntryDao {
     return entry;
   }
 
-  Future<void> updateTagsColors(String id, Map<String, String> tagsColors) async {
-    final tagsColorValue =
-        tagsColors.isEmpty ? const Value(null) : Value(jsonEncode(tagsColors));
-    await (_database.update(_database.entries)
-      ..where((t) => t.id.equals(id)))
-        .write(db.EntriesCompanion(tagsColor: tagsColorValue));
-  }
-
   Future<void> delete(String id) async {
     await (_database.delete(_database.entries)
       ..where((t) => t.id.equals(id)))
@@ -118,9 +110,6 @@ class EntryDao {
       content: Value(entry.content),
       metadata: Value(jsonEncode(entry.metadata)),
       tags: Value(jsonEncode(entry.tags)),
-      tagsColor: entry.tagsColors.isEmpty
-          ? const Value(null)
-          : Value(jsonEncode(entry.tagsColors)),
       secret: Value(entry.secret),
       requiresAuth: Value(entry.requiresAuth),
       encryptedSecret: Value(entry.encryptedSecret),
@@ -141,7 +130,6 @@ class EntryDao {
       'content': row.content,
       'metadata': row.metadata,
       'tags': row.tags,
-      'tags_color': row.tagsColor,
       'secret': row.secret,
       'requiresAuth': row.requiresAuth,
       'encryptedSecret': row.encryptedSecret,

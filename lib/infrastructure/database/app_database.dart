@@ -23,7 +23,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.custom(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -70,22 +70,30 @@ class AppDatabase extends _$AppDatabase {
             await customInsert('ALTER TABLE entries DROP COLUMN topic_key');
           }
           if (from < 6) {
-            await m.addColumn(entries, entries.tagsColor);
+            await customInsert(
+              'ALTER TABLE entries ADD COLUMN tags_color TEXT',
+            );
           }
           if (from < 7) {
             // Create tag_settings table
             await m.createTable(tagSettings);
 
-            // Copy existing per-entry tag colors into tag_settings
-            final entriesRows = await select(entries).get();
+            // Copy existing per-entry tag colors into tag_settings.
+            // Use raw SQL because tags_color column is dropped at v10 and no
+            // longer present in the Drift table definition.
+            final entryRows = await customSelect(
+              'SELECT id, tags, tags_color FROM entries',
+            ).get();
             final seenTags = <String, String?>{}; // tag name → color
-            for (final entry in entriesRows) {
+            for (final row in entryRows) {
+              final tagsRaw = row.read<String>('tags');
               final tagsList =
-                  List<String>.from(jsonDecode(entry.tags) as List);
-              if (entry.tagsColor != null) {
+                  List<String>.from(jsonDecode(tagsRaw) as List);
+              final tagsColorRaw = row.read<String?>('tags_color');
+              if (tagsColorRaw != null) {
                 final colors = Map<String, String>.from(
                   Map<String, dynamic>.from(
-                    jsonDecode(entry.tagsColor!) as Map,
+                    jsonDecode(tagsColorRaw) as Map,
                   ).map((k, v) => MapEntry(k, v as String)),
                 );
                 for (final tag in tagsList) {
@@ -108,6 +116,45 @@ class AppDatabase extends _$AppDatabase {
                 ),
               );
             }
+          }
+          if (from < 9) {
+            // Data-fill: migrate colors from entries.tags_color to tag_settings.
+            // Only fills where tag_settings.color is null — idempotent.
+            // Use raw SQL because tags_color column is dropped at v10 and no
+            // longer present in the Drift table definition.
+            final entryRows = await customSelect(
+              'SELECT id, tags, tags_color FROM entries',
+            ).get();
+            final seen = <String, String?>{};
+            for (final row in entryRows) {
+              final tagsColorRaw = row.read<String?>('tags_color');
+              if (tagsColorRaw == null) continue;
+              final colors = Map<String, String>.from(
+                Map<String, dynamic>.from(
+                  jsonDecode(tagsColorRaw) as Map,
+                ).map((k, v) => MapEntry(k, v as String)),
+              );
+              for (final tagName in colors.keys) {
+                seen.putIfAbsent(tagName, () => colors[tagName]);
+              }
+            }
+            for (final entry in seen.entries) {
+              if (entry.value == null) continue;
+              final existing = await (select(tagSettings)
+                ..where((t) => t.name.equals(entry.key)))
+                .getSingleOrNull();
+              if (existing == null || existing.color == null) {
+                await into(tagSettings).insertOnConflictUpdate(
+                  TagSettingsCompanion.insert(
+                    name: entry.key,
+                    color: Value(entry.value!),
+                  ),
+                );
+              }
+            }
+          }
+          if (from < 10) {
+            await m.dropColumn(entries, 'tags_color');
           }
         },
         beforeOpen: (_) async {
