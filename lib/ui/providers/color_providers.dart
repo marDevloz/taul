@@ -18,8 +18,9 @@ final entryDisplayColorProvider =
   final entry = ref.watch(entryDetailProvider(entryId)).valueOrNull;
   if (entry == null || entry.tags.isEmpty) return null;
 
+  final tagMap = ref.watch(tagSettingsMapProvider);
   final matched = entry.tags
-      .map((t) => entry.tagsColors[t])
+      .map((t) => tagMap[t.toLowerCase()]?.color)
       .whereType<String>()
       .map(_parseHex)
       .toList();
@@ -30,15 +31,16 @@ final entryDisplayColorProvider =
 
 /// Resolves the color for a specific tag within a specific entry.
 ///
-/// Parameters: (entryId, tag).
-/// Returns null if the tag has no color assigned in that entry.
+/// Parameters: (entryId, tag). The entryId parameter is kept for
+/// call-site compatibility but is not used internally — color is
+/// resolved from the canonical [tagSettingsMapProvider].
+/// Returns null if the tag has no color assigned.
 final tagColorForEntryProvider =
     Provider.autoDispose.family<Color?, (String entryId, String tag)>(
   (ref, params) {
-    final (entryId, tag) = params;
-    final entry = ref.watch(entryDetailProvider(entryId)).valueOrNull;
-    if (entry == null) return null;
-    final hex = entry.tagsColors[tag];
+    final (_, tag) = params;
+    final tagMap = ref.watch(tagSettingsMapProvider);
+    final hex = tagMap[tag.toLowerCase()]?.color;
     if (hex == null) return null;
     return _parseHex(hex);
   },

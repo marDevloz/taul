@@ -23,7 +23,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.custom(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -107,6 +107,37 @@ class AppDatabase extends _$AppDatabase {
                   color: Value.absentIfNull(entry.value),
                 ),
               );
+            }
+          }
+          if (from < 9) {
+            // Data-fill: migrate colors from entries.tags_color to tag_settings.
+            // Only fills where tag_settings.color is null — idempotent.
+            final rows = await select(entries).get();
+            final seen = <String, String?>{};
+            for (final row in rows) {
+              if (row.tagsColor == null) continue;
+              final colors = Map<String, String>.from(
+                Map<String, dynamic>.from(
+                  jsonDecode(row.tagsColor!) as Map,
+                ).map((k, v) => MapEntry(k, v as String)),
+              );
+              for (final tagName in colors.keys) {
+                seen.putIfAbsent(tagName, () => colors[tagName]);
+              }
+            }
+            for (final entry in seen.entries) {
+              if (entry.value == null) continue;
+              final existing = await (select(tagSettings)
+                ..where((t) => t.name.equals(entry.key)))
+                .getSingleOrNull();
+              if (existing == null || existing.color == null) {
+                await into(tagSettings).insertOnConflictUpdate(
+                  TagSettingsCompanion.insert(
+                    name: entry.key,
+                    color: Value(entry.value!),
+                  ),
+                );
+              }
             }
           }
         },

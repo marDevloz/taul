@@ -36,23 +36,23 @@ DB schema changes are the hardest to chain. The solution: **v9 = data-fill only*
 
 ### Phase 1.1: Infrastructure — v9 Data-fill Migration
 
-- [ ] 1.1.1 Bump `schemaVersion` from 8 to 9 in `app_database.dart`
-- [ ] 1.1.2 Add `onUpgrade` block for `from < 9`: scan `entries.tags_color`, deduplicate by tag name, write to `tag_settings.color` where null. Use drift typed queries (column still present in table def).
-- [ ] 1.1.3 [TEST RED] Write migration v9 test: `AppDatabase.custom()` with schema v8 → insert entries with `tags_color` → migrate to v9 → verify data in `tag_settings` matches deduplicated expected values → verify v9 runs idempotently
-- [ ] 1.1.4 `flutter test` — migration test passes
+- [x] 1.1.1 Bump `schemaVersion` from 7 to 9 in `app_database.dart` (current schema was 7, bumped directly to 9)
+- [x] 1.1.2 Add `onUpgrade` block for `from < 9`: scan `entries.tags_color`, deduplicate by tag name, write to `tag_settings.color` where null. Uses drift typed queries.
+- [x] 1.1.3 [TEST RED] Write migration v9 test: `NativeDatabase.opened()` with raw sqlite3 v7 schema → insert entries with `tags_color` → migrate to v9 → verify data in `tag_settings` matches deduplicated expected values → verify v9 runs idempotently
+- [x] 1.1.4 `flutter test` — migration test passes
 
 ### Phase 1.2: UI — Reader Providers Switch
 
-- [ ] 1.2.1 [TEST RED] Write unit test for `entryDisplayColorProvider`: mock `entryDetailProvider` (entry with tags) + `tagSettingsMapProvider` (tag→color map). Verify mix color output for: 0 tags → null, N tags with colors → `TagColorMixer.mix` result, tags without colors → `TagPalette.defaultGrey`
-- [ ] 1.2.2 [TEST RED] Write unit test for `tagColorForEntryProvider`: mock `tagSettingsMapProvider`. Verify resolved color for matching tag → `Color`, unknown tag → null
-- [ ] 1.2.3 Switch `entryDisplayColorProvider` in `color_providers.dart`: add `ref.watch(tagSettingsMapProvider)`, replace `entry.tagsColors[t]` with `tagMap[t.toLowerCase()]?.color`
-- [ ] 1.2.4 Switch `tagColorForEntryProvider` in `color_providers.dart`: add `ref.watch(tagSettingsMapProvider)`, replace `entry.tagsColors[tag]` with `tagMap[tag.toLowerCase()]?.color`. Drop unused `entryId` param internally (keep signature for call-site compat).
-- [ ] 1.2.5 `flutter test` — new unit tests pass, no regressions
+- [x] 1.2.1 [TEST RED] Write unit test for `entryDisplayColorProvider`: mock `entryDetailProvider` (entry with tags) + `tagSettingsMapProvider` (tag→color map). Verify mix color output for: 0 tags → null, N tags with colors → `TagColorMixer.mix` result, tags without colors → `TagPalette.defaultGrey`
+- [x] 1.2.2 [TEST RED] Write unit test for `tagColorForEntryProvider`: mock `tagSettingsMapProvider`. Verify resolved color for matching tag → `Color`, unknown tag → null
+- [x] 1.2.3 Switch `entryDisplayColorProvider` in `color_providers.dart`: add `ref.watch(tagSettingsMapProvider)`, replace `entry.tagsColors[t]` with `tagMap[t.toLowerCase()]?.color`
+- [x] 1.2.4 Switch `tagColorForEntryProvider` in `color_providers.dart`: add `ref.watch(tagSettingsMapProvider)`, replace `entry.tagsColors[tag]` with `tagMap[tag.toLowerCase()]?.color`. Drop unused `entryId` param internally (keep signature for call-site compat).
+- [x] 1.2.5 `flutter test` — new unit tests pass, no regressions
 
 ### PR 1 Verification
 
-- [ ] V1.1 `dart analyze` — zero warnings
-- [ ] V1.2 `flutter test` — all tests pass
+- [x] V1.1 `dart analyze` — zero warnings
+- [ ] V1.2 `flutter test` — all tests pass (pre-existing timing test in tag_color_mixer_test.dart fails)
 
 ---
 
