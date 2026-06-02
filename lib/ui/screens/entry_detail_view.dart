@@ -207,7 +207,9 @@ class EntryDetailView extends ConsumerWidget {
                       ),
                     ),
                   ),
-                content,
+                // Force full width even when content text is short,
+                // so the background ColoredBox fills the whole card.
+                SizedBox(width: double.infinity, child: content),
               ],
             ),
           );
@@ -502,14 +504,6 @@ class _NoteContent extends ConsumerWidget {
       ),
     );
 
-    if (isWide) {
-      return Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: body,
-        ),
-      );
-    }
     return body;
   }
 
@@ -660,14 +654,6 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
       ),
     );
 
-    if (isWide) {
-      return Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: body,
-        ),
-      );
-    }
     return body;
   }
 
