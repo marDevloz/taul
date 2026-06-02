@@ -209,5 +209,54 @@ void main() {
       expect(results.length, 1);
       expect(results.first.id, 'search-4');
     });
+
+    test('should_exclude_archived_entries_when_excludeArchived_true', () async {
+      await repository.create(Entry(
+        id: 'repo-1',
+        type: EntryType.note,
+        title: 'Normal',
+        content: 'Content',
+        tags: ['work'],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+      await repository.create(Entry(
+        id: 'repo-2',
+        type: EntryType.note,
+        title: 'Archived',
+        content: 'Content',
+        tags: ['archivado'],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+
+      final entries = await repository.list(excludeArchived: true);
+      expect(entries, hasLength(1));
+      expect(entries.first.id, 'repo-1');
+    });
+
+    test('should_include_all_entries_when_excludeArchived_false', () async {
+      await repository.create(Entry(
+        id: 'repo-3',
+        type: EntryType.note,
+        title: 'Normal',
+        content: 'Content',
+        tags: ['work'],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+      await repository.create(Entry(
+        id: 'repo-4',
+        type: EntryType.note,
+        title: 'Archived',
+        content: 'Content',
+        tags: ['archivado'],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+
+      final entries = await repository.list(excludeArchived: false);
+      expect(entries, hasLength(2));
+    });
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:taul/core/credential_parser.dart';
+import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/widgets/entry_expanded_content.dart';
@@ -19,6 +20,10 @@ class EntryCard extends StatelessWidget {
   final VoidCallback? onDoubleTapGated;
   final bool isSelected;
   final VoidCallback? onLongPress;
+  final VoidCallback? onToggleFavorito;
+  final VoidCallback? onToggleArchivado;
+  final bool isFavorito;
+  final bool isArchivado;
 
   const EntryCard({
     super.key,
@@ -35,6 +40,10 @@ class EntryCard extends StatelessWidget {
     this.onDoubleTapGated,
     this.isSelected = false,
     this.onLongPress,
+    this.onToggleFavorito,
+    this.onToggleArchivado,
+    this.isFavorito = false,
+    this.isArchivado = false,
   });
 
   IconData get _typeIcon {
@@ -43,6 +52,7 @@ class EntryCard extends StatelessWidget {
       EntryType.note => Icons.description,
       EntryType.idea => Icons.lightbulb,
       EntryType.credential => Icons.lock,
+      EntryType.task => Icons.checklist,
     };
   }
 
@@ -50,7 +60,9 @@ class EntryCard extends StatelessWidget {
     if (entry.type == EntryType.credential && entry.metadata.containsKey('username')) {
       return CredentialParser.maskUsername(entry.metadata['username']!);
     }
-    return entry.content;
+    if (entry.content.isEmpty) return '';
+    final doc = RichTextHelper.getDocument(entry.content);
+    return RichTextHelper.documentToPlainText(doc);
   }
 
   bool get _isExpandable => entry.type != EntryType.credential;
@@ -127,13 +139,10 @@ class EntryCard extends StatelessWidget {
                 ListTile(
                   leading: Icon(_typeIcon, color: theme.colorScheme.primary),
                   title: Text(
-                    entry.title.isNotEmpty ? entry.title : '(sin título)',
+                    entry.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
-                      color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
-                    ),
+                    style: theme.textTheme.titleSmall,
                   ),
                   subtitle: subtitle ?? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,33 +171,75 @@ class EntryCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall,
                         ),
+                      // Show completedAt timestamp if present
+                      if (entry.completedAt != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Completada: ${_formatDate(entry.completedAt!)}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
-                  trailing: trailingAction ??
-                      (isExpanded
-                          ? SizedBox(
-                              width: 32,
-                              height: 32,
-                              child: IconButton(
-                                icon: Icon(Icons.copy, size: 16, color: theme.colorScheme.primary),
-                                onPressed: () {
-                                  final text = '${entry.title}\n\n${entry.content}';
-                                  Clipboard.setData(ClipboardData(text: text));
-                                  ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Contenido copiado'),
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                                padding: EdgeInsets.zero,
-                                tooltip: 'Copiar título y contenido',
-                              ),
-                            )
-                          : Text(
-                              _formatDate(entry.updatedAt),
-                              style: theme.textTheme.labelSmall,
-                            )),
+                  trailing: trailingAction ?? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Favorito toggle
+                      if (onToggleFavorito != null)
+                        GestureDetector(
+                          onTap: onToggleFavorito,
+                          child: Icon(
+                            isFavorito ? Icons.star : Icons.star_border,
+                            size: 20,
+                            color: isFavorito ? Colors.amber : theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      const SizedBox(width: 4),
+                      // Archivado toggle
+                      if (onToggleArchivado != null)
+                        GestureDetector(
+                          onTap: onToggleArchivado,
+                          child: Icon(
+                            isArchivado ? Icons.archive : Icons.archive_outlined,
+                            size: 20,
+                            color: isArchivado ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      const SizedBox(width: 4),
+                      if (isExpanded)
+                        SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: IconButton(
+                            icon: Icon(Icons.copy, size: 16, color: theme.colorScheme.primary),
+                            onPressed: () {
+                              final plainContent = RichTextHelper.documentToPlainText(
+                                RichTextHelper.getDocument(entry.content),
+                              );
+                              final text = '${entry.title}\n\n$plainContent';
+                              Clipboard.setData(ClipboardData(text: text));
+                              ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                                const SnackBar(
+                                  content: Text('Contenido copiado'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            padding: EdgeInsets.zero,
+                            tooltip: 'Copiar título y contenido',
+                          ),
+                        )
+                      else
+                        Text(
+                          _formatDate(entry.updatedAt),
+                          style: theme.textTheme.labelSmall,
+                        ),
+                    ],
+                  ),
                 ),
                 AnimatedSize(
                   duration: const Duration(milliseconds: 200),
@@ -288,13 +339,10 @@ class EntryCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    entry.title.isNotEmpty ? entry.title : '(sin título)',
+                    entry.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontStyle: entry.title.isEmpty ? FontStyle.italic : null,
-                      color: entry.title.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
-                    ),
+                    style: theme.textTheme.titleSmall,
                   ),
                   const SizedBox(height: 4),
                   if (isSecure)

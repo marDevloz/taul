@@ -7,6 +7,7 @@ abstract class IEntryRepository {
   Future<List<Entry>> list({
     EntryType? type,
     bool includeDeleted = false,
+    bool excludeArchived = false,
   });
   Future<List<Entry>> search(String query, {int limit = 100});
   Future<Entry> update(Entry entry);

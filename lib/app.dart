@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
@@ -77,6 +78,7 @@ class TaulApp extends ConsumerWidget {
       themeMode: ref.watch(themeModeProvider),
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: FlutterQuillLocalizations.localizationsDelegates,
       builder: (context, child) {
         if (lockStatus == AppLockStatus.checking) {
           return const Scaffold(

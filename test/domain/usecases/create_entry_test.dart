@@ -65,7 +65,7 @@ void main() {
         (i) => Future.value(i.positionalArguments[0] as Entry),
       );
 
-      final result = await useCase.call(title: 'Idea', content: '! great idea');
+      final result = await useCase.call(title: 'Idea', content: '!great idea');
 
       expect(result.type, EntryType.idea);
     });
@@ -75,7 +75,7 @@ void main() {
         (i) => Future.value(i.positionalArguments[0] as Entry),
       );
 
-      final result = await useCase.call(title: 'Term', content: 'Término: definición');
+      final result = await useCase.call(title: 'Term', content: 'Término:definición');
 
       expect(result.type, EntryType.glossary);
     });
@@ -92,6 +92,53 @@ void main() {
       );
 
       expect(result.type, EntryType.note);
+    });
+
+    test('should_add_pendiente_when_type_is_task', () async {
+      when(() => repository.create(any())).thenAnswer((invocation) {
+        final entry = invocation.positionalArguments[0] as Entry;
+        return Future.value(entry);
+      });
+
+      final result = await useCase.call(
+        title: 'Task',
+        content: 'Do something',
+        type: EntryType.task,
+      );
+
+      expect(result.tags, contains('pendiente'));
+    });
+
+    test('should_not_duplicate_pendiente_when_already_present', () async {
+      when(() => repository.create(any())).thenAnswer((invocation) {
+        final entry = invocation.positionalArguments[0] as Entry;
+        return Future.value(entry);
+      });
+
+      final result = await useCase.call(
+        title: 'Task',
+        content: 'Do something',
+        type: EntryType.task,
+        tags: ['pendiente', 'urgente'],
+      );
+
+      expect(result.tags, contains('pendiente'));
+      expect(result.tags.where((t) => t == 'pendiente').length, 1);
+    });
+
+    test('should_not_add_pendiente_for_non_task_entries', () async {
+      when(() => repository.create(any())).thenAnswer((invocation) {
+        final entry = invocation.positionalArguments[0] as Entry;
+        return Future.value(entry);
+      });
+
+      final result = await useCase.call(
+        title: 'Note',
+        content: 'Just a note',
+        type: EntryType.note,
+      );
+
+      expect(result.tags, isNot(contains('pendiente')));
     });
   });
 }

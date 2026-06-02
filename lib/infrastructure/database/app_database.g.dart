@@ -179,6 +179,17 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, Entry> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _completedAtMeta = const VerificationMeta(
+    'completedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+    'completed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -197,6 +208,7 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, Entry> {
     updatedAt,
     version,
     deletedAt,
+    completedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -328,6 +340,15 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, Entry> {
         deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
       );
     }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+        _completedAtMeta,
+        completedAt.isAcceptableOrUnknown(
+          data['completed_at']!,
+          _completedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -401,6 +422,10 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, Entry> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}deleted_at'],
       ),
+      completedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}completed_at'],
+      ),
     );
   }
 
@@ -427,6 +452,7 @@ class Entry extends DataClass implements Insertable<Entry> {
   final DateTime updatedAt;
   final int version;
   final DateTime? deletedAt;
+  final DateTime? completedAt;
   const Entry({
     required this.id,
     required this.type,
@@ -444,6 +470,7 @@ class Entry extends DataClass implements Insertable<Entry> {
     required this.updatedAt,
     required this.version,
     this.deletedAt,
+    this.completedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -475,6 +502,9 @@ class Entry extends DataClass implements Insertable<Entry> {
     map['version'] = Variable<int>(version);
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<DateTime>(completedAt);
     }
     return map;
   }
@@ -509,6 +539,9 @@ class Entry extends DataClass implements Insertable<Entry> {
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(deletedAt),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
     );
   }
 
@@ -534,6 +567,7 @@ class Entry extends DataClass implements Insertable<Entry> {
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       version: serializer.fromJson<int>(json['version']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
     );
   }
   @override
@@ -556,6 +590,7 @@ class Entry extends DataClass implements Insertable<Entry> {
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'version': serializer.toJson<int>(version),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
     };
   }
 
@@ -576,6 +611,7 @@ class Entry extends DataClass implements Insertable<Entry> {
     DateTime? updatedAt,
     int? version,
     Value<DateTime?> deletedAt = const Value.absent(),
+    Value<DateTime?> completedAt = const Value.absent(),
   }) => Entry(
     id: id ?? this.id,
     type: type ?? this.type,
@@ -595,6 +631,7 @@ class Entry extends DataClass implements Insertable<Entry> {
     updatedAt: updatedAt ?? this.updatedAt,
     version: version ?? this.version,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    completedAt: completedAt.present ? completedAt.value : this.completedAt,
   );
   Entry copyWithCompanion(EntriesCompanion data) {
     return Entry(
@@ -620,6 +657,9 @@ class Entry extends DataClass implements Insertable<Entry> {
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       version: data.version.present ? data.version.value : this.version,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      completedAt: data.completedAt.present
+          ? data.completedAt.value
+          : this.completedAt,
     );
   }
 
@@ -641,7 +681,8 @@ class Entry extends DataClass implements Insertable<Entry> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('version: $version, ')
-          ..write('deletedAt: $deletedAt')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('completedAt: $completedAt')
           ..write(')'))
         .toString();
   }
@@ -664,6 +705,7 @@ class Entry extends DataClass implements Insertable<Entry> {
     updatedAt,
     version,
     deletedAt,
+    completedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -684,7 +726,8 @@ class Entry extends DataClass implements Insertable<Entry> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.version == this.version &&
-          other.deletedAt == this.deletedAt);
+          other.deletedAt == this.deletedAt &&
+          other.completedAt == this.completedAt);
 }
 
 class EntriesCompanion extends UpdateCompanion<Entry> {
@@ -704,6 +747,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
   final Value<DateTime> updatedAt;
   final Value<int> version;
   final Value<DateTime?> deletedAt;
+  final Value<DateTime?> completedAt;
   final Value<int> rowid;
   const EntriesCompanion({
     this.id = const Value.absent(),
@@ -722,6 +766,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     this.updatedAt = const Value.absent(),
     this.version = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.completedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   EntriesCompanion.insert({
@@ -741,6 +786,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     required DateTime updatedAt,
     this.version = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.completedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        type = Value(type),
@@ -767,6 +813,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     Expression<DateTime>? updatedAt,
     Expression<int>? version,
     Expression<DateTime>? deletedAt,
+    Expression<DateTime>? completedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -786,6 +833,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
       if (updatedAt != null) 'updated_at': updatedAt,
       if (version != null) 'version': version,
       if (deletedAt != null) 'deleted_at': deletedAt,
+      if (completedAt != null) 'completed_at': completedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -807,6 +855,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     Value<DateTime>? updatedAt,
     Value<int>? version,
     Value<DateTime?>? deletedAt,
+    Value<DateTime?>? completedAt,
     Value<int>? rowid,
   }) {
     return EntriesCompanion(
@@ -826,6 +875,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
       updatedAt: updatedAt ?? this.updatedAt,
       version: version ?? this.version,
       deletedAt: deletedAt ?? this.deletedAt,
+      completedAt: completedAt ?? this.completedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -881,6 +931,9 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     if (deletedAt.present) {
       map['deleted_at'] = Variable<DateTime>(deletedAt.value);
     }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -906,6 +959,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
           ..write('updatedAt: $updatedAt, ')
           ..write('version: $version, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('completedAt: $completedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1680,6 +1734,21 @@ class $TagSettingsTable extends TagSettings
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _isSystemMeta = const VerificationMeta(
+    'isSystem',
+  );
+  @override
+  late final GeneratedColumn<bool> isSystem = GeneratedColumn<bool>(
+    'is_system',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_system" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1693,7 +1762,13 @@ class $TagSettingsTable extends TagSettings
     defaultValue: currentDateAndTime,
   );
   @override
-  List<GeneratedColumn> get $columns => [name, color, isSecure, createdAt];
+  List<GeneratedColumn> get $columns => [
+    name,
+    color,
+    isSecure,
+    isSystem,
+    createdAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1726,6 +1801,12 @@ class $TagSettingsTable extends TagSettings
         isSecure.isAcceptableOrUnknown(data['is_secure']!, _isSecureMeta),
       );
     }
+    if (data.containsKey('is_system')) {
+      context.handle(
+        _isSystemMeta,
+        isSystem.isAcceptableOrUnknown(data['is_system']!, _isSystemMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1753,6 +1834,10 @@ class $TagSettingsTable extends TagSettings
         DriftSqlType.bool,
         data['${effectivePrefix}is_secure'],
       )!,
+      isSystem: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_system'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1770,11 +1855,13 @@ class TagSetting extends DataClass implements Insertable<TagSetting> {
   final String name;
   final String? color;
   final bool isSecure;
+  final bool isSystem;
   final DateTime createdAt;
   const TagSetting({
     required this.name,
     this.color,
     required this.isSecure,
+    required this.isSystem,
     required this.createdAt,
   });
   @override
@@ -1785,6 +1872,7 @@ class TagSetting extends DataClass implements Insertable<TagSetting> {
       map['color'] = Variable<String>(color);
     }
     map['is_secure'] = Variable<bool>(isSecure);
+    map['is_system'] = Variable<bool>(isSystem);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -1796,6 +1884,7 @@ class TagSetting extends DataClass implements Insertable<TagSetting> {
           ? const Value.absent()
           : Value(color),
       isSecure: Value(isSecure),
+      isSystem: Value(isSystem),
       createdAt: Value(createdAt),
     );
   }
@@ -1809,6 +1898,7 @@ class TagSetting extends DataClass implements Insertable<TagSetting> {
       name: serializer.fromJson<String>(json['name']),
       color: serializer.fromJson<String?>(json['color']),
       isSecure: serializer.fromJson<bool>(json['isSecure']),
+      isSystem: serializer.fromJson<bool>(json['isSystem']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -1819,6 +1909,7 @@ class TagSetting extends DataClass implements Insertable<TagSetting> {
       'name': serializer.toJson<String>(name),
       'color': serializer.toJson<String?>(color),
       'isSecure': serializer.toJson<bool>(isSecure),
+      'isSystem': serializer.toJson<bool>(isSystem),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -1827,11 +1918,13 @@ class TagSetting extends DataClass implements Insertable<TagSetting> {
     String? name,
     Value<String?> color = const Value.absent(),
     bool? isSecure,
+    bool? isSystem,
     DateTime? createdAt,
   }) => TagSetting(
     name: name ?? this.name,
     color: color.present ? color.value : this.color,
     isSecure: isSecure ?? this.isSecure,
+    isSystem: isSystem ?? this.isSystem,
     createdAt: createdAt ?? this.createdAt,
   );
   TagSetting copyWithCompanion(TagSettingsCompanion data) {
@@ -1839,6 +1932,7 @@ class TagSetting extends DataClass implements Insertable<TagSetting> {
       name: data.name.present ? data.name.value : this.name,
       color: data.color.present ? data.color.value : this.color,
       isSecure: data.isSecure.present ? data.isSecure.value : this.isSecure,
+      isSystem: data.isSystem.present ? data.isSystem.value : this.isSystem,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -1849,13 +1943,14 @@ class TagSetting extends DataClass implements Insertable<TagSetting> {
           ..write('name: $name, ')
           ..write('color: $color, ')
           ..write('isSecure: $isSecure, ')
+          ..write('isSystem: $isSystem, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(name, color, isSecure, createdAt);
+  int get hashCode => Object.hash(name, color, isSecure, isSystem, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1863,6 +1958,7 @@ class TagSetting extends DataClass implements Insertable<TagSetting> {
           other.name == this.name &&
           other.color == this.color &&
           other.isSecure == this.isSecure &&
+          other.isSystem == this.isSystem &&
           other.createdAt == this.createdAt);
 }
 
@@ -1870,12 +1966,14 @@ class TagSettingsCompanion extends UpdateCompanion<TagSetting> {
   final Value<String> name;
   final Value<String?> color;
   final Value<bool> isSecure;
+  final Value<bool> isSystem;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const TagSettingsCompanion({
     this.name = const Value.absent(),
     this.color = const Value.absent(),
     this.isSecure = const Value.absent(),
+    this.isSystem = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1883,6 +1981,7 @@ class TagSettingsCompanion extends UpdateCompanion<TagSetting> {
     required String name,
     this.color = const Value.absent(),
     this.isSecure = const Value.absent(),
+    this.isSystem = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : name = Value(name);
@@ -1890,6 +1989,7 @@ class TagSettingsCompanion extends UpdateCompanion<TagSetting> {
     Expression<String>? name,
     Expression<String>? color,
     Expression<bool>? isSecure,
+    Expression<bool>? isSystem,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -1897,6 +1997,7 @@ class TagSettingsCompanion extends UpdateCompanion<TagSetting> {
       if (name != null) 'name': name,
       if (color != null) 'color': color,
       if (isSecure != null) 'is_secure': isSecure,
+      if (isSystem != null) 'is_system': isSystem,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1906,6 +2007,7 @@ class TagSettingsCompanion extends UpdateCompanion<TagSetting> {
     Value<String>? name,
     Value<String?>? color,
     Value<bool>? isSecure,
+    Value<bool>? isSystem,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -1913,6 +2015,7 @@ class TagSettingsCompanion extends UpdateCompanion<TagSetting> {
       name: name ?? this.name,
       color: color ?? this.color,
       isSecure: isSecure ?? this.isSecure,
+      isSystem: isSystem ?? this.isSystem,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1930,6 +2033,9 @@ class TagSettingsCompanion extends UpdateCompanion<TagSetting> {
     if (isSecure.present) {
       map['is_secure'] = Variable<bool>(isSecure.value);
     }
+    if (isSystem.present) {
+      map['is_system'] = Variable<bool>(isSystem.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1945,6 +2051,7 @@ class TagSettingsCompanion extends UpdateCompanion<TagSetting> {
           ..write('name: $name, ')
           ..write('color: $color, ')
           ..write('isSecure: $isSecure, ')
+          ..write('isSystem: $isSystem, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -1988,6 +2095,7 @@ typedef $$EntriesTableCreateCompanionBuilder =
       required DateTime updatedAt,
       Value<int> version,
       Value<DateTime?> deletedAt,
+      Value<DateTime?> completedAt,
       Value<int> rowid,
     });
 typedef $$EntriesTableUpdateCompanionBuilder =
@@ -2008,6 +2116,7 @@ typedef $$EntriesTableUpdateCompanionBuilder =
       Value<DateTime> updatedAt,
       Value<int> version,
       Value<DateTime?> deletedAt,
+      Value<DateTime?> completedAt,
       Value<int> rowid,
     });
 
@@ -2097,6 +2206,11 @@ class $$EntriesTableFilterComposer
 
   ColumnFilters<DateTime> get deletedAt => $composableBuilder(
     column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -2189,6 +2303,11 @@ class $$EntriesTableOrderingComposer
     column: $table.deletedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$EntriesTableAnnotationComposer
@@ -2253,6 +2372,11 @@ class $$EntriesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => column,
+  );
 }
 
 class $$EntriesTableTableManager
@@ -2299,6 +2423,7 @@ class $$EntriesTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> version = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EntriesCompanion(
                 id: id,
@@ -2317,6 +2442,7 @@ class $$EntriesTableTableManager
                 updatedAt: updatedAt,
                 version: version,
                 deletedAt: deletedAt,
+                completedAt: completedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2337,6 +2463,7 @@ class $$EntriesTableTableManager
                 required DateTime updatedAt,
                 Value<int> version = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EntriesCompanion.insert(
                 id: id,
@@ -2355,6 +2482,7 @@ class $$EntriesTableTableManager
                 updatedAt: updatedAt,
                 version: version,
                 deletedAt: deletedAt,
+                completedAt: completedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -2722,6 +2850,7 @@ typedef $$TagSettingsTableCreateCompanionBuilder =
       required String name,
       Value<String?> color,
       Value<bool> isSecure,
+      Value<bool> isSystem,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -2730,6 +2859,7 @@ typedef $$TagSettingsTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String?> color,
       Value<bool> isSecure,
+      Value<bool> isSystem,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -2755,6 +2885,11 @@ class $$TagSettingsTableFilterComposer
 
   ColumnFilters<bool> get isSecure => $composableBuilder(
     column: $table.isSecure,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isSystem => $composableBuilder(
+    column: $table.isSystem,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2788,6 +2923,11 @@ class $$TagSettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isSystem => $composableBuilder(
+    column: $table.isSystem,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -2811,6 +2951,9 @@ class $$TagSettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get isSecure =>
       $composableBuilder(column: $table.isSecure, builder: (column) => column);
+
+  GeneratedColumn<bool> get isSystem =>
+      $composableBuilder(column: $table.isSystem, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -2850,12 +2993,14 @@ class $$TagSettingsTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String?> color = const Value.absent(),
                 Value<bool> isSecure = const Value.absent(),
+                Value<bool> isSystem = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TagSettingsCompanion(
                 name: name,
                 color: color,
                 isSecure: isSecure,
+                isSystem: isSystem,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -2864,12 +3009,14 @@ class $$TagSettingsTableTableManager
                 required String name,
                 Value<String?> color = const Value.absent(),
                 Value<bool> isSecure = const Value.absent(),
+                Value<bool> isSystem = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TagSettingsCompanion.insert(
                 name: name,
                 color: color,
                 isSecure: isSecure,
+                isSystem: isSystem,
                 createdAt: createdAt,
                 rowid: rowid,
               ),

@@ -215,6 +215,8 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
         }
       case EntryType.note:
         content = body;
+      case EntryType.task:
+        content = body;
     }
 
     try {
@@ -401,6 +403,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
       EntryType.idea => Icons.lightbulb,
       EntryType.glossary => Icons.book,
       EntryType.credential => Icons.lock,
+      EntryType.task => Icons.checklist,
     };
   }
 
@@ -410,6 +413,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
       EntryType.idea => 'Idea',
       EntryType.glossary => 'Glosario',
       EntryType.credential => 'Credencial',
+      EntryType.task => 'Tarea',
     };
   }
 }

@@ -98,6 +98,7 @@ class EmptyStateFiltered extends StatelessWidget {
     EntryType.note => (Icons.description, 'nota'),
     EntryType.idea => (Icons.lightbulb, 'idea'),
     EntryType.credential => (Icons.lock, 'credencial'),
+    EntryType.task => (Icons.checklist, 'tarea'),
   };
 }
 

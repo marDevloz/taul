@@ -8,11 +8,11 @@ import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/effective_auth_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:go_router/go_router.dart';
-import 'package:taul/ui/screens/credential_form_sheet.dart';
+import 'package:taul/ui/screens/create_entry_sheet.dart';
 import 'package:taul/ui/screens/entry_detail_view.dart';
 import 'package:taul/ui/screens/merge_editor_screen.dart';
-import 'package:taul/ui/screens/quick_add_sheet.dart';
 import 'package:taul/ui/widgets/empty_states.dart';
 import 'package:taul/ui/widgets/entry_card.dart';
 import 'package:taul/ui/widgets/master_password_gate.dart';
@@ -33,6 +33,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
   final Set<String> _unlockedEntryIds = {};
   final Map<String, DateTime> _unlockTimestamps = {};
   String? _expandedFabId;
+  Timer? _autoLockTimer;
 
   @override
   void initState() {
@@ -40,8 +41,14 @@ class _HomeViewState extends ConsumerState<HomeView> {
     _startAutoLockTimer();
   }
 
+  @override
+  void dispose() {
+    _autoLockTimer?.cancel();
+    super.dispose();
+  }
+
   void _startAutoLockTimer() {
-    Timer.periodic(const Duration(seconds: 30), (_) {
+    _autoLockTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted) return;
       final now = DateTime.now();
       final expired = _unlockTimestamps.entries
@@ -99,82 +106,128 @@ class _HomeViewState extends ConsumerState<HomeView> {
                             itemCount: entries.length,
                             itemBuilder: (context, index) {
                               final entry = entries[index];
-                              final color = ref.watch(entryDisplayColorProvider(entry.id));
-                              final isSecure = ref.watch(hasSecureTagProvider(entry.id));
-                              final isUnlocked = _unlockedEntryIds.contains(entry.id);
-                              final showLocked = isSecure && !isUnlocked;
-                              final isCredential = entry.type.label == 'credential';
-                              return EntryCard(
-                                entry: entry,
-                                displayColor: color,
-                                isExpanded: !_isSelectMode && _expandedEntryId == entry.id && !showLocked,
-                                isSecure: showLocked,
-                                isSelected: _selectedEntryIds.contains(entry.id),
-                                onLongPress: () => _enterSelectMode(entry.id),
-                                onToggle: _isSelectMode
-                                    ? () => _toggleSelection(entry.id)
-                                    : () {
-                                        setState(() {
-                                          _expandedEntryId = _expandedEntryId == entry.id ? null : entry.id;
-                                        });
-                                      },
-                                onTapGated: _isSelectMode
-                                    ? null
-                                    : () async {
-                                        final ok = await showMasterPasswordGate(context: context, ref: ref);
-                                        if (!ok || !context.mounted) return;
-                                        if (isCredential) {
-                                          _openEntry(context, entry.id);
-                                        } else {
-                                          _unlockEntry(entry.id);
-                                          setState(() {
-                                            _expandedEntryId = entry.id;
-                                          });
-                                        }
-                                      },
-                                onDoubleTapGated: _isSelectMode
-                                    ? null
-                                    : () async {
-                                        final ok = await showMasterPasswordGate(context: context, ref: ref);
-                                        if (!ok || !context.mounted) return;
-                                        _openEntry(context, entry.id);
-                                      },
-                                onTap: _isSelectMode ? null : () => _openEntry(context, entry.id),
+                              return Consumer(
+                                builder: (context, ref, _) {
+                                  final color = ref.watch(
+                                    entryDisplayColorProvider(entry.id),
+                                  );
+                                  final isSecure = ref.watch(
+                                    hasSecureTagProvider(entry.id),
+                                  );
+                                  final isUnlocked = _unlockedEntryIds.contains(
+                                    entry.id,
+                                  );
+                                  final showLocked = isSecure && !isUnlocked;
+                                  final isCredential =
+                                      entry.type.label == 'credential';
+                                  return EntryCard(
+                                    entry: entry,
+                                    displayColor: color,
+                                    isExpanded:
+                                        !_isSelectMode &&
+                                        _expandedEntryId == entry.id &&
+                                        !showLocked,
+                                    isSecure: showLocked,
+                                    isSelected: _selectedEntryIds.contains(
+                                      entry.id,
+                                    ),
+                                    onLongPress: () =>
+                                        _enterSelectMode(entry.id),
+                                    onToggle: _isSelectMode
+                                        ? () => _toggleSelection(entry.id)
+                                        : () {
+                                            setState(() {
+                                              _expandedEntryId =
+                                                  _expandedEntryId == entry.id
+                                                  ? null
+                                                  : entry.id;
+                                            });
+                                          },
+                                    onTapGated: _isSelectMode
+                                        ? null
+                                        : () async {
+                                            final ok =
+                                                await showMasterPasswordGate(
+                                                  context: context,
+                                                  ref: ref,
+                                                );
+                                            if (!ok || !context.mounted) return;
+                                            if (isCredential) {
+                                              _openEntry(context, entry.id);
+                                            } else {
+                                              _unlockEntry(entry.id);
+                                              setState(() {
+                                                _expandedEntryId = entry.id;
+                                              });
+                                            }
+                                          },
+                                    onDoubleTapGated: _isSelectMode
+                                        ? null
+                                        : () async {
+                                            final ok =
+                                                await showMasterPasswordGate(
+                                                  context: context,
+                                                  ref: ref,
+                                                );
+                                            if (!ok || !context.mounted) return;
+                                            _openEntry(context, entry.id);
+                                          },
+                                    onTap: _isSelectMode
+                                        ? null
+                                        : () => _openEntry(context, entry.id),
+                                  );
+                                },
                               );
                             },
                           );
                         }
-                        final crossAxisCount =
-                            width < Breakpoints.tablet ? 2 : 3;
+                        final crossAxisCount = width < Breakpoints.tablet
+                            ? 2
+                            : 3;
                         return GridView.builder(
                           padding: const EdgeInsets.all(12),
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
-                            childAspectRatio: 1.8,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                          ),
+                                crossAxisCount: crossAxisCount,
+                                childAspectRatio: 1.8,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 8,
+                              ),
                           itemCount: entries.length,
                           itemBuilder: (context, index) {
                             final entry = entries[index];
-                            final color = ref.watch(entryDisplayColorProvider(entry.id));
-                            final isSecure = ref.watch(hasSecureTagProvider(entry.id));
-                            final isUnlocked = _unlockedEntryIds.contains(entry.id);
-                            final showLocked = isSecure && !isUnlocked;
-                            final isCredential = entry.type.label == 'credential';
-                            return EntryCard(
-                              entry: entry,
-                              isGrid: true,
-                              displayColor: color,
-                              isSecure: showLocked,
-                              isSelected: _selectedEntryIds.contains(entry.id),
-                              onLongPress: () => _enterSelectMode(entry.id),
-                              onTap: _isSelectMode
-                                  ? () => _toggleSelection(entry.id)
-                                  : showLocked
+                            return Consumer(
+                              builder: (context, ref, _) {
+                                final color = ref.watch(
+                                  entryDisplayColorProvider(entry.id),
+                                );
+                                final isSecure = ref.watch(
+                                  hasSecureTagProvider(entry.id),
+                                );
+                                final isUnlocked = _unlockedEntryIds.contains(
+                                  entry.id,
+                                );
+                                final showLocked = isSecure && !isUnlocked;
+                                final isCredential =
+                                    entry.type.label == 'credential';
+                                return EntryCard(
+                                  entry: entry,
+                                  isGrid: true,
+                                  displayColor: color,
+                                  isSecure: showLocked,
+                                  isSelected: _selectedEntryIds.contains(
+                                    entry.id,
+                                  ),
+                                  onLongPress: () => _enterSelectMode(entry.id),
+                                  onTap: _isSelectMode
+                                      ? () => _toggleSelection(entry.id)
+                                      : showLocked
                                       ? () async {
-                                          final ok = await showMasterPasswordGate(context: context, ref: ref);
+                                          final ok =
+                                              await showMasterPasswordGate(
+                                                context: context,
+                                                ref: ref,
+                                              );
                                           if (!ok || !context.mounted) return;
                                           if (isCredential) {
                                             _openEntry(context, entry.id);
@@ -184,6 +237,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
                                           }
                                         }
                                       : () => _openEntry(context, entry.id),
+                                );
+                              },
                             );
                           },
                         );
@@ -206,7 +261,9 @@ class _HomeViewState extends ConsumerState<HomeView> {
           FloatingActionButton(
             heroTag: null,
             onPressed: () => _showQuickAdd(context),
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.7),
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.primaryContainer.withValues(alpha: 0.7),
             child: const Icon(Icons.add),
           ),
         ],
@@ -242,14 +299,15 @@ class _HomeViewState extends ConsumerState<HomeView> {
           label: 'Credencial',
           icon: Icons.lock,
         ),
+        SnakeFabItem(value: 'task', label: 'Tarea', icon: Icons.checklist),
       ],
       selectedValue: selectedType?.name ?? '',
       onItemSelected: (value) {
         if (value == null || value.isEmpty) {
           ref.read(selectedTypeFilterProvider.notifier).state = null;
         } else {
-          ref.read(selectedTypeFilterProvider.notifier).state =
-              EntryType.values.firstWhere((e) => e.name == value);
+          ref.read(selectedTypeFilterProvider.notifier).state = EntryType.values
+              .firstWhere((e) => e.name == value);
         }
         setState(() => _expandedFabId = null);
       },
@@ -257,7 +315,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
   }
 
   Widget _buildTagFilterFab() {
-    final tags = ref.watch(tagsListProvider);
+    final tagSettingsAsync = ref.watch(tagSettingsListProvider);
+    final tagSettings = tagSettingsAsync.valueOrNull ?? [];
     final selectedTag = ref.watch(selectedTagFilterProvider);
     final tagColors = ref.watch(tagColorMapProvider);
     final isExpanded = _expandedFabId == 'tag';
@@ -265,13 +324,17 @@ class _HomeViewState extends ConsumerState<HomeView> {
 
     final items = <SnakeFabItem>[
       if (hasFilter)
-        const SnakeFabItem(value: '', label: 'Todas', icon: Icons.all_inclusive),
-      for (final tag in tags)
+        const SnakeFabItem(
+          value: '',
+          label: 'Todas',
+          icon: Icons.all_inclusive,
+        ),
+      for (final tagSetting in tagSettings)
         SnakeFabItem(
-          value: tag,
-          label: tag,
+          value: tagSetting.name,
+          label: tagSetting.name,
           icon: Icons.label,
-          color: tagColors[tag],
+          color: tagColors[tagSetting.name.toLowerCase()],
         ),
     ];
 
@@ -310,10 +373,15 @@ class _HomeViewState extends ConsumerState<HomeView> {
       EntryType.note => Icons.description,
       EntryType.idea => Icons.lightbulb,
       EntryType.credential => Icons.lock,
+      EntryType.task => Icons.checklist,
     };
   }
 
-  Widget _buildEmptyState(BuildContext context, WidgetRef ref, String searchQuery) {
+  Widget _buildEmptyState(
+    BuildContext context,
+    WidgetRef ref,
+    String searchQuery,
+  ) {
     if (searchQuery.isNotEmpty) {
       return const EmptyStateSearch();
     }
@@ -323,34 +391,20 @@ class _HomeViewState extends ConsumerState<HomeView> {
       return EmptyStateFiltered(type: selectedType);
     }
 
-    return EmptyStateAll(
-      onCreateEntry: () => _showQuickAdd(context),
-    );
+    return EmptyStateAll(onCreateEntry: () => _showQuickAdd(context));
   }
 
   void _openEntry(BuildContext context, String id) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => EntryDetailView(entryId: id)),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => EntryDetailView(entryId: id)));
   }
 
   void _showQuickAdd(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => QuickAddSheet(
-        onCredentialRequested: () => _showCredentialForm(context),
-      ),
-    );
-  }
-
-  Future<void> _showCredentialForm(BuildContext context) async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => CredentialFormSheet(
-        onGoBack: () => _showQuickAdd(context),
-      ),
+      builder: (_) => const CreateEntrySheet(),
     );
   }
 
@@ -407,10 +461,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
           onPressed: _selectedEntryIds.length >= 2 ? _navigateToMerge : null,
           child: const Text('Combinar'),
         ),
-        TextButton(
-          onPressed: _exitSelectMode,
-          child: const Text('Cancelar'),
-        ),
+        TextButton(onPressed: _exitSelectMode, child: const Text('Cancelar')),
       ],
     );
   }
@@ -460,20 +511,22 @@ class _HomeViewState extends ConsumerState<HomeView> {
 
       final mergedText = MergeService.concatenate(selected);
 
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => MergeEditorScreen(
-            initialText: mergedText,
-            sourceEntries: selected,
-          ),
-        ),
-      ).then((saved) {
-        if (saved == true) {
-          _exitSelectMode();
-          // Refresh the list by invalidating providers
-          ref.invalidate(entryListProvider);
-        }
-      });
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute(
+              builder: (_) => MergeEditorScreen(
+                initialText: mergedText,
+                sourceEntries: selected,
+              ),
+            ),
+          )
+          .then((saved) {
+            if (saved == true) {
+              _exitSelectMode();
+              // Refresh the list by invalidating providers
+              ref.invalidate(entryListProvider);
+            }
+          });
     });
   }
 
@@ -517,23 +570,43 @@ class _ShortcutsSheet extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.keyboard, size: 20, color: theme.colorScheme.primary),
+                Icon(
+                  Icons.keyboard,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Text('Atajos de teclado', style: theme.textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 16),
-            Text('Generales', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
+            Text(
+              'Generales',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
+            ),
             const SizedBox(height: 8),
-            ...shortcuts.map((s) => _ShortcutRow(keyCombo: s.$1, description: s.$2)),
+            ...shortcuts.map(
+              (s) => _ShortcutRow(keyCombo: s.$1, description: s.$2),
+            ),
             const SizedBox(height: 16),
-            Text('Escritura rápida', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
+            Text(
+              'Escritura rápida',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
+            ),
             const SizedBox(height: 8),
-            ...typeHints.map((s) => _ShortcutRow(keyCombo: s.$1, description: s.$2)),
+            ...typeHints.map(
+              (s) => _ShortcutRow(keyCombo: s.$1, description: s.$2),
+            ),
             const SizedBox(height: 12),
             Text(
               'Tocá Taúl de nuevo para cerrar',
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -561,7 +634,10 @@ class _ShortcutRow extends StatelessWidget {
               color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Text(keyCombo, style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
+            child: Text(
+              keyCombo,
+              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+            ),
           ),
           const SizedBox(width: 12),
           Flexible(child: Text(description, style: theme.textTheme.bodyMedium)),

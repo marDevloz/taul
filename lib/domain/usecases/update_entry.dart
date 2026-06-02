@@ -22,10 +22,11 @@ class UpdateEntry {
     bool clearProtection = false,
     EntryType? type,
   }) async {
+    final resolvedTags = _resolveTags(tags ?? existing.tags, type ?? existing.type);
     final updated = existing.copyWith(
       title: title?.trim() ?? existing.title,
       content: content?.trim() ?? existing.content,
-      tags: tags ?? existing.tags,
+      tags: resolvedTags,
       tagsColors: tagsColors ?? existing.tagsColors,
       metadata: metadata ?? existing.metadata,
       secret: secret,
@@ -38,5 +39,14 @@ class UpdateEntry {
       version: existing.version + 1,
     );
     return _repository.update(updated);
+  }
+
+  List<String> _resolveTags(List<String> tags, EntryType type) {
+    if (type == EntryType.task &&
+        !tags.contains('pendiente') &&
+        !tags.contains('completada')) {
+      return [...tags, 'pendiente'];
+    }
+    return tags;
   }
 }

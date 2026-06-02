@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:taul/core/constants.dart';
+import 'package:taul/shared/tag_palette.dart';
 
 import 'entries_table.dart';
 import 'master_password_config_table.dart';
@@ -30,6 +31,17 @@ class AppDatabase extends _$AppDatabase {
         onCreate: (m) async {
           await m.createAll();
           await _createFtsTable();
+          // Seed system tags for fresh databases
+          for (final entry in TagPalette.systemTagDefaults.entries) {
+            await into(tagSettings).insertOnConflictUpdate(
+              TagSettingsCompanion.insert(
+                name: entry.key,
+                color: Value(entry.value.hex),
+                isSecure: const Value(false),
+                isSystem: const Value(true),
+              ),
+            );
+          }
         },
         onUpgrade: (m, from, to) async {
           if (from < 2) {
@@ -113,6 +125,23 @@ class AppDatabase extends _$AppDatabase {
                 TagSettingsCompanion.insert(
                   name: entry.key,
                   color: Value.absentIfNull(entry.value),
+                ),
+              );
+            }
+          }
+          if (from < 8) {
+            // Add completed_at column to entries
+            await m.addColumn(entries, entries.completedAt);
+            // Add is_system column to tag_settings
+            await m.addColumn(tagSettings, tagSettings.isSystem);
+            // Seed 4 system tags with reserved default colors
+            for (final entry in TagPalette.systemTagDefaults.entries) {
+              await into(tagSettings).insertOnConflictUpdate(
+                TagSettingsCompanion.insert(
+                  name: entry.key,
+                  color: Value(entry.value.hex),
+                  isSecure: const Value(false),
+                  isSystem: const Value(true),
                 ),
               );
             }

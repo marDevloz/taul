@@ -17,110 +17,186 @@ void main() {
     version: 1,
   );
 
-  group('EntryCard grid mode — accent bar', () {
-    testWidgets('should_show_left_border_when_displayColor_provided',
-        (tester) async {
+  group('EntryCard task icon', () {
+    testWidgets('should show checklist icon for task entries', (tester) async {
+      final taskEntry = Entry(
+        id: 'task-1',
+        type: EntryType.task,
+        title: 'My Task',
+        content: 'Task content',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        version: 1,
+      );
+
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: EntryCard(
-              entry: testEntry,
-              isGrid: true,
-              displayColor: Colors.red,
-            ),
+            body: EntryCard(entry: taskEntry),
           ),
         ),
       );
 
-      // The card is wrapped in a Container with a left border
-      // Verify the Container decoration exists
-      final containerFinder = find.byType(Container).first;
-      final container = tester.widget<Container>(containerFinder);
-      final decoration = container.decoration as BoxDecoration?;
-
-      expect(decoration, isNotNull);
-      expect(decoration!.border, isNotNull);
-      final border = decoration.border as Border;
-      expect(border.left.color, Colors.red);
-      expect(border.left.width, 4);
+      // Task entries should show a checklist icon
+      expect(find.byIcon(Icons.checklist), findsOneWidget);
     });
 
-    testWidgets('should_hide_left_border_when_displayColor_is_null',
-        (tester) async {
+    testWidgets('should show book icon for glossary entries', (tester) async {
+      final glossaryEntry = Entry(
+        id: 'glos-1',
+        type: EntryType.glossary,
+        title: 'Term',
+        content: 'Definition',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        version: 1,
+      );
+
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: EntryCard(
-              entry: testEntry,
-              isGrid: true,
-              displayColor: null,
-            ),
+            body: EntryCard(entry: glossaryEntry),
           ),
         ),
       );
 
-      final containerFinder = find.byType(Container).first;
-      final container = tester.widget<Container>(containerFinder);
-      final decoration = container.decoration as BoxDecoration?;
-
-      expect(decoration, isNotNull);
-      final border = decoration!.border as Border;
-      expect(border.left.color, Colors.transparent);
+      expect(find.byIcon(Icons.book), findsOneWidget);
     });
   });
 
-  group('EntryCard list mode — colored dot', () {
-    testWidgets('should_show_colored_dot_when_displayColor_provided',
-        (tester) async {
+  group('EntryCard favorito/archivado toggles', () {
+    testWidgets('should show favorito toggle when callback provided', (tester) async {
+      bool favoritoToggled = false;
+
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: EntryCard(
               entry: testEntry,
-              isGrid: false,
-              displayColor: Colors.blue,
+              isFavorito: false,
+              onToggleFavorito: () => favoritoToggled = true,
             ),
           ),
         ),
       );
 
-      // Look for the small colored dot container
-      final dotFinder = find.byWidgetPredicate(
-        (w) =>
-            w is Container &&
-            w.decoration is BoxDecoration &&
-            (w.decoration as BoxDecoration).color == Colors.blue &&
-            (w.decoration as BoxDecoration).shape == BoxShape.circle &&
-            w.constraints?.maxWidth == 8,
-      );
+      // Should show star_border icon (not favorited)
+      expect(find.byIcon(Icons.star_border), findsOneWidget);
 
-      expect(dotFinder, findsOneWidget);
+      // Tap the favorito toggle
+      await tester.tap(find.byIcon(Icons.star_border));
+      expect(favoritoToggled, isTrue);
     });
 
-    testWidgets('should_hide_dot_when_displayColor_is_null',
-        (tester) async {
+    testWidgets('should show filled star when favorito is true', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: EntryCard(
               entry: testEntry,
-              isGrid: false,
-              displayColor: null,
+              isFavorito: true,
+              onToggleFavorito: () {},
             ),
           ),
         ),
       );
 
-      // The dot Container should not exist in the tree
-      final dotFinder = find.byWidgetPredicate(
-        (w) =>
-            w is Container &&
-            w.decoration is BoxDecoration &&
-            (w.decoration as BoxDecoration).shape == BoxShape.circle &&
-            w.constraints?.maxWidth == 8,
+      expect(find.byIcon(Icons.star), findsOneWidget);
+    });
+
+    testWidgets('should show archivado toggle when callback provided', (tester) async {
+      bool archivadoToggled = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EntryCard(
+              entry: testEntry,
+              isArchivado: false,
+              onToggleArchivado: () => archivadoToggled = true,
+            ),
+          ),
+        ),
       );
 
-      expect(dotFinder, findsNothing);
+      // Should show archive_outlined icon (not archived)
+      expect(find.byIcon(Icons.archive_outlined), findsOneWidget);
+
+      // Tap the archivado toggle
+      await tester.tap(find.byIcon(Icons.archive_outlined));
+      expect(archivadoToggled, isTrue);
+    });
+
+    testWidgets('should show filled archive when archivado is true', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EntryCard(
+              entry: testEntry,
+              isArchivado: true,
+              onToggleArchivado: () {},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byIcon(Icons.archive), findsOneWidget);
+    });
+
+    testWidgets('should not show toggles when callbacks are null', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EntryCard(entry: testEntry),
+          ),
+        ),
+      );
+
+      // No star or archive icons should be present
+      expect(find.byIcon(Icons.star_border), findsNothing);
+      expect(find.byIcon(Icons.star), findsNothing);
+      expect(find.byIcon(Icons.archive_outlined), findsNothing);
+      expect(find.byIcon(Icons.archive), findsNothing);
+    });
+  });
+
+  group('EntryCard completedAt', () {
+    testWidgets('should show completedAt timestamp when present', (tester) async {
+      final completedEntry = Entry(
+        id: 'completed-1',
+        type: EntryType.task,
+        title: 'Done Task',
+        content: 'Completed',
+        completedAt: DateTime(2024, 6, 15, 10, 30),
+        createdAt: DateTime(2024, 6, 1),
+        updatedAt: DateTime(2024, 6, 15),
+        tags: ['completada'],
+        version: 2,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EntryCard(entry: completedEntry),
+          ),
+        ),
+      );
+
+      // Should show "Completada:" label
+      expect(find.textContaining('Completada:'), findsOneWidget);
+    });
+
+    testWidgets('should not show completedAt when null', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EntryCard(entry: testEntry),
+          ),
+        ),
+      );
+
+      // Should NOT show "Completada:" label
+      expect(find.textContaining('Completada:'), findsNothing);
     });
   });
 }

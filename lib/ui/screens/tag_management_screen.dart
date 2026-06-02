@@ -55,16 +55,42 @@ class TagManagementScreen extends ConsumerWidget {
               ),
             );
           }
-          return ListView.builder(
-            itemCount: tags.length,
-            itemBuilder: (_, index) => _TagSettingTile(
-              setting: tags[index],
-              ref: ref,
-            ),
+
+          final systemTags = tags.where((t) => t.isSystem).toList();
+          final userTags = tags.where((t) => !t.isSystem).toList();
+
+          return ListView(
+            children: [
+              // System tags section
+              if (systemTags.isNotEmpty) ...[
+                _buildSectionHeader(context, 'Tags del sistema'),
+                for (final tag in systemTags)
+                  _TagSettingTile(setting: tag, ref: ref, isSystem: true),
+              ],
+              // User tags section
+              if (userTags.isNotEmpty) ...[
+                _buildSectionHeader(context, 'Tags personalizados'),
+                for (final tag in userTags)
+                  _TagSettingTile(setting: tag, ref: ref, isSystem: false),
+              ],
+            ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error: $err')),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -101,7 +127,9 @@ class TagManagementScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 PalettePicker(
                   onColorSelected: (hex) {
-                    setLocalState(() => selectedColor = hex);
+                    setLocalState(
+                      () => selectedColor = hex.isEmpty ? null : hex,
+                    );
                   },
                 ),
               ],
@@ -136,10 +164,12 @@ class TagManagementScreen extends ConsumerWidget {
 class _TagSettingTile extends ConsumerWidget {
   final TagSetting setting;
   final WidgetRef ref;
+  final bool isSystem;
 
   const _TagSettingTile({
     required this.setting,
     required this.ref,
+    this.isSystem = false,
   });
 
   @override
@@ -148,6 +178,24 @@ class _TagSettingTile extends ConsumerWidget {
         ? Color(int.parse(setting.color!.substring(1), radix: 16) + 0xFF000000)
         : TagPalette.defaultGrey;
 
+    if (isSystem) {
+      // System tag: lock icon, no delete, no rename, no secure toggle,
+      // but color IS editable via tap
+      return ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color,
+          radius: 16,
+          child: const Icon(Icons.lock, size: 16, color: Colors.white),
+        ),
+        title: Text(setting.name),
+        subtitle: const Text('Tag del sistema — tocar para cambiar color'),
+        trailing: const Icon(Icons.palette_outlined, size: 20),
+        onTap: () => _showColorPicker(context),
+        onLongPress: null,
+      );
+    }
+
+    // User tag: full CRUD as before
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: color,
@@ -157,9 +205,7 @@ class _TagSettingTile extends ConsumerWidget {
             : null,
       ),
       title: Text(setting.name),
-      subtitle: setting.isSecure
-          ? const Text('Requiere autenticación')
-          : null,
+      subtitle: setting.isSecure ? const Text('Requiere autenticación') : null,
       trailing: Switch(
         value: setting.isSecure,
         onChanged: (value) => _toggleSecure(context, value),
@@ -167,6 +213,39 @@ class _TagSettingTile extends ConsumerWidget {
       onTap: () => _showRenameDialog(context),
       onLongPress: () => _showDeleteConfirmation(context),
     );
+  }
+
+  Future<void> _showColorPicker(BuildContext context) async {
+    final defaultHex =
+        TagPalette.systemTagDefaults[setting.name.toLowerCase()]?.hex;
+    final selectedHex = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Color para "${setting.name}"'),
+        content: PalettePicker(
+          initialColor: setting.color != null
+              ? Color(
+                  int.parse(setting.color!.substring(1), radix: 16) +
+                      0xFF000000,
+                )
+              : null,
+          onColorSelected: (hex) => Navigator.pop(ctx, hex),
+        ),
+      ),
+    );
+
+    if (selectedHex == null || !context.mounted) return;
+
+    // For system tags, "sin color" reverts to the system default
+    final finalHex = selectedHex.isEmpty
+        ? (defaultHex ?? selectedHex)
+        : selectedHex;
+    final saveUseCase = ref.read(saveTagSettingProvider);
+    await saveUseCase.call(
+      setting.name,
+      color: finalHex.isEmpty ? null : finalHex,
+    );
+    ref.invalidate(tagSettingsListProvider);
   }
 
   Future<void> _showRenameDialog(BuildContext context) async {
@@ -181,10 +260,7 @@ class _TagSettingTile extends ConsumerWidget {
           content: TextField(
             controller: ctrl,
             autofocus: true,
-            decoration: InputDecoration(
-              labelText: 'Nombre',
-              errorText: error,
-            ),
+            decoration: InputDecoration(labelText: 'Nombre', errorText: error),
             textCapitalization: TextCapitalization.words,
             onChanged: (_) {
               if (error != null) setLocalState(() => error = null);
@@ -218,7 +294,11 @@ class _TagSettingTile extends ConsumerWidget {
     final saveUseCase = ref.read(saveTagSettingProvider);
 
     await deleteUseCase.call(setting.name);
-    await saveUseCase.call(result, color: setting.color, isSecure: setting.isSecure);
+    await saveUseCase.call(
+      result,
+      color: setting.color,
+      isSecure: setting.isSecure,
+    );
     ref.invalidate(tagSettingsListProvider);
   }
 
@@ -267,7 +347,9 @@ class _TagSettingTile extends ConsumerWidget {
       } catch (_) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al verificar la contraseña maestra')),
+            const SnackBar(
+              content: Text('Error al verificar la contraseña maestra'),
+            ),
           );
         }
         return;
@@ -277,8 +359,11 @@ class _TagSettingTile extends ConsumerWidget {
     if (!context.mounted) return;
 
     final saveUseCase = ref.read(saveTagSettingProvider);
-    await saveUseCase.call(setting.name,
-        color: setting.color, isSecure: newValue);
+    await saveUseCase.call(
+      setting.name,
+      color: setting.color,
+      isSecure: newValue,
+    );
     ref.invalidate(tagSettingsListProvider);
   }
 }

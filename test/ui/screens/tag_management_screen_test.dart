@@ -70,15 +70,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap the + button in the AppBar
       await tester.tap(find.byIcon(Icons.add));
       await tester.pumpAndSettle();
 
-      // Dialog should show
       expect(find.text('Nueva etiqueta'), findsOneWidget);
       expect(find.text('Cancelar'), findsOneWidget);
       expect(find.text('Crear'), findsOneWidget);
-      // Palette picker should be present (16 color circles)
       expect(find.byType(GestureDetector), findsWidgets);
     });
 
@@ -95,15 +92,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Open add dialog
       await tester.tap(find.byIcon(Icons.add));
       await tester.pumpAndSettle();
 
-      // Tap Crear without entering a name
       await tester.tap(find.text('Crear'));
       await tester.pumpAndSettle();
 
-      // Error message should appear
       expect(find.text('El nombre no puede estar vacío'), findsOneWidget);
     });
 
@@ -129,11 +123,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap the tag
       await tester.tap(find.text('work'));
       await tester.pumpAndSettle();
 
-      // Rename dialog should show
       expect(find.text('Renombrar etiqueta'), findsOneWidget);
       expect(find.text('Renombrar'), findsOneWidget);
     });
@@ -161,11 +153,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Long press the tag
       await tester.longPress(find.text('work'));
       await tester.pumpAndSettle();
 
-      // Delete confirmation should show
       expect(find.text('Eliminar etiqueta'), findsOneWidget);
       expect(find.textContaining('¿Eliminar la etiqueta'), findsOneWidget);
     });
@@ -192,12 +182,170 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Switch should be present and toggled on
       final switches = find.byType(Switch);
       expect(switches, findsOneWidget);
 
       final switchWidget = tester.widget<Switch>(switches);
       expect(switchWidget.value, isTrue);
+    });
+
+    // --- NEW TESTS for Task 4.2 ---
+
+    group('system tags section', () {
+      testWidgets('should show system tags in separate section', (tester) async {
+        final tags = [
+          TagSetting(
+            name: 'pendiente',
+            color: '#FFC107',
+            isSecure: false,
+            isSystem: true,
+            createdAt: DateTime(2024, 1, 1),
+          ),
+          TagSetting(
+            name: 'work',
+            color: '#E06C75',
+            isSecure: false,
+            createdAt: DateTime(2024, 1, 2),
+          ),
+        ];
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              tagSettingsListProvider.overrideWith(
+                (ref) => Future.value(tags),
+              ),
+            ],
+            child: const MaterialApp(home: TagManagementScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Should show section headers
+        expect(find.text('Tags del sistema'), findsOneWidget);
+        expect(find.text('Tags personalizados'), findsOneWidget);
+
+        // Both tags should be present
+        expect(find.text('pendiente'), findsOneWidget);
+        expect(find.text('work'), findsOneWidget);
+      });
+
+      testWidgets('should show lock icon for system tags', (tester) async {
+        final tags = [
+          TagSetting(
+            name: 'pendiente',
+            color: '#FFC107',
+            isSecure: false,
+            isSystem: true,
+            createdAt: DateTime(2024, 1, 1),
+          ),
+        ];
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              tagSettingsListProvider.overrideWith(
+                (ref) => Future.value(tags),
+              ),
+            ],
+            child: const MaterialApp(home: TagManagementScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // System tag should have a lock icon in the CircleAvatar
+        expect(find.byIcon(Icons.lock), findsOneWidget);
+      });
+
+      testWidgets('should not show delete option for system tags', (tester) async {
+        final tags = [
+          TagSetting(
+            name: 'pendiente',
+            color: '#FFC107',
+            isSecure: false,
+            isSystem: true,
+            createdAt: DateTime(2024, 1, 1),
+          ),
+        ];
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              tagSettingsListProvider.overrideWith(
+                (ref) => Future.value(tags),
+              ),
+            ],
+            child: const MaterialApp(home: TagManagementScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Long press on system tag should NOT show delete dialog
+        await tester.longPress(find.text('pendiente'));
+        await tester.pumpAndSettle();
+
+        // Delete dialog should NOT appear
+        expect(find.text('Eliminar etiqueta'), findsNothing);
+      });
+
+      testWidgets('should not show rename dialog for system tags', (tester) async {
+        final tags = [
+          TagSetting(
+            name: 'pendiente',
+            color: '#FFC107',
+            isSecure: false,
+            isSystem: true,
+            createdAt: DateTime(2024, 1, 1),
+          ),
+        ];
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              tagSettingsListProvider.overrideWith(
+                (ref) => Future.value(tags),
+              ),
+            ],
+            child: const MaterialApp(home: TagManagementScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Tap on system tag should NOT show rename dialog
+        await tester.tap(find.text('pendiente'));
+        await tester.pumpAndSettle();
+
+        // Rename dialog should NOT appear
+        expect(find.text('Renombrar etiqueta'), findsNothing);
+      });
+
+      testWidgets('should show only user tags when no system tags exist', (tester) async {
+        final tags = [
+          TagSetting(
+            name: 'work',
+            color: '#E06C75',
+            isSecure: false,
+            createdAt: DateTime(2024, 1, 1),
+          ),
+        ];
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              tagSettingsListProvider.overrideWith(
+                (ref) => Future.value(tags),
+              ),
+            ],
+            child: const MaterialApp(home: TagManagementScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Should NOT show system tags section
+        expect(find.text('Tags del sistema'), findsNothing);
+        // Should show user tags section
+        expect(find.text('Tags personalizados'), findsOneWidget);
+      });
     });
   });
 }

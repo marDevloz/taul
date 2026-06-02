@@ -27,12 +27,14 @@ class CreateEntry {
     Map<String, String> metadata = const {},
   }) async {
     final now = DateTime.now();
+    final effectiveType = type ?? _inferType(title, content);
+    final effectiveTags = _buildTags(tags, effectiveType);
     final entry = Entry(
       id: _uuid.v4(),
-      type: type ?? _inferType(title, content),
+      type: effectiveType,
       title: title.trim(),
       content: content.trim(),
-      tags: tags,
+      tags: effectiveTags,
       tagsColors: tagsColors,
       secret: secret,
       requiresAuth: requiresAuth,
@@ -48,9 +50,18 @@ class CreateEntry {
   }
 
   EntryType _inferType(String title, String content) {
-    if (content.startsWith('!')) return EntryType.idea;
-    if (content.contains(':')) return EntryType.glossary;
-    if (content.startsWith('+')) return EntryType.credential;
+    if (content.startsWith('!') && content.length > 1 && content[1] != ' ') {
+      return EntryType.idea;
+    }
+    if (RegExp(r'\S\*\S').hasMatch(content)) return EntryType.credential;
+    if (RegExp(r'\w:\S').hasMatch(content)) return EntryType.glossary;
     return EntryType.note;
+  }
+
+  List<String> _buildTags(List<String> tags, EntryType type) {
+    if (type == EntryType.task && !tags.contains('pendiente')) {
+      return [...tags, 'pendiente'];
+    }
+    return tags;
   }
 }

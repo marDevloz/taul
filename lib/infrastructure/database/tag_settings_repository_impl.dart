@@ -22,8 +22,8 @@ class TagSettingsRepositoryImpl implements ITagSettingsRepository {
   }
 
   @override
-  Future<void> save(String name, {String? color, bool isSecure = false}) =>
-      _dao.upsert(name, color: color, isSecure: isSecure);
+  Future<void> save(String name, {String? color, bool isSecure = false, bool isSystem = false}) =>
+      _dao.upsert(name, color: color, isSecure: isSecure, isSystem: isSystem);
 
   @override
   Future<void> delete(String name) => _dao.deleteByName(name);
@@ -36,10 +36,26 @@ class TagSettingsRepositoryImpl implements ITagSettingsRepository {
   Future<void> updateSecure(String name, bool isSecure) =>
       _dao.updateSecure(name, isSecure);
 
+  @override
+  Future<List<domain.TagSetting>> getSystemTags() async {
+    final rows = await _dao.getSystemTags();
+    return rows.map(_toDomain).toList();
+  }
+
+  @override
+  Future<List<domain.TagSetting>> getUserTags() async {
+    final rows = await _dao.getUserTags();
+    return rows.map(_toDomain).toList();
+  }
+
+  @override
+  Future<void> seedSystemTags() => _dao.seedSystemTags();
+
   domain.TagSetting _toDomain(db.TagSetting row) => domain.TagSetting(
         name: row.name,
         color: row.color,
         isSecure: row.isSecure,
+        isSystem: row.isSystem,
         createdAt: row.createdAt,
       );
 }

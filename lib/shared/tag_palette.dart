@@ -179,4 +179,43 @@ class TagPalette {
 
   /// Default grey used when no tags have colors assigned.
   static const Color defaultGrey = Color(0xFF9E9E9E);
+
+  /// Default colors for the four system tags.
+  ///
+  /// These colors are OUTSIDE the normal 16-color palette, reserved exclusively
+  /// for system-managed tags. Keys match tag names without the `#` prefix.
+  static const Map<String, PaletteColor> systemTagDefaults = {
+    'pendiente': PaletteColor(
+      name: 'pendiente',
+      hex: '#FFC107',
+      color: Color(0xFFFFC107),
+      hue: 45.0,
+      saturation: 1.0,
+      lightness: 0.5,
+    ),
+    'completada': PaletteColor(
+      name: 'completada',
+      hex: '#4CAF50',
+      color: Color(0xFF4CAF50),
+      hue: 120.0,
+      saturation: 0.5,
+      lightness: 0.5,
+    ),
+    'favorito': PaletteColor(
+      name: 'favorito',
+      hex: '#E53935',
+      color: Color(0xFFE53935),
+      hue: 4.0,
+      saturation: 0.8,
+      lightness: 0.5,
+    ),
+    'archivado': PaletteColor(
+      name: 'archivado',
+      hex: '#9E9E9E',
+      color: Color(0xFF9E9E9E),
+      hue: 0.0,
+      saturation: 0.0,
+      lightness: 0.6,
+    ),
+  };
 }

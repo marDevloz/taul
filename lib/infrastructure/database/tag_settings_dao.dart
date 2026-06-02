@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:taul/infrastructure/database/app_database.dart';
 import 'package:taul/infrastructure/database/tag_settings_table.dart';
+import 'package:taul/shared/tag_palette.dart';
 
 part 'tag_settings_dao.g.dart';
 
@@ -16,12 +17,13 @@ class TagSettingsDao extends DatabaseAccessor<AppDatabase>
           .getSingleOrNull();
 
   Future<void> upsert(String name,
-          {String? color, bool isSecure = false}) =>
+          {String? color, bool isSecure = false, bool isSystem = false}) =>
       into(tagSettings).insertOnConflictUpdate(
         TagSettingsCompanion.insert(
           name: name,
           color: Value.absentIfNull(color),
           isSecure: Value(isSecure),
+          isSystem: Value(isSystem),
         ),
       );
 
@@ -39,4 +41,24 @@ class TagSettingsDao extends DatabaseAccessor<AppDatabase>
       (update(tagSettings)..where((t) => t.name.equals(name))).write(
         TagSettingsCompanion(isSecure: Value(isSecure)),
       );
+
+  Future<List<TagSetting>> getSystemTags() =>
+      (select(tagSettings)..where((t) => t.isSystem.equals(true))).get();
+
+  Future<List<TagSetting>> getUserTags() =>
+      (select(tagSettings)..where((t) => t.isSystem.equals(false))).get();
+
+  Future<void> seedSystemTags() async {
+    for (final entry in TagPalette.systemTagDefaults.entries) {
+      await into(tagSettings).insert(
+        TagSettingsCompanion.insert(
+          name: entry.key,
+          color: Value(entry.value.hex),
+          isSecure: const Value(false),
+          isSystem: const Value(true),
+        ),
+        mode: InsertMode.insertOrIgnore,
+      );
+    }
+  }
 }

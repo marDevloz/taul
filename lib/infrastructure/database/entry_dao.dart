@@ -3,16 +3,20 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/infrastructure/database/tag_settings_dao.dart';
 
 import 'app_database.dart' as db;
 
 class EntryDao {
   final db.AppDatabase _database;
+  final TagSettingsDao _tagSettingsDao;
 
-  const EntryDao(this._database);
+  EntryDao(this._database)
+      : _tagSettingsDao = TagSettingsDao(_database);
 
   Future<Entry> insert(Entry entry) async {
     await _database.into(_database.entries).insert(_toCompanion(entry));
+    await _syncTags(entry);
     await _syncFts(entry);
     return entry;
   }
@@ -22,6 +26,7 @@ class EntryDao {
     await (_database.update(_database.entries)
       ..where((t) => t.id.equals(entry.id)))
         .write(companion);
+    await _syncTags(entry);
     await _syncFts(entry);
     return entry;
   }
@@ -40,13 +45,16 @@ class EntryDao {
     return _fromDbEntry(row);
   }
 
-  Future<List<Entry>> list({String? type, bool includeDeleted = false}) async {
+  Future<List<Entry>> list({String? type, bool includeDeleted = false, bool excludeArchived = false}) async {
     var query = _database.select(_database.entries);
     if (type != null) {
       query = query..where((t) => t.type.equals(type));
     }
     if (!includeDeleted) {
       query = query..where((t) => t.deletedAt.isNull());
+    }
+    if (excludeArchived) {
+      query = query..where((t) => t.tags.like('%"archivado"%').not());
     }
     query = query
       ..orderBy([
@@ -79,6 +87,14 @@ class EntryDao {
       final data = Map<String, dynamic>.from(row.data);
       return _fromMap(data);
     }).toList();
+  }
+
+  /// Sincroniza los tags de un entry a TagSettings para que aparezcan
+  /// en la pantalla de Gestión de etiquetas.
+  Future<void> _syncTags(Entry entry) async {
+    for (final tag in entry.tags) {
+      await _tagSettingsDao.upsert(tag);
+    }
   }
 
   Future<void> _syncFts(Entry entry) async {
@@ -119,6 +135,7 @@ class EntryDao {
       updatedAt: Value(entry.updatedAt),
       version: Value(entry.version),
       deletedAt: Value(entry.deletedAt),
+      completedAt: Value(entry.completedAt),
     );
   }
 
@@ -139,6 +156,7 @@ class EntryDao {
       'updatedAt': row.updatedAt.toIso8601String(),
       'version': row.version,
       'deletedAt': row.deletedAt?.toIso8601String(),
+      'completedAt': row.completedAt?.toIso8601String(),
     });
   }
 
@@ -200,6 +218,7 @@ class EntryDao {
       updatedAt: _dateTime(data, 'updatedAt', 'updated_at'),
       version: _val<int>(data, 'version', 'version') ?? 1,
       deletedAt: _dateTimeOrNull(data, 'deletedAt', 'deleted_at'),
+      completedAt: _dateTimeOrNull(data, 'completedAt', 'completed_at'),
     );
   }
 }
