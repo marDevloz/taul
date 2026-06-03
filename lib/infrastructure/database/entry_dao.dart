@@ -93,7 +93,16 @@ class EntryDao {
   /// en la pantalla de Gestión de etiquetas.
   Future<void> _syncTags(Entry entry) async {
     for (final tag in entry.tags) {
-      await _tagSettingsDao.upsert(tag);
+      final existing = await _tagSettingsDao.getByName(tag);
+      if (existing != null) {
+        // Preserve system tag flags — only upsert name to ensure existence
+        await _tagSettingsDao.upsert(tag,
+            isSystem: existing.isSystem,
+            isSecure: existing.isSecure,
+            color: existing.color);
+      } else {
+        await _tagSettingsDao.upsert(tag);
+      }
     }
   }
 

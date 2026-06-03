@@ -149,7 +149,7 @@ class TagManagementScreen extends ConsumerWidget {
                   return;
                 }
                 final saveUseCase = ref.read(saveTagSettingProvider);
-                await saveUseCase.call(name, color: selectedColor);
+                await saveUseCase.call(name, color: selectedColor, isSystem: false);
                 ref.invalidate(tagSettingsListProvider);
                 if (ctx.mounted) Navigator.pop(ctx, true);
               },
@@ -240,6 +240,7 @@ class _TagSettingTile extends ConsumerWidget {
     await saveUseCase.call(
       setting.name,
       color: finalHex.isEmpty ? null : finalHex,
+      isSystem: setting.isSystem,
     );
     ref.invalidate(tagSettingsListProvider);
   }
@@ -294,6 +295,7 @@ class _TagSettingTile extends ConsumerWidget {
       result,
       color: setting.color,
       isSecure: setting.isSecure,
+      isSystem: setting.isSystem,
     );
     ref.invalidate(tagSettingsListProvider);
   }
@@ -359,6 +361,7 @@ class _TagSettingTile extends ConsumerWidget {
       setting.name,
       color: setting.color,
       isSecure: newValue,
+      isSystem: setting.isSystem,
     );
     ref.invalidate(tagSettingsListProvider);
   }

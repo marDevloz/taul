@@ -30,12 +30,14 @@ Database _createV9RawDb() {
     )
   ''');
 
-  // Create tag_settings table
+  // Create tag_settings table matching actual v9 schema
+  // (v8 added is_system column, v9 has no column changes)
   db.execute('''
     CREATE TABLE tag_settings (
       name TEXT NOT NULL PRIMARY KEY,
       color TEXT,
       is_secure INTEGER NOT NULL DEFAULT 0,
+      is_system INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL DEFAULT 0
     )
   ''');
@@ -126,9 +128,7 @@ void main() {
       await database.close();
     });
 
-    test(
-        'should run idempotently — tags_color already absent on re-migration',
-        () async {
+    test('should handle v10 migration — tags_color absent', () async {
       final rawDb = _createV9RawDb();
 
       // Run migration: opens DB, triggers v10, drops tags_color, sets user_version to 10
@@ -137,7 +137,7 @@ void main() {
 
       // Verify user_version was bumped to 10
       final version = rawDb.userVersion;
-      expect(version, 10, reason: 'user_version should be 10 after migration');
+      expect(version, 10, reason: 'user_version should be 10 after v10 migration');
 
       // Verify column is gone
       final columnsAfter = rawDb.select("PRAGMA table_info('entries')");

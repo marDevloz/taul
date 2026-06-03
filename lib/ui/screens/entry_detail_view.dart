@@ -529,9 +529,12 @@ class _NoteContent extends ConsumerWidget {
     );
 
     if (selectedHex != null && context.mounted) {
+      final existingIsSystem =
+          tagMap[tagName.toLowerCase()]?.isSystem ?? false;
       await ref.read(saveTagSettingProvider).call(
         tagName,
         color: selectedHex.isEmpty ? null : selectedHex,
+        isSystem: existingIsSystem,
       );
       ref.invalidate(tagSettingsListProvider);
     }
@@ -1034,9 +1037,12 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
     );
 
     if (selectedHex != null && context.mounted) {
+      final existingIsSystem =
+          tagMap[tagName.toLowerCase()]?.isSystem ?? false;
       await ref.read(saveTagSettingProvider).call(
         tagName,
         color: selectedHex.isEmpty ? null : selectedHex,
+        isSystem: existingIsSystem,
       );
       ref.invalidate(tagSettingsListProvider);
     }

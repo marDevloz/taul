@@ -6,6 +6,8 @@ class SaveTagSetting {
   SaveTagSetting({required ITagSettingsRepository repository})
       : _repository = repository;
 
-  Future<void> call(String name, {String? color, bool isSecure = false}) =>
-      _repository.save(name, color: color, isSecure: isSecure);
+  Future<void> call(String name,
+          {String? color, bool isSecure = false, bool isSystem = false}) =>
+      _repository.save(name,
+          color: color, isSecure: isSecure, isSystem: isSystem);
 }
