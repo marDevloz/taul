@@ -7,11 +7,16 @@ import 'package:taul/ui/providers/entry_providers.dart';
 /// Captures global keyboard shortcuts for the app.
 ///
 /// Wraps the unlocked app tree and handles these shortcuts:
-/// - **Ctrl+N**: new entry (home only)
-/// - **Ctrl+F**: focus search bar (home only)
+/// - **Ctrl+N**: new entry (home only — fires event, HomeView listens)
+/// - **Ctrl+F**: focus search bar (home only — fires event, HomeView listens)
 /// - **Ctrl+,**: navigate to settings
 /// - **Ctrl+Shift+T**: navigate to trash
 /// - **Escape**: navigate to home from any screen
+///
+/// NOTE: This widget lives in MaterialApp.router's builder, OUTSIDE the
+/// GoRouter tree, so GoRouterState.of(context) is NOT available here.
+/// Shortcuts that need to check the current route instead fire events
+/// that only the relevant screen listens to.
 class AppKeyboardShortcuts extends ConsumerWidget {
   final Widget child;
   const AppKeyboardShortcuts({super.key, required this.child});
@@ -20,14 +25,12 @@ class AppKeyboardShortcuts extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Focus(
       autofocus: true,
-      onFocusChange: (f) => debugPrint(
-        '[KB] AppKeyboardShortcuts focus: $f, route: ${GoRouterState.of(context).uri.toString()}',
-      ),
+      onFocusChange: (f) =>
+          debugPrint('[KB] AppKeyboardShortcuts focus: $f'),
       onKeyEvent: (node, event) {
         // DEBUG: log every key event
         debugPrint(
-          '[KB] keyEvent: ${event.runtimeType} logicalKey=${event.logicalKey} '
-          'physicalKey=${event.physicalKey}',
+          '[KB] keyEvent: ${event.runtimeType} logicalKey=${event.logicalKey}',
         );
 
         // Ignore repeats to avoid spawning multiple dialogs.
@@ -45,48 +48,36 @@ class AppKeyboardShortcuts extends ConsumerWidget {
                 HardwareKeyboard.instance
                     .isLogicalKeyPressed(LogicalKeyboardKey.shiftRight);
 
-        // ── Ctrl+N → nueva entrada (solo en home) ──
+        // ── Ctrl+N → nueva entrada (dispara evento, HomeView escucha) ──
         if (ctrl && !shift && event.logicalKey == LogicalKeyboardKey.keyN) {
-          try {
-            if (GoRouterState.of(context).uri.toString() == '/') {
-              ref.read(createEntryEventProvider.notifier).state++;
-              return KeyEventResult.handled;
-            }
-          } catch (_) {
-            // Router may not be available during transitions.
-          }
-          return KeyEventResult.ignored;
+          debugPrint('[KB] Ctrl+N fired');
+          ref.read(createEntryEventProvider.notifier).state++;
+          return KeyEventResult.handled;
         }
 
-        // ── Ctrl+F → enfocar búsqueda (solo en home) ──
+        // ── Ctrl+F → enfocar búsqueda (dispara evento, HomeView escucha) ──
         if (ctrl && !shift && event.logicalKey == LogicalKeyboardKey.keyF) {
-          try {
-            if (GoRouterState.of(context).uri.toString() == '/') {
-              ref.read(focusSearchProvider.notifier).state = true;
-              return KeyEventResult.handled;
-            }
-          } catch (_) {}
-          return KeyEventResult.ignored;
+          debugPrint('[KB] Ctrl+F fired');
+          ref.read(focusSearchProvider.notifier).state = true;
+          return KeyEventResult.handled;
         }
 
-        // ── Ctrl+, → settings (global) ──
+        // ── Ctrl+, → settings ──
         if (ctrl && !shift && event.logicalKey == LogicalKeyboardKey.comma) {
+          debugPrint('[KB] Ctrl+, → settings');
           try {
-            if (GoRouterState.of(context).uri.toString() != '/settings') {
-              context.go('/settings');
-            }
+            context.push('/settings');
             return KeyEventResult.handled;
           } catch (_) {
             return KeyEventResult.ignored;
           }
         }
 
-        // ── Ctrl+Shift+T → papelera (global) ──
+        // ── Ctrl+Shift+T → papelera ──
         if (ctrl && shift && event.logicalKey == LogicalKeyboardKey.keyT) {
+          debugPrint('[KB] Ctrl+Shift+T → trash');
           try {
-            if (GoRouterState.of(context).uri.toString() != '/trash') {
-              context.push('/trash');
-            }
+            context.push('/trash');
             return KeyEventResult.handled;
           } catch (_) {
             return KeyEventResult.ignored;
@@ -95,20 +86,16 @@ class AppKeyboardShortcuts extends ConsumerWidget {
 
         // ── Escape → navegar a home ──
         if (event.logicalKey == LogicalKeyboardKey.escape) {
+          debugPrint('[KB] Escape → go home');
           try {
-            if (GoRouterState.of(context).uri.toString() != '/') {
-              debugPrint('[KB] Escape → go home');
-              context.go('/');
-              return KeyEventResult.handled;
-            }
-          } catch (_) {}
-          return KeyEventResult.ignored;
+            context.go('/');
+            return KeyEventResult.handled;
+          } catch (_) {
+            return KeyEventResult.ignored;
+          }
         }
 
-        debugPrint(
-          '[KB] unhandled: ctrl=$ctrl shift=$shift key=${event.logicalKey} '
-          'route=${GoRouterState.of(context).uri.toString()}',
-        );
+        debugPrint('[KB] unhandled: ctrl=$ctrl shift=$shift key=${event.logicalKey}');
         return KeyEventResult.ignored;
       },
       child: child,

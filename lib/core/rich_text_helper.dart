@@ -49,12 +49,7 @@ class RichTextHelper {
     return plainTextToDocument(content);
   }
 
-  /// Si [content] tiene un separador `:`, devuelve Delta JSON con el término
-  /// en **negrita** (mayúscula inicial), `: `, y la definición en *cursiva*
-  /// (mayúscula inicial). Si no hay `:`, devuelve el contenido sin cambios.
-  ///
-  /// Acepta tanto texto plano como Delta JSON de entrada.
-  /// Extrae `-#tag` de un texto plano y devuelve el texto limpio + los tags.
+  /// Extrae los `-#tag` de un texto plano y devuelve el texto limpio + los tags.
   ///
   /// El formato exacto es `-#tag` — el `-` antes de `#` es el marker.
   /// Los tags pueden contener guiones: `-#gol-caracol`.
@@ -95,6 +90,11 @@ class RichTextHelper {
     return jsonEncode(cleanedOps);
   }
 
+  /// Si [content] tiene un separador `:`, devuelve Delta JSON con el término
+  /// en **negrita** (mayúscula inicial), `: `, y la definición en *cursiva*
+  /// (mayúscula inicial). Si no hay `:`, devuelve el contenido sin cambios.
+  ///
+  /// Acepta tanto texto plano como Delta JSON de entrada.
   static String formatForGlossary(String content) {
     final plainText = documentToPlainText(getDocument(content));
 

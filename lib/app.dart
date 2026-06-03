@@ -18,37 +18,44 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
     routes: [
-      GoRoute(
-        path: '/',
-        name: 'home',
-        builder: (_, __) => const HomeView(),
-      ),
-      GoRoute(
-        path: '/entry/:id',
-        name: 'entry',
-        builder: (_, state) => EntryDetailView(entryId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/settings',
-        name: 'settings',
-        builder: (_, __) => const SettingsScreen(),
+      // ShellRoute wraps ALL routes so AppKeyboardShortcuts lives inside
+      // the GoRouter tree and GoRouterState.of(context) works.
+      ShellRoute(
+        builder: (context, state, child) => AppKeyboardShortcuts(child: child),
         routes: [
           GoRoute(
-            path: 'tags',
-            name: 'tags',
-            builder: (_, __) => const TagManagementScreen(),
+            path: '/',
+            name: 'home',
+            builder: (_, __) => const HomeView(),
           ),
           GoRoute(
-            path: 'manual',
-            name: 'manual',
-            builder: (_, __) => const UserManualScreen(),
+            path: '/entry/:id',
+            name: 'entry',
+            builder: (_, state) => EntryDetailView(entryId: state.pathParameters['id']!),
+          ),
+          GoRoute(
+            path: '/settings',
+            name: 'settings',
+            builder: (_, __) => const SettingsScreen(),
+            routes: [
+              GoRoute(
+                path: 'tags',
+                name: 'tags',
+                builder: (_, __) => const TagManagementScreen(),
+              ),
+              GoRoute(
+                path: 'manual',
+                name: 'manual',
+                builder: (_, __) => const UserManualScreen(),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: '/trash',
+            name: 'trash',
+            builder: (_, __) => const TrashScreen(),
           ),
         ],
-      ),
-      GoRoute(
-        path: '/trash',
-        name: 'trash',
-        builder: (_, __) => const TrashScreen(),
       ),
     ],
   );
@@ -88,9 +95,7 @@ class TaulApp extends ConsumerWidget {
         if (lockStatus == AppLockStatus.locked) {
           return const _LockScreenWrapper();
         }
-        return AppKeyboardShortcuts(
-          child: InactivityDetector(child: child!),
-        );
+        return InactivityDetector(child: child!);
       },
     );
   }

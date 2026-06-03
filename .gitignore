@@ -25,3 +25,7 @@ coverage/
 # OS
 .DS_Store
 Thumbs.db
+
+# Flutter generated
+.flutter-plugins
+.flutter-plugins-dependencies
