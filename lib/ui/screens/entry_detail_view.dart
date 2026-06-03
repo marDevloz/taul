@@ -68,7 +68,16 @@ class EntryDetailView extends ConsumerWidget {
 
     return Focus(
       autofocus: true,
+      onFocusChange: (f) => debugPrint(
+        '[EDV] EntryDetailView focus: $f entryId=$entryId',
+      ),
       onKeyEvent: (node, event) {
+        // DEBUG: log every key event
+        debugPrint(
+          '[EDV] keyEvent: ${event.runtimeType} logicalKey=${event.logicalKey} '
+          'physicalKey=${event.physicalKey}',
+        );
+
         if (event is KeyRepeatEvent) return KeyEventResult.ignored;
         if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
@@ -80,24 +89,28 @@ class EntryDetailView extends ConsumerWidget {
 
         // Ctrl+E → editar entrada
         if (ctrl && event.logicalKey == LogicalKeyboardKey.keyE) {
+          debugPrint('[EDV] Ctrl+E → edit entryId=$entryId');
           _showEdit(context, ref);
           return KeyEventResult.handled;
         }
 
         // Delete → eliminar entrada
         if (event.logicalKey == LogicalKeyboardKey.delete) {
+          debugPrint('[EDV] Delete → trash entryId=$entryId');
           _confirmDelete(context, ref);
           return KeyEventResult.handled;
         }
 
         // Ctrl+Left → entrada anterior
         if (ctrl && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+          debugPrint('[EDV] Ctrl+Left → previous from index=$currentIndex');
           _goToAdjacent(entryIds, currentIndex, context, -1);
           return KeyEventResult.handled;
         }
 
         // Ctrl+Right → entrada siguiente
         if (ctrl && event.logicalKey == LogicalKeyboardKey.arrowRight) {
+          debugPrint('[EDV] Ctrl+Right → next from index=$currentIndex');
           _goToAdjacent(entryIds, currentIndex, context, 1);
           return KeyEventResult.handled;
         }
@@ -109,10 +122,14 @@ class EntryDetailView extends ConsumerWidget {
                       .isLogicalKeyPressed(LogicalKeyboardKey.shiftLeft) ||
                   HardwareKeyboard.instance
                       .isLogicalKeyPressed(LogicalKeyboardKey.shiftRight);
+          debugPrint('[EDV] Ctrl+Tab shift=$shift from index=$currentIndex');
           _goToAdjacent(entryIds, currentIndex, context, shift ? -1 : 1);
           return KeyEventResult.handled;
         }
 
+        debugPrint(
+          '[EDV] unhandled: ctrl=$ctrl key=${event.logicalKey}',
+        );
         return KeyEventResult.ignored;
       },
       child: Scaffold(

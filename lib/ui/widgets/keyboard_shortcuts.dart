@@ -20,7 +20,16 @@ class AppKeyboardShortcuts extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Focus(
       autofocus: true,
+      onFocusChange: (f) => debugPrint(
+        '[KB] AppKeyboardShortcuts focus: $f, route: ${GoRouterState.of(context).uri.toString()}',
+      ),
       onKeyEvent: (node, event) {
+        // DEBUG: log every key event
+        debugPrint(
+          '[KB] keyEvent: ${event.runtimeType} logicalKey=${event.logicalKey} '
+          'physicalKey=${event.physicalKey}',
+        );
+
         // Ignore repeats to avoid spawning multiple dialogs.
         if (event is KeyRepeatEvent) return KeyEventResult.ignored;
         if (event is! KeyDownEvent) return KeyEventResult.ignored;
@@ -88,6 +97,7 @@ class AppKeyboardShortcuts extends ConsumerWidget {
         if (event.logicalKey == LogicalKeyboardKey.escape) {
           try {
             if (GoRouterState.of(context).uri.toString() != '/') {
+              debugPrint('[KB] Escape → go home');
               context.go('/');
               return KeyEventResult.handled;
             }
@@ -95,6 +105,10 @@ class AppKeyboardShortcuts extends ConsumerWidget {
           return KeyEventResult.ignored;
         }
 
+        debugPrint(
+          '[KB] unhandled: ctrl=$ctrl shift=$shift key=${event.logicalKey} '
+          'route=${GoRouterState.of(context).uri.toString()}',
+        );
         return KeyEventResult.ignored;
       },
       child: child,
