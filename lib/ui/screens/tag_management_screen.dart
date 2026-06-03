@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/domain/entities/tag_setting.dart';
 import 'package:taul/shared/tag_palette.dart';
+import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:taul/ui/screens/credential_protection_controller.dart';
@@ -174,9 +175,7 @@ class _TagSettingTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef _) {
-    final color = setting.color != null
-        ? Color(int.parse(setting.color!.substring(1), radix: 16) + 0xFF000000)
-        : TagPalette.defaultGrey;
+    final color = setting.color != null ? parseHex(setting.color!) : TagPalette.defaultGrey;
 
     if (isSystem) {
       // System tag: lock icon, no delete, no rename, no secure toggle,
@@ -223,11 +222,8 @@ class _TagSettingTile extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         title: Text('Color para "${setting.name}"'),
         content: PalettePicker(
-          initialColor: setting.color != null
-              ? Color(
-                  int.parse(setting.color!.substring(1), radix: 16) +
-                      0xFF000000,
-                )
+          initialColor: setting.color != null && setting.color!.isNotEmpty
+              ? parseHex(setting.color!)
               : null,
           onColorSelected: (hex) => Navigator.pop(ctx, hex),
         ),

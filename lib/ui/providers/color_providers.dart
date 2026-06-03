@@ -22,7 +22,7 @@ final entryDisplayColorProvider =
   final matched = entry.tags
       .map((t) => tagMap[t.toLowerCase()]?.color)
       .whereType<String>()
-      .map(_parseHex)
+      .map(parseHex)
       .toList();
 
   if (matched.isEmpty) return TagPalette.defaultGrey;
@@ -42,7 +42,7 @@ final tagColorForEntryProvider =
     final tagMap = ref.watch(tagSettingsMapProvider);
     final hex = tagMap[tag.toLowerCase()]?.color;
     if (hex == null) return null;
-    return _parseHex(hex);
+    return parseHex(hex);
   },
 );
 
@@ -56,13 +56,13 @@ final tagColorMapProvider = Provider.autoDispose<Map<String, Color>>((ref) {
   final result = <String, Color>{};
   for (final entry in tagMap.entries) {
     if (entry.value.color != null) {
-      result[entry.key.toLowerCase()] = _parseHex(entry.value.color!);
+      result[entry.key.toLowerCase()] = parseHex(entry.value.color!);
     }
   }
   return result;
 });
 
-Color _parseHex(String hex) {
+Color parseHex(String hex) {
   if (hex.length < 2 || hex[0] != '#') {
     return TagPalette.defaultGrey;
   }

@@ -14,6 +14,9 @@ build/
 *.g.dart
 *.drift.dart
 
+# Coverage
+coverage/
+
 # IDE
 .idea/
 .vscode/

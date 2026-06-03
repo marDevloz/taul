@@ -513,8 +513,8 @@ class _NoteContent extends ConsumerWidget {
   void _showPalettePicker(BuildContext context, WidgetRef ref, Entry entry, String tagName) async {
     final tagMap = ref.watch(tagSettingsMapProvider);
     final currentHex = tagMap[tagName.toLowerCase()]?.color;
-    final initialColor = currentHex != null
-        ? Color(int.parse(currentHex.substring(1), radix: 16) + 0xFF000000)
+    final initialColor = currentHex != null && currentHex.isNotEmpty
+        ? parseHex(currentHex)
         : null;
 
     final selectedHex = await showDialog<String>(
@@ -1018,8 +1018,8 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
   void _showPalettePicker(BuildContext context, WidgetRef ref, Entry entry, String tagName) async {
     final tagMap = ref.watch(tagSettingsMapProvider);
     final currentHex = tagMap[tagName.toLowerCase()]?.color;
-    final initialColor = currentHex != null
-        ? Color(int.parse(currentHex.substring(1), radix: 16) + 0xFF000000)
+    final initialColor = currentHex != null && currentHex.isNotEmpty
+        ? parseHex(currentHex)
         : null;
 
     final selectedHex = await showDialog<String>(
