@@ -84,14 +84,16 @@ class AppKeyboardShortcuts extends ConsumerWidget {
           }
         }
 
-        // ── Escape → navegar a home ──
+        // ── Escape → cerrar modal/sheet o volver ──
         if (event.logicalKey == LogicalKeyboardKey.escape) {
-          debugPrint('[KB] Escape → go home');
+          debugPrint('[KB] Escape → pop');
           try {
-            context.go('/');
-            return KeyEventResult.handled;
+            if (context.canPop()) {
+              context.pop();
+              return KeyEventResult.handled;
+            }
           } catch (_) {
-            return KeyEventResult.ignored;
+            // ignore
           }
         }
 
