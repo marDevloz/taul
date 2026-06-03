@@ -374,15 +374,31 @@ class EntryDetailView extends ConsumerWidget {
                           : () async {
                               setLocalState(() => isSaving = true);
                               try {
-                                final tags = tagsCtrl.text
+                                // Extraer -#tag del contenido rich text
+                                final plainText = RichTextHelper.documentToPlainText(
+                                  RichTextHelper.getDocument(richContent),
+                                );
+                                final extracted = RichTextHelper.extractTags(plainText);
+                                final contentTags = extracted.tags;
+                                final content = RichTextHelper.stripTagsFromContent(
+                                  richContent,
+                                  contentTags,
+                                );
+
+                                // Tags manuales (campo separado por coma)
+                                final manualTags = tagsCtrl.text
                                     .split(',')
                                     .map((t) => t.trim())
                                     .where((t) => t.isNotEmpty)
                                     .toList();
+
+                                // Merge sin duplicados
+                                final tags = {...manualTags, ...contentTags}.toList();
+
                                 await ref.read(updateEntryProvider).call(
                                   entry,
                                   title: titleCtrl.text,
-                                  content: richContent,
+                                  content: content,
                                   tags: tags,
                                   type: selectedType,
                                 );

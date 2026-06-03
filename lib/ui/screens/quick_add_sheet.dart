@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/credential_parser.dart';
+import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
@@ -82,13 +83,8 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   /// Extrae los -#tags de un texto y devuelve el texto limpio + los tags.
   /// El formato exacto es `-#tag` — el `-` antes de `#` es el marker.
   /// Los tags pueden contener guiones: `-#gol-caracol`.
-  ({String clean, List<String> tags}) _extractTags(String raw) {
-    final re = RegExp(r'-#([\w-]+)');
-    final matches = re.allMatches(raw);
-    final tags = matches.map((m) => m.group(1)!).toList();
-    final clean = raw.replaceAll(re, '').replaceAll(RegExp(r'\s+'), ' ').trim();
-    return (clean: clean, tags: tags);
-  }
+  ({String clean, List<String> tags}) _extractTags(String raw) =>
+      RichTextHelper.extractTags(raw);
 
   /// Vista previa del parseo: muestra tipo detectado, título y tags.
   Widget _buildParsePreview() {

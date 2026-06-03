@@ -54,6 +54,47 @@ class RichTextHelper {
   /// (mayúscula inicial). Si no hay `:`, devuelve el contenido sin cambios.
   ///
   /// Acepta tanto texto plano como Delta JSON de entrada.
+  /// Extrae `-#tag` de un texto plano y devuelve el texto limpio + los tags.
+  ///
+  /// El formato exacto es `-#tag` — el `-` antes de `#` es el marker.
+  /// Los tags pueden contener guiones: `-#gol-caracol`.
+  static ({String clean, List<String> tags}) extractTags(String raw) {
+    final re = RegExp(r'-#([\w-]+)');
+    final matches = re.allMatches(raw);
+    final tags = matches.map((m) => m.group(1)!).toList();
+    final clean = raw.replaceAll(re, '').replaceAll(RegExp(r'\s+'), ' ').trim();
+    return (clean: clean, tags: tags);
+  }
+
+  /// Removes all `-#tagName` markers from rich text (Delta JSON) content.
+  ///
+  /// Iterates each Delta operation and strips the exact `-#tagName` text
+  /// from insert strings. Preserves all formatting attributes on remaining
+  /// text. If [tagNames] is empty, returns the content unchanged.
+  static String stripTagsFromContent(String jsonContent, List<String> tagNames) {
+    if (tagNames.isEmpty || jsonContent.isEmpty) return jsonContent;
+
+    final doc = getDocument(jsonContent);
+    final ops = doc.toDelta().toJson();
+
+    final cleanedOps = <Map<String, dynamic>>[];
+    for (final op in ops) {
+      if (op['insert'] is String) {
+        var text = op['insert'] as String;
+        final original = text;
+        for (final tag in tagNames) {
+          text = text.replaceAll('-#$tag', '');
+        }
+        if (text.isEmpty) continue; // remove empty operations
+        cleanedOps.add({...op, 'insert': text != original ? text : original});
+      } else {
+        cleanedOps.add(op);
+      }
+    }
+
+    return jsonEncode(cleanedOps);
+  }
+
   static String formatForGlossary(String content) {
     final plainText = documentToPlainText(getDocument(content));
 

@@ -58,13 +58,8 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
   }
 
   /// Extrae los `-#tag` de un texto y devuelve el texto limpio + los tags.
-  ({String clean, List<String> tags}) _extractTags(String raw) {
-    final re = RegExp(r'-#([\w-]+)');
-    final matches = re.allMatches(raw);
-    final tags = matches.map((m) => m.group(1)!).toList();
-    final clean = raw.replaceAll(re, '').replaceAll(RegExp(r'\s+'), ' ').trim();
-    return (clean: clean, tags: tags);
-  }
+  ({String clean, List<String> tags}) _extractTags(String raw) =>
+      RichTextHelper.extractTags(raw);
 
   // ---------------------------------------------------------------------------
   // Auto-detección de tipo desde el contenido
@@ -162,11 +157,11 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
         } else {
           // No se pudo parsear como credencial — guardar como nota
           type = EntryType.note;
-          content = _richContent;
+          content = RichTextHelper.stripTagsFromContent(_richContent, contentTags);
         }
       case EntryType.task:
       case EntryType.note:
-        content = _richContent;
+        content = RichTextHelper.stripTagsFromContent(_richContent, contentTags);
     }
 
     setState(() => _isSaving = true);
