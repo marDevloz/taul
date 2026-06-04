@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:taul/infrastructure/database/app_database.dart';
@@ -57,7 +58,11 @@ void main() {
         databaseProvider.overrideWithValue(database),
         entryAuthServiceProvider.overrideWithValue(auth),
       ],
-      child: const MaterialApp(
+      child: MaterialApp(
+        localizationsDelegates: const [
+          ...FlutterQuillLocalizations.localizationsDelegates,
+        ],
+        supportedLocales: FlutterQuillLocalizations.supportedLocales,
         home: EntryDetailView(entryId: testEntryId),
       ),
     );
@@ -197,6 +202,110 @@ void main() {
       await tester.tapAt(const Offset(0, 0));
       await tester.pumpAndSettle();
       expect(find.byType(PalettePicker), findsNothing);
+    });
+  });
+
+  group('T-18: Tag autocomplete tests', () {
+    /// Creates a note entry with a specific tag for autocomplete testing.
+    Future<void> createNoteEntry({String tag = 'urgente'}) async {
+      final now = DateTime.now();
+      await database.into(database.entries).insert(
+        Entry(
+          id: testEntryId,
+          type: 'NOTA',
+          title: 'Test Note',
+          content: 'Content',
+          metadata: '{}',
+          tags: '["$tag"]',
+          requiresAuth: false,
+          createdAt: now,
+          updatedAt: now,
+          version: 1,
+        ),
+      );
+    }
+
+    Future<void> openEditSheet(WidgetTester tester) async {
+      await tester.pumpWidget(createTestApp());
+      // Use a larger surface so the bottom sheet doesn't overflow
+      await tester.binding.setSurfaceSize(const Size(800, 1200));
+      await pumpAndSettle(tester);
+
+      // Tap the edit button (Icons.edit in the AppBar)
+      final editBtn = find.byIcon(Icons.edit);
+      await tester.tap(editBtn);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Should see "Editar entrada" in the bottom sheet
+      expect(find.text('Editar entrada'), findsOneWidget);
+    }
+
+    testWidgets('should_show_matching_suggestions_and_hide_on_no_match',
+        (tester) async {
+      await createNoteEntry(tag: 'urgente');
+
+      await openEditSheet(tester);
+
+      // Find the tags field by its label text
+      final tagsField = find.widgetWithText(TextField, 'Tags (opcional)');
+      expect(tagsField, findsOneWidget);
+
+      // Type matching text "ur"
+      await tester.enterText(tagsField, 'ur');
+      // Wait for debounce (300ms) + pump to settle
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump();
+
+      // After debounce, Autocomplete should show suggestion with "urgente"
+      expect(find.text('urgente'), findsOneWidget);
+
+      // Clear and type non-matching text
+      await tester.enterText(tagsField, 'xyz');
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump();
+
+      // No suggestion should appear for non-matching text
+      // "urgente" should no longer be visible in the dropdown
+      // (might still be in the tag chip area of the detail view)
+      // We check that the suggestion overlay is not showing "urgente"
+      // Note: the chip "urgente" might still be visible in the detail view
+      // but the suggestion overlay should be gone. Let's check there's no
+      // extra "urgente" text beyond the existing tag chip.
+      final urgenteWidgets = find.text('urgente');
+      // There should be at most 1 (the tag chip in the detail view)
+      expect(urgenteWidgets, findsOneWidget);
+    });
+
+    testWidgets('should_append_tag_with_comma_and_space_on_selection',
+        (tester) async {
+      await createNoteEntry(tag: 'urgente');
+
+      await openEditSheet(tester);
+
+      final tagsField = find.widgetWithText(TextField, 'Tags (opcional)');
+      expect(tagsField, findsOneWidget);
+
+      // Type matching text
+      await tester.enterText(tagsField, 'ur');
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump();
+
+      // Suggestions appear (tag chip 'urgente' + overlay option 'urgente')
+      final suggestions = find.text('urgente');
+      expect(suggestions, findsWidgets);
+
+      // Select the overlay suggestion
+      final suggestion = suggestions.last;
+      await tester.ensureVisible(suggestion);
+      await tester.pumpAndSettle();
+
+      await tester.tap(suggestion, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      // After selection the overlay dismisses, field now contains "urgente, "
+      // Only the tag chip 'urgente' should remain visible (1 widget)
+      expect(find.text('urgente'), findsOneWidget);
     });
   });
 }

@@ -210,7 +210,10 @@ void main() {
         expect(find.text('Copiar todo'), findsOneWidget);
 
         // Check confirmation and tap Confirm
-        await tester.tap(find.byType(Checkbox));
+        final checkbox = find.byType(Checkbox);
+        await tester.ensureVisible(checkbox);
+        await tester.pump();
+        await tester.tap(checkbox);
         await tester.pump();
         await tester.tap(find.text('Confirmar'));
         await tester.pump();
