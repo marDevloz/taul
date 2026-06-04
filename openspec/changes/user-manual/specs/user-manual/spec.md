@@ -8,7 +8,7 @@ In-app offline reference documenting Taúl features — entry types, quick-add s
 
 ### Requirement: Quick-Add Syntax Reference
 
-The manual MUST document every quick-add shorthand: entry type prefixes (`#`, `!`, `?`, `.`), tag injection (`+tag`), and secure-tag injection (`++tag`).
+The manual MUST document every quick-add shorthand: the entry type detection rules (`!` for idea, `*` pattern for credential, `word:def` for glossary, `Title# text` for explicit title), and tag extraction via `-#tag` syntax.
 
 #### Scenario: Displays all quick-add modifiers
 
