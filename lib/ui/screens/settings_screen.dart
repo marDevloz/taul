@@ -617,6 +617,34 @@ class SettingsScreen extends ConsumerWidget {
   // ── Import / Export ──
 
   Future<void> _exportData(BuildContext context, WidgetRef ref) async {
+    // 0. Disclaimer dialog
+    if (!context.mounted) return;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Exportar datos'),
+        content: const Text(
+          'Este archivo contiene todas tus entradas, incluyendo '
+          'credenciales cifradas con tu Contraseña Maestra.\n\n'
+          'Los datos cifrados solo pueden leerse desde Taúl con la '
+          'contraseña correcta, pero el archivo en sí no está protegido '
+          'con contraseña.\n\n'
+          'No compartas este archivo a menos que sea estrictamente necesario.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Entendido, exportar'),
+          ),
+        ],
+      ),
+    );
+    if (proceed != true) return;
+
     // 1. Progress dialog
     if (!context.mounted) return;
     _showProgressDialog(context, 'Exportando datos...');

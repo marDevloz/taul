@@ -131,7 +131,7 @@ class _MasterPasswordSetupDialogState
           maxLength: 200,
           decoration: const InputDecoration(
             labelText: 'Pista (opcional)',
-            helperText: 'Tu pista se guarda como texto plano',
+            helperText: 'Se guarda como texto plano — no uses tu contraseña ni variaciones',
             helperMaxLines: 2,
           ),
         ),
@@ -284,7 +284,7 @@ class _MasterPasswordSetupDialogState
           maxLength: 200,
           decoration: const InputDecoration(
             labelText: 'Pista (opcional)',
-            helperText: 'Tu pista se guarda como texto plano',
+            helperText: 'Se guarda como texto plano — no uses tu contraseña ni variaciones',
             helperMaxLines: 2,
           ),
         ),

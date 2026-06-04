@@ -35,7 +35,7 @@ class EntryAuthService {
         _argon2id = argon2id ??
             Argon2id(
               memory: 65536,
-              iterations: 2,
+              iterations: 3,
               parallelism: 1,
               hashLength: 32,
             );

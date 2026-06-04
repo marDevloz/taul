@@ -466,7 +466,7 @@ class CredentialProtectionController {
                 decoration: const InputDecoration(
                   labelText: 'Pista (opcional)',
                   hintText: 'Ej: nombre de mi primera mascota',
-                  helperText: 'Tu hint se guarda en texto plano',
+                  helperText: 'Se guarda en texto plano — no uses tu contraseña ni variaciones',
                   helperMaxLines: 2,
                 ),
               ),
