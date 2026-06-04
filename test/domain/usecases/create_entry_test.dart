@@ -98,6 +98,26 @@ void main() {
       expect(result.type, EntryType.note);
     });
 
+    test('should_infer_task_type_when_content_starts_with_brackets', () async {
+      when(() => repository.create(any())).thenAnswer(
+        (i) => Future.value(i.positionalArguments[0] as Entry),
+      );
+
+      final result = await useCase.call(title: '', content: '[] Comprar leche');
+
+      expect(result.type, EntryType.task);
+    });
+
+    test('should_infer_task_type_when_content_starts_with_dash_bracket', () async {
+      when(() => repository.create(any())).thenAnswer(
+        (i) => Future.value(i.positionalArguments[0] as Entry),
+      );
+
+      final result = await useCase.call(title: '', content: '- [ ] Hacer ejercicio');
+
+      expect(result.type, EntryType.task);
+    });
+
     test('should_add_pendiente_when_type_is_task', () async {
       when(() => repository.create(any())).thenAnswer((invocation) {
         final entry = invocation.positionalArguments[0] as Entry;

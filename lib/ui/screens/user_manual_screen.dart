@@ -87,6 +87,7 @@ class UserManualScreen extends StatelessWidget {
         _bp([_c('!texto'), _t(' → '), _b('Idea'), _t('. El texto después de '), _c('!'), _t(' sin espacio se guarda como contenido de tipo Idea.')]),
         _bp([_c('servicio*user*pass'), _t(' → '), _b('Credencial'), _t('. El patrón con '), _c('*'), _t(' rodeado de texto activa el tipo Credencial.')]),
         _bp([_c('término:definición'), _t(' → '), _b('Glosario'), _t('. Los dos puntos sin espacio antes detectan el tipo Glosario.')]),
+        _bp([_c('[] Tarea'), _t(' → '), _b('Tarea'), _t('. Las líneas que empiezan con '), _c('[]'), _t(' o '), _c('- [ ]'), _t(' crean una entrada de tipo Tarea. Varias líneas se guardan como tareas separadas.')]),
         _bp([_c('Título# texto'), _t(' → '), _b('Nota con título explícito'), _t('. El texto antes de '), _c('# '), _t(' (almohadilla seguida de espacio) se usa como título.')]),
         _p([_b('Inyección de etiquetas')]),
         _bp([_c('-#etiqueta'), _t(' → agrega una etiqueta a la entrada. El formato exacto es '), _c('-#'), _t(' seguido del nombre de la etiqueta. Podés agregar varias: '), _c('-#libros -#pendiente'), _t('.')]),

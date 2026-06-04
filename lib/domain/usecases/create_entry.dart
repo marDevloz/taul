@@ -54,9 +54,16 @@ class CreateEntry {
     if (content.startsWith('!') && content.length > 1 && content[1] != ' ') {
       return EntryType.idea;
     }
+    if (_startsWithTaskMarker(content)) return EntryType.task;
     if (RegExp(r'\S\*\S').hasMatch(content)) return EntryType.credential;
     if (RegExp(r'\w:\S').hasMatch(content)) return EntryType.glossary;
     return EntryType.note;
+  }
+
+  /// Devuelve true si el contenido empieza con `[]`, `[ ]`, o `-[ ]`.
+  static final _taskMarker = RegExp(r'^(?:-\s+)?\[\s?\]');
+  bool _startsWithTaskMarker(String content) {
+    return _taskMarker.hasMatch(content.trimLeft());
   }
 
   List<String> _buildTags(List<String> tags, EntryType type) {

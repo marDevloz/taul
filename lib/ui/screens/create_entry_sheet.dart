@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/credential_parser.dart';
@@ -79,6 +81,9 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
       if (rest.startsWith('!') && rest.length > 1 && rest[1] != ' ') {
         // ! seguido de NO espacio → idea
         _detectedType = EntryType.idea;
+      } else if (RichTextHelper.startsWithTaskMarker(rest)) {
+        // [] / [ ] / - [ ] → tarea
+        _detectedType = EntryType.task;
       } else if (RegExp(r'\S\*\S').hasMatch(rest)) {
         // * rodeado de NO espacios en ambos lados → credencial
         _detectedType = EntryType.credential;
@@ -160,6 +165,15 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
           content = RichTextHelper.stripTagsFromContent(_richContent, contentTags);
         }
       case EntryType.task:
+        content = RichTextHelper.stripTagsFromContent(_richContent, contentTags);
+        // Si el contenido plano empieza con [] lo limpiamos también
+        if (RichTextHelper.startsWithTaskMarker(body)) {
+          final plainContent = RichTextHelper.stripTaskMarker(body);
+          // Regenerar rich content sin el marker
+          content = jsonEncode([
+            {'insert': '$plainContent\n'},
+          ]);
+        }
       case EntryType.note:
         content = RichTextHelper.stripTagsFromContent(_richContent, contentTags);
     }

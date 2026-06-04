@@ -23,6 +23,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   static const _typeHints = {
     EntryType.note: 'Texto libre',
     EntryType.idea: '!idea genial',
+    EntryType.task: '[] Comprar leche',
     EntryType.glossary: 'Término:definición',
     EntryType.credential: 'servicio*user*pass*url(opcional) -#tag',
   };
@@ -69,6 +70,8 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     setState(() {
       if (rest.startsWith('!')) {
         _detectedType = EntryType.idea;
+      } else if (RichTextHelper.startsWithTaskMarker(rest)) {
+        _detectedType = EntryType.task;
       } else if (rest.contains('*')) {
         _detectedType = EntryType.credential;
       } else if (RegExp(r'\w:').hasMatch(rest)) {
@@ -159,12 +162,38 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
 
     setState(() => _isSaving = true);
 
-    // Extraer #tags de todo el texto original
+    // --- Multi-task: varias líneas con []  → cada una es una entrada Tarea ---
+    final taskLines = RichTextHelper.extractTaskLines(rawText);
+    if (taskLines.isNotEmpty) {
+      try {
+        for (final line in taskLines) {
+          final clean = RichTextHelper.stripTaskMarker(line).trim();
+          final extracted = _extractTags(clean);
+          await ref.read(createEntryProvider).call(
+                title: extracted.clean,
+                content: extracted.clean,
+                type: EntryType.task,
+                tags: extracted.tags,
+              );
+        }
+        ref.invalidate(entryListProvider);
+        if (mounted) Navigator.pop(context);
+      } catch (e) {
+        setState(() => _isSaving = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al guardar: $e')),
+          );
+        }
+      }
+      return;
+    }
+
+    // --- Single entry ---
     final extracted = _extractTags(rawText);
     final text = extracted.clean;
     List<String> tags = extracted.tags;
 
-    // Extraer título opcional: "Title# resto"
     final parsed = _splitTitle(text);
     String entryTitle = parsed.title;
     final body = parsed.rest;
@@ -177,12 +206,10 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
 
     switch (type) {
       case EntryType.idea:
-        // Sacar el ! del inicio y el resto es contenido
         content = body.startsWith('!') ? body.substring(1).trim() : body;
       case EntryType.glossary:
         final splitIdx = body.indexOf(':');
         if (splitIdx >= 0) {
-          // Si no hay título explícito, usar el término como título (backward compat)
           if (entryTitle.isEmpty) {
             entryTitle = body.substring(0, splitIdx).trim();
           }
@@ -205,14 +232,13 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
           requiresAuth = true;
           tags = {...tags, ...parsedCred.tags}.toList();
         } else {
-          // Parser no encontró * — guardar como nota
           type = EntryType.note;
           content = body;
         }
       case EntryType.note:
         content = body;
       case EntryType.task:
-        content = body;
+        content = RichTextHelper.stripTaskMarker(body).trim();
     }
 
     try {

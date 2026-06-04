@@ -118,4 +118,29 @@ class RichTextHelper {
       {'insert': '\n'},
     ]);
   }
+
+  /// Regex para detectar inicio de línea con `[]`, `[ ]` o `- [ ]`.
+  static final _taskMarker = RegExp(r'^(?:-\s+)?\[\s?\]\s*');
+
+  /// Indica si [text] empieza con un marker de tarea (`[]`, `[ ]`, `-[ ]`).
+  static bool startsWithTaskMarker(String text) {
+    return _taskMarker.hasMatch(text.trimLeft());
+  }
+
+  /// Remueve el marker `[]` / `[ ]` / `-[ ]` del inicio de [line].
+  /// Si no hay marker, devuelve la línea sin cambios.
+  static String stripTaskMarker(String line) {
+    return line.replaceFirst(_taskMarker, '');
+  }
+
+  /// Dado un texto plano, extrae las líneas que empiezan con `[]` / `[ ]`.
+  /// Si hay múltiples líneas con marker, cada una es un item de tarea.
+  /// Si solo hay una (o ninguna), devuelve una lista vacía: el caller decide.
+  static List<String> extractTaskLines(String text) {
+    final lines = text.split('\n');
+    final taskLines = lines.where((l) => _taskMarker.hasMatch(l.trimLeft())).toList();
+    // Solo consideramos múltiples si hay 2+ líneas con marker
+    if (taskLines.length < 2) return [];
+    return taskLines;
+  }
 }
