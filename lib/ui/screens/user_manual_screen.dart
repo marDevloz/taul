@@ -18,12 +18,12 @@ sealed class _Paragraph {}
 
 final class _TextParagraph extends _Paragraph {
   final TextSpan span;
-  _TextParagraph(this.span);
+  const _TextParagraph(this.span);
 }
 
 final class _BulletParagraph extends _Paragraph {
   final TextSpan span;
-  _BulletParagraph(this.span);
+  const _BulletParagraph(this.span);
 }
 
 /// Convenience: build a [TextSpan] with optional bold segments.
@@ -61,162 +61,113 @@ class UserManualScreen extends StatelessWidget {
   const UserManualScreen({super.key});
 
   static final _sections = <_ManualSection>[
-    // ── 1. Inicio rápido ──
-    _ManualSection(
-      title: 'Inicio rápido',
-      icon: Icons.flash_on,
-      paragraphs: [
-        _p([
-          _t('Usá el botón '),
-          _b('+'),
-          _t(' o '),
-          _b('Ctrl+N'),
-          _t(
-            ' para abrir el formulario de creación. '
-            'Ingresá un título, el contenido con editor de texto enriquecido, '
-            'y etiquetas.',
-          ),
-        ]),
-        _p([
-          _b('Auto-detección de tipo'),
-          _t(
-            ': Taúl detecta automáticamente el tipo según el formato del contenido. '
-            'No se detecta si hay espacio después del marcador:',
-          ),
-        ]),
-        _bp([_c('!idea genial'), _t(' → '), _b('Idea'), _t('. El '), _c('!'), _t(' sin espacio después lo activa. Se saca del contenido al guardar.')]),
-        _bp([_c('Título# texto'), _t(' → '), _b('Nota con título'), _t('. Todo antes de '), _c('# '), _t(' es el título.')]),
-        _bp([_c('término:definición'), _t(' → '), _b('Glosario'), _t('. Los dos puntos deben estar pegados al término (sin espacios).')]),
-        _bp([_c('servicio*user*pass'), _t(' → '), _b('Credencial'), _t('. El '), _c('*'), _t(' debe estar rodeado de texto sin espacios.')]),
-        _bp([_c('-#etiqueta'), _t(' → agrega una '), _b('etiqueta'), _t(' desde el contenido.')]),
-        _p([
-          _i('Consejo: '),
-          _t('si necesitás usar '),
-          _c('!'),
-          _t(', '),
-          _c('*'),
-          _t(' o '),
-          _c(':'),
-          _t(' en una nota normal, dejá un espacio después del carácter y Taúl lo tratará como texto común.'),
-        ]),
-      ],
-    ),
-
-    // ── 2. Tipos de entrada ──
+    // ── 1. Tipos de entrada ──
     _ManualSection(
       title: 'Tipos de entrada',
       icon: Icons.category_outlined,
       paragraphs: [
-        _p([_b('Nota'), _t(' — el tipo predeterminado. Texto libre con formato enriquecido (negrita, cursiva). Ideal para apuntes detallados.')]),
-        _p([_b('Idea'), _t(' — comienza con '), _c('!'), _t(' sin espacio. Se muestra con estilo de cita para destacar ideas.')]),
-        _p([_b('Glosario'), _t(' — define un término con '), _c('término:definición'), _t(' (sin espacios alrededor de los dos puntos). El término aparece en negrita y la definición en cursiva.')]),
-        _p([_b('Credencial'), _t(' — almacena contraseñas con '), _c('servicio*user*pass'), _t('. Solo visible con la '), _b('Contraseña Maestra'), _t(' desbloqueada. También se puede crear desde el formulario de credenciales dedicado.')]),
+        _p([_b('Nota'), _t(' — tipo predeterminado. Sin prefijo especial. Texto libre con formato enriquecido (negrita, cursiva). Icono: '), _c('description'), _t('.')]),
+        _p([_b('Idea'), _t(' — comienza con '), _c('!'), _t(' sin espacio después (ej: '), _c('!idea genial'), _t('). El '), _c('!'), _t(' se elimina del contenido al guardar. Icono: '), _c('lightbulb'), _t('.')]),
+        _p([_b('Glosario'), _t(' — usa el formato '), _c('término:definición'), _t(' sin espacios alrededor de los dos puntos (ej: '), _c('Flutter:framework de Google'), _t('). El término se muestra en negrita y la definición en cursiva. Icono: '), _c('book'), _t('.')]),
+        _p([_b('Credencial'), _t(' — usa el formato '), _c('servicio*user*pass'), _t(' con el caracter '), _c('*'), _t(' rodeado de texto (ej: '), _c('github*manu*pass123'), _t('). Solo visible con la Contraseña Maestra desbloqueada. Icono: '), _c('lock'), _t('.')]),
+        _p([_b('Tarea'), _t(' — tipo manual, se asigna desde el selector de tipo. Agrega automáticamente la etiqueta '), _c('pendiente'), _t(' al crear. Ideal para seguimiento de acciones pendientes. Icono: '), _c('checklist'), _t('.')]),
+        _p([_i('Consejo: '), _t('si necesitás usar '), _c('!'), _t(', '), _c('*'), _t(' o '), _c(':'), _t(' en una nota normal, dejá un espacio después del carácter y Taúl lo tratará como texto común sin detectar un tipo especial.')]),
       ],
     ),
 
-    // ── 3. Búsqueda ──
+    // ── 2. Sintaxis de agregado rápido ──
     _ManualSection(
-      title: 'Búsqueda',
-      icon: Icons.search,
+      title: 'Sintaxis de agregado rápido',
+      icon: Icons.bolt,
       paragraphs: [
-        _p([
-          _t('Usá '),
-          _b('Ctrl+F'),
-          _t(' o el icono de búsqueda en la pantalla principal para abrir la barra de búsqueda. '
-              'Mientras escribís, Taúl busca en tiempo real sobre el título y contenido '
-              'de todas las entradas usando '),
-          _c('FTS5'),
-          _t('.'),
-        ]),
-        _p([
-          _t('La búsqueda encuentra coincidencias parciales. Por ejemplo, '),
-          _c('git'),
-          _t(' encuentra "github", "gitlab", etc.'),
-        ]),
+        _p([_t('La ventana de agregado rápido (') , _b('Ctrl+N'), _t(') permite crear entradas escribiendo todo en una línea. Taúl detecta automáticamente el tipo y extrae etiquetas.')]),
+        _p([_b('Prefijos de tipo')]),
+        _bp([_c('!texto'), _t(' → '), _b('Idea'), _t('. El texto después de '), _c('!'), _t(' sin espacio se guarda como contenido de tipo Idea.')]),
+        _bp([_c('servicio*user*pass'), _t(' → '), _b('Credencial'), _t('. El patrón con '), _c('*'), _t(' rodeado de texto activa el tipo Credencial.')]),
+        _bp([_c('término:definición'), _t(' → '), _b('Glosario'), _t('. Los dos puntos sin espacio antes detectan el tipo Glosario.')]),
+        _bp([_c('Título# texto'), _t(' → '), _b('Nota con título explícito'), _t('. El texto antes de '), _c('# '), _t(' (almohadilla seguida de espacio) se usa como título.')]),
+        _p([_b('Inyección de etiquetas')]),
+        _bp([_c('-#etiqueta'), _t(' → agrega una etiqueta a la entrada. El formato exacto es '), _c('-#'), _t(' seguido del nombre de la etiqueta. Podés agregar varias: '), _c('-#libros -#pendiente'), _t('.')]),
+        _p([_i('Consejo: '), _t('las etiquetas se extraen automáticamente del texto y no forman parte del contenido guardado.')]),
       ],
     ),
 
-    // ── 4. Etiquetas ──
+    // ── 3. Referencia de etiquetas ──
     _ManualSection(
-      title: 'Etiquetas',
+      title: 'Referencia de etiquetas',
       icon: Icons.label_outline,
       paragraphs: [
-        _p([_t('Las etiquetas ('), _c('tags'), _t(') te permiten clasificar y filtrar entradas.')]),
-        _p([_b('Crear'), _t(': desde "Gestionar etiquetas" en Ajustes o escribiendo '), _c('-#tag'), _t(' en el contenido al crear o editar una entrada.')]),
-        _p([_b('Colores'), _t(': cada etiqueta tiene un color asignado visible como badge en las tarjetas. Para cambiarlo, mantení presionada la etiqueta en cualquier entrada y elegí un color de la paleta. El cambio se aplica a todas las entradas con esa etiqueta.')]),
-        _p([_b('Etiquetas seguras'), _t(': marcá una etiqueta como '), _c('segura'), _t(' desde Gestión de etiquetas. Las entradas con etiquetas seguras solo se muestran cuando la '), _b('Contraseña Maestra'), _t(' está desbloqueada.')]),
-        _p([_b('Autocompletado'), _t(': al escribir etiquetas en el formulario de creación o edición, Taúl sugiere etiquetas existentes.')]),
-        _p([
-          _i('Consejo: '),
-          _t('agregá etiquetas sobre la marcha con '),
-          _c('-#tag'),
-          _t(' en el contenido.'),
-        ]),
+        _p([_t('Las etiquetas ('), _c('tags'), _t(') clasifican y filtran entradas. Se crean desde "Gestionar etiquetas" en Ajustes o sobre la marcha con '), _c('-#tag'), _t(' en el contenido.')]),
+        _p([_b('Colores'), _t(': cada etiqueta tiene un color asignado, visible como badge en las tarjetas. Para cambiarlo, mantené presionada la etiqueta en cualquier entrada y elegí un color de la paleta. El cambio se aplica a todas las entradas con esa etiqueta.')]),
+        _p([_b('Etiquetas seguras'), _t(': desde Gestión de etiquetas podés marcar una etiqueta como "segura". Las entradas con etiquetas seguras solo se muestran cuando la '), _b('Contraseña Maestra'), _t(' está desbloqueada. Esto permite ocultar contenido sensible junto con las credenciales.')]),
+        _p([_b('Autocompletado'), _t(': al escribir etiquetas en el formulario de creación o edición, Taúl sugiere etiquetas existentes a medida que escribís, filtrando por coincidencia parcial.')]),
+        _p([_b('Etiquetas de sistema'), _t(': algunas etiquetas son generadas automáticamente (como '), _c('pendiente'), _t(' para las tareas). Se muestran con un ícono de candado y no pueden renombrarse ni eliminarse.')]),
       ],
     ),
 
-    // ── 5. Combinar entradas ──
+    // ── 4. Combinar entradas ──
     _ManualSection(
       title: 'Combinar entradas',
       icon: Icons.merge_type,
       paragraphs: [
-        _p([_t('Seleccioná dos o más entradas desde la pantalla principal (modo selección) y combinalas en una sola.')]),
-        _p([_b('Comportamiento'), _t(': el contenido de todas las entradas se concatena. Las etiquetas se fusionan. El resultado es una entrada de tipo '), _b('Nota'), _t('.')]),
-        _p([_b('⚠️ Advertencia'), _t(': esta operación es '), _b('destructiva'), _t('. Las entradas originales se eliminan y '), _b('no se puede deshacer'), _t('. Asegurate de seleccionar las correctas antes de confirmar.')]),
+        _p([_t('Seleccioná dos o más entradas desde la pantalla principal activando el modo selección y tocad el botón de combinación en la barra inferior.')]),
+        _p([_b('Comportamiento'), _t(': el contenido de todas las entradas se concatena con separadores ("-- título --"). Las etiquetas de todas las entradas se fusionan en una sola lista única. El resultado es una entrada de tipo '), _b('Nota'), _t('.')]),
+        _p([_b('Límite'), _t(': se pueden combinar hasta '), _b('20 entradas'), _t(' a la vez.')]),
+        _p([_b('⚠️ Destructiva'), _t(': esta operación es '), _b('irreversible'), _t('. Las entradas originales '), _b('se eliminan permanentemente'), _t(' y '), _b('no se pueden recuperar'), _t(' (ni siquiera desde la papelera). Asegurate de seleccionar las entradas correctas antes de confirmar.')]),
       ],
     ),
 
-    // ── 6. Contraseña Maestra ──
+    // ── 5. Protección de credenciales ──
     _ManualSection(
-      title: 'Contraseña Maestra',
+      title: 'Protección de credenciales',
       icon: Icons.lock_outline,
       paragraphs: [
-        _p([_b('¿Qué es?'), _t(' — es la clave que protege tus credenciales y etiquetas seguras. Sin ella, esos datos no se pueden leer.')]),
-        _p([_b('Configuración'), _t(': desde Ajustes → "Configurar Contraseña Maestra". Establecé una contraseña y guardá los '), _b('códigos de respaldo'), _t(' en un lugar seguro.')]),
-        _p([_b('Cambio'), _t(': desde Ajustes → "Cambiar Contraseña Maestra". Necesitás la contraseña actual.')]),
-        _p([_b('Códigos de respaldo'), _t(': se generan al configurar. Usalos si olvidás tu contraseña. Cada código solo se puede usar una vez. Regeneralos desde Ajustes.')]),
-        _p([_b('Seguridad'), _t(': las credenciales se cifran con '), _c('AES-256-GCM'), _t(' y la clave se deriva con '), _c('Argon2id'), _t('. Mientras la bóveda está bloqueada, las credenciales y etiquetas seguras permanecen ocultas.')]),
+        _p([_b('Contraseña Maestra'), _t(' — es la clave que protege tus credenciales y etiquetas seguras. Sin ella, esos datos no se pueden leer. Se configura desde Ajustes → "Configurar Contraseña Maestra".')]),
+        _p([_b('Cifrado'), _t(': las credenciales se cifran con '), _c('AES-256-GCM'), _t(' y la clave de cifrado se deriva usando '), _c('Argon2id'), _t('. Esto asegura que los datos protegidos no puedan leerse sin la contraseña correcta.')]),
+        _p([_b('Cierre de bóveda'), _t(': mientras la bóveda está bloqueada, las entradas de tipo Credencial y aquellas con etiquetas seguras '), _b('permanecen ocultas'), _t('. No aparecen en la lista principal ni en resultados de búsqueda.')]),
+        _p([_b('Bloqueo automático'), _t(': podés configurar el bloqueo automático por inactividad desde Ajustes. Opciones: 1, 5, 15, 30 minutos o nunca. También podés activar el bloqueo al iniciar la app.')]),
+        _p([_b('Códigos de respaldo'), _t(': se generan al configurar la Contraseña Maestra. Usalos si olvidás tu contraseña. Cada código solo se puede usar una vez. Podés regenerarlos desde Ajustes.')]),
+        _p([_b('Pista'), _t(': podés asociar una pista a tu Contraseña Maestra para recordarla más fácilmente. Se muestra en la pantalla de desbloqueo.')]),
       ],
     ),
 
-    // ── 7. Atajos de teclado ──
+    // ── 6. Atajos de teclado ──
     _ManualSection(
       title: 'Atajos de teclado',
       icon: Icons.keyboard,
       paragraphs: [
-        _p([_b('Pantalla principal')]),
-        _bp([_b('Ctrl + N'), _t(' — nueva entrada')]),
-        _bp([_b('Ctrl + F'), _t(' — enfocar búsqueda')]),
+        _p([_b('Globales (en toda la app)')]),
+        _bp([_b('Ctrl + N'), _t(' — nueva entrada (abre el diálogo de creación)')]),
+        _bp([_b('Ctrl + F'), _t(' — enfocar la barra de búsqueda')]),
         _bp([_b('Ctrl + ,'), _t(' — ir a Configuración')]),
         _bp([_b('Ctrl + Shift + T'), _t(' — ir a Papelera')]),
-        _bp([_b('Esc'), _t(' — volver a pantalla principal')]),
-        _p([_b('Detalle de entrada')]),
-        _bp([_b('Ctrl + E'), _t(' — editar entrada')]),
-        _bp([_b('Delete'), _t(' — mover a papelera')]),
+        _bp([_b('Esc'), _t(' — volver atrás o cerrar el panel actual')]),
+        _p([_b('En detalle de entrada')]),
+        _bp([_b('Ctrl + E'), _t(' — editar la entrada actual')]),
+        _bp([_b('Delete'), _t(' — mover la entrada a la papelera')]),
         _bp([_b('Ctrl + ← / →'), _t(' — entrada anterior / siguiente')]),
         _bp([_b('Ctrl + Tab / Shift + Tab'), _t(' — entrada siguiente / anterior')]),
         _p([
           _i('Nota: '),
-          _t('los atajos funcionan con '),
+          _t('todos los atajos usan '),
           _b('Ctrl'),
           _t(' en Windows/Linux.'),
         ]),
       ],
     ),
 
-    // ── 8. Configuración ──
+    // ── 7. Resumen de configuración ──
     _ManualSection(
-      title: 'Configuración',
+      title: 'Resumen de configuración',
       icon: Icons.settings,
       paragraphs: [
-        _p([_b('Contraseña Maestra'), _t(': configurar, cambiar, editar pista, regenerar códigos de respaldo, eliminar protección.')]),
-        _p([_b('Seguridad'), _t(': activar bloqueo al iniciar la app, configurar bloqueo automático por inactividad (1, 5, 15, 30 minutos o nunca).')]),
-        _p([_b('Tema'), _t(': elegir entre tema claro, oscuro o seguir el del sistema.')]),
-        _p([_b('Datos'), _t(': exportar todas las entradas a JSON o importar desde un archivo JSON. Las importaciones agregan entradas sin sobrescribir existentes.')]),
-        _p([_b('Papelera'), _t(': ver entradas eliminadas, restaurarlas o vaciar la papelera por completo.')]),
-        _p([_b('Etiquetas'), _t(': crear, renombrar, asignar color, marcar como segura o eliminar etiquetas.')]),
-        _p([_b('Bandeja del sistema'), _t(' (Windows): al cerrar la ventana, Taúl se minimiza a la bandeja. Clic derecho para Abrir o Salir.')]),
-        _p([_b('Zona de Peligro'), _t(': eliminar la Contraseña Maestra. Esto '), _b('descifra y destruye permanentemente'), _t(' todas las credenciales y etiquetas seguras. '), _b('No se puede deshacer'), _t('.')]),
+        _p([_b('Contraseña Maestra'), _t(': '), _i('Configurar'), _t(' — establece la contraseña y genera códigos de respaldo. '), _i('Cambiar'), _t(' — requiere la contraseña actual. '), _i('Editar Pista'), _t(' — asociá una pista visual. '), _i('Regenerar Códigos'), _t(' — invalida los códigos anteriores.')]),
+        _p([_b('Seguridad'), _t(': '), _i('Bloqueo general'), _t(' — pide contraseña al iniciar la app. '), _i('Bloqueo automático'), _t(' — bloquea tras inactividad (1, 5, 15, 30 min o nunca).')]),
+        _p([_b('Tema'), _t(': elegí entre tema '), _i('Claro'), _t(', '), _i('Oscuro'), _t(' o '), _i('Sistema'), _t(' (sigue la configuración del SO).')]),
+        _p([_b('Datos'), _t(': '), _i('Exportar'), _t(' — guarda todas las entradas como archivo JSON. '), _i('Importar'), _t(' — agrega entradas desde un archivo JSON sin sobrescribir las existentes.')]),
+        _p([_b('Etiquetas'), _t(': crear, renombrar, asignar color, marcar como segura o eliminar etiquetas desde "Gestionar etiquetas".')]),
+        _p([_b('Bandeja del sistema'), _t(' (Windows): al cerrar la ventana, Taúl se minimiza a la bandeja en lugar de cerrarse. Clic derecho para '), _i('Abrir'), _t(' o '), _i('Salir'), _t('.')]),
+        _p([_b('⚠️ Zona de Peligro'), _t(': '), _b('Eliminar Contraseña Maestra'), _t(' — descifra y destruye permanentemente todas las credenciales y etiquetas seguras. '), _b('Esta acción no se puede deshacer'), _t('. Los datos protegidos se pierden para siempre.')]),
       ],
     ),
   ];
