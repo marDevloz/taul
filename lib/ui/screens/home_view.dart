@@ -323,12 +323,22 @@ class _HomeViewState extends ConsumerState<HomeView> {
 
     IconData icon;
     switch (taskStatus) {
-      case 'pending':
+      case TaskStatusFilter.pending:
         icon = Icons.hourglass_empty;
-      case 'completed':
+      case TaskStatusFilter.completed:
         icon = Icons.check_circle;
       default:
-        icon = Icons.checklist;
+        icon = Icons.task_alt;
+    }
+
+    String selectedString;
+    switch (taskStatus) {
+      case TaskStatusFilter.pending:
+        selectedString = 'pending';
+      case TaskStatusFilter.completed:
+        selectedString = 'completed';
+      default:
+        selectedString = '';
     }
 
     return SnakeFab(
@@ -348,13 +358,13 @@ class _HomeViewState extends ConsumerState<HomeView> {
         SnakeFabItem(value: 'pending', label: 'Pendientes', icon: Icons.hourglass_empty),
         SnakeFabItem(value: 'completed', label: 'Completadas', icon: Icons.check_circle),
       ],
-      selectedValue: taskStatus ?? '',
+      selectedValue: selectedString,
       onItemSelected: (value) {
-        if (value == null || value.isEmpty) {
-          ref.read(taskStatusFilterProvider.notifier).state = null;
-        } else {
-          ref.read(taskStatusFilterProvider.notifier).state = value;
-        }
+        ref.read(taskStatusFilterProvider.notifier).state = switch (value) {
+          'pending' => TaskStatusFilter.pending,
+          'completed' => TaskStatusFilter.completed,
+          _ => null,
+        };
         setState(() => _expandedFabId = null);
       },
     );
