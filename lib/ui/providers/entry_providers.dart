@@ -212,6 +212,9 @@ final searchResultsProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
 
 final selectedTypeFilterProvider = StateProvider<EntryType?>((ref) => null);
 
+/// Estado de completitud para filtrar tareas. `null` = mostrar todas.
+final taskStatusFilterProvider = StateProvider<String?>((ref) => null);
+
 /// Tag seleccionado para filtrar. `null` = mostrar todos.
 final selectedTagFilterProvider = StateProvider<String?>((ref) => null);
 
@@ -237,6 +240,7 @@ final tagsListProvider = Provider<List<String>>((ref) {
 final filteredEntriesProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
   final type = ref.watch(selectedTypeFilterProvider);
   final tag = ref.watch(selectedTagFilterProvider);
+  final taskStatus = ref.watch(taskStatusFilterProvider);
   final entries = ref.watch(entryListProvider).valueOrNull ?? [];
   var result = entries;
   if (type != null) {
@@ -244,6 +248,11 @@ final filteredEntriesProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
   }
   if (tag != null && tag.isNotEmpty) {
     result = result.where((e) => e.tags.any((t) => t.toLowerCase() == tag.toLowerCase())).toList();
+  }
+  if (taskStatus == 'pending') {
+    result = result.where((e) => e.type == EntryType.task && e.completedAt == null).toList();
+  } else if (taskStatus == 'completed') {
+    result = result.where((e) => e.type == EntryType.task && e.completedAt != null).toList();
   }
   return result;
 });

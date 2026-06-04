@@ -256,6 +256,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
         children: [
           _buildTypeFilterFab(),
           const SizedBox(height: 8),
+          _buildTaskStatusFilterFab(),
+          const SizedBox(height: 8),
           _buildTagFilterFab(),
           const SizedBox(height: 8),
           FloatingActionButton(
@@ -308,6 +310,50 @@ class _HomeViewState extends ConsumerState<HomeView> {
         } else {
           ref.read(selectedTypeFilterProvider.notifier).state = EntryType.values
               .firstWhere((e) => e.name == value);
+        }
+        setState(() => _expandedFabId = null);
+      },
+    );
+  }
+
+  Widget _buildTaskStatusFilterFab() {
+    final taskStatus = ref.watch(taskStatusFilterProvider);
+    final isExpanded = _expandedFabId == 'task-status';
+    final hasFilter = taskStatus != null;
+
+    IconData icon;
+    switch (taskStatus) {
+      case 'pending':
+        icon = Icons.hourglass_empty;
+      case 'completed':
+        icon = Icons.check_circle;
+      default:
+        icon = Icons.checklist;
+    }
+
+    return SnakeFab(
+      isExpanded: isExpanded,
+      onTap: () {
+        if (hasFilter && !isExpanded) {
+          ref.read(taskStatusFilterProvider.notifier).state = null;
+        } else {
+          setState(() {
+            _expandedFabId = isExpanded ? null : 'task-status';
+          });
+        }
+      },
+      collapsedIcon: Icon(icon),
+      items: const [
+        SnakeFabItem(value: '', label: 'Todas', icon: Icons.all_inclusive),
+        SnakeFabItem(value: 'pending', label: 'Pendientes', icon: Icons.hourglass_empty),
+        SnakeFabItem(value: 'completed', label: 'Completadas', icon: Icons.check_circle),
+      ],
+      selectedValue: taskStatus ?? '',
+      onItemSelected: (value) {
+        if (value == null || value.isEmpty) {
+          ref.read(taskStatusFilterProvider.notifier).state = null;
+        } else {
+          ref.read(taskStatusFilterProvider.notifier).state = value;
         }
         setState(() => _expandedFabId = null);
       },

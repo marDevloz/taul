@@ -47,6 +47,9 @@ class EntryCard extends StatelessWidget {
   });
 
   IconData get _typeIcon {
+    if (entry.type == EntryType.task && entry.completedAt != null) {
+      return Icons.check_circle;
+    }
     return switch (entry.type) {
       EntryType.glossary => Icons.book,
       EntryType.note => Icons.description,
