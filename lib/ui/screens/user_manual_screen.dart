@@ -14,7 +14,9 @@ class _ManualSection {
 }
 
 /// A paragraph inside a manual section — either plain text or a bullet point.
-sealed class _Paragraph {}
+sealed class _Paragraph {
+  const _Paragraph();
+}
 
 final class _TextParagraph extends _Paragraph {
   final TextSpan span;
