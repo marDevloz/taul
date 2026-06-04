@@ -1,4 +1,3 @@
-import 'package:taul/core/errors/failures.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/domain/repositories/i_entry_repository.dart';
@@ -28,10 +27,6 @@ class CreateEntry {
     Map<String, String> metadata = const {},
   }) async {
     final trimmedTitle = title.trim();
-    if (trimmedTitle.isEmpty) {
-      throw const ValidationFailure(message: 'Title must not be empty');
-    }
-
     final now = DateTime.now();
     final effectiveType = type ?? _inferType(trimmedTitle, content);
     final effectiveTags = _buildTags(tags, effectiveType);

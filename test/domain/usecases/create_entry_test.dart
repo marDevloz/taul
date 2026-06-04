@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:taul/core/errors/failures.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/domain/repositories/i_entry_repository.dart';
@@ -53,11 +52,16 @@ void main() {
       verify(() => repository.create(any())).called(1);
     });
 
-    test('should_throw_on_empty_title', () async {
-      expectLater(
-        useCase.call(title: '', content: 'content'),
-        throwsA(isA<ValidationFailure>()),
+    test('should_allow_empty_title', () async {
+      when(() => repository.create(any())).thenAnswer(
+        (i) => Future.value(i.positionalArguments[0] as Entry),
       );
+
+      final result = await useCase.call(title: '', content: 'content');
+
+      expect(result.title, '');
+      expect(result.content, 'content');
+      verify(() => repository.create(any())).called(1);
     });
 
     test('should_infer_idea_type_when_content_starts_with_exclamation', () async {
