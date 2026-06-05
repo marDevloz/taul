@@ -194,20 +194,35 @@ class _TagSettingTile extends ConsumerWidget {
       );
     }
 
-    // User tag: full CRUD as before
+    // User tag: full CRUD
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: color,
-        radius: 16,
-        child: setting.isSecure
-            ? const Icon(Icons.lock, size: 16, color: Colors.white)
-            : null,
+      leading: GestureDetector(
+        onTap: () => _showColorPicker(context),
+        child: CircleAvatar(
+          backgroundColor: color,
+          radius: 16,
+          child: setting.isSecure
+              ? const Icon(Icons.lock, size: 16, color: Colors.white)
+              : null,
+        ),
       ),
       title: Text(setting.name),
-      subtitle: setting.isSecure ? const Text('Requiere autenticación') : null,
-      trailing: Switch(
-        value: setting.isSecure,
-        onChanged: (value) => _toggleSecure(context, value),
+      subtitle: setting.isSecure
+          ? const Text('Requiere autenticación')
+          : const Text('Tocar círculo para cambiar color'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.palette_outlined, size: 20),
+            tooltip: 'Color',
+            onPressed: () => _showColorPicker(context),
+          ),
+          Switch(
+            value: setting.isSecure,
+            onChanged: (value) => _toggleSecure(context, value),
+          ),
+        ],
       ),
       onTap: () => _showRenameDialog(context),
       onLongPress: () => _showDeleteConfirmation(context),
