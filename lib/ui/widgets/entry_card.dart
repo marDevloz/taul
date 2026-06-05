@@ -145,21 +145,30 @@ class EntryCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
+                  dense: _isCompact,
+                  visualDensity: _isCompact
+                      ? VisualDensity.compact
+                      : null,
                   leading: Icon(_typeIcon, color: theme.colorScheme.primary),
-                  title: Text(
-                    entry.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      decoration: _isCompact
-                          ? TextDecoration.lineThrough
-                          : null,
-                      color: _isCompact
-                          ? theme.colorScheme.onSurfaceVariant
-                          : null,
-                    ),
-                  ),
-                  subtitle: subtitle ?? Column(
+                  title: _isCompact
+                      ? Text(
+                          _displayContent,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            decoration: TextDecoration.lineThrough,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        )
+                      : Text(
+                          entry.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall,
+                        ),
+                  subtitle: _isCompact
+                      ? null
+                      : subtitle ?? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -369,19 +378,23 @@ class EntryCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    entry.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      decoration: _isCompact
-                          ? TextDecoration.lineThrough
-                          : null,
-                      color: _isCompact
-                          ? theme.colorScheme.onSurfaceVariant
-                          : null,
+                  if (_isCompact)
+                    Text(
+                      _displayContent,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        decoration: TextDecoration.lineThrough,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    )
+                  else
+                    Text(
+                      entry.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall,
                     ),
-                  ),
                   const SizedBox(height: 4),
                   if (isSecure)
                     Row(

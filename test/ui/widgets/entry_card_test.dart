@@ -182,8 +182,15 @@ void main() {
         ),
       );
 
-      // Should show "Completada:" label
-      expect(find.textContaining('Completada:'), findsOneWidget);
+      // Compact mode: content instead of title, with strikethrough
+      expect(find.textContaining('Completada:'), findsNothing);
+      // Title is not shown; content is shown in compact mode
+      expect(find.text(completedEntry.title), findsNothing);
+      // The content text ('Completed') is displayed with strikethrough
+      expect(
+        tester.widget<Text>(find.textContaining('Completed')).style?.decoration,
+        TextDecoration.lineThrough,
+      );
     });
 
     testWidgets('should not show completedAt when null', (tester) async {
