@@ -89,7 +89,7 @@ class EntryCard extends StatelessWidget {
       onDoubleTap: isSecure ? onDoubleTapGated ?? onTap : onTap,
       onLongPress: onLongPress,
       child: Card(
-        margin: const EdgeInsets.symmetric(vertical: 4),
+        margin: EdgeInsets.symmetric(vertical: _isCompact ? 2 : 4),
         color: Colors.transparent,
         elevation: 0,
         shape: RoundedRectangleBorder(
