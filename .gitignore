@@ -29,3 +29,6 @@ Thumbs.db
 # Flutter generated
 .flutter-plugins
 .flutter-plugins-dependencies
+
+dist/
+*.exe

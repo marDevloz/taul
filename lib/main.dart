@@ -6,25 +6,25 @@ import 'package:system_tray/system_tray.dart';
 import 'package:taul/app.dart';
 import 'package:window_manager/window_manager.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Desktop tray — async init before app starts
   if (Platform.isWindows) {
-    await _initDesktopTray();
+    _initDesktopTray().whenComplete(() {
+      runApp(const ProviderScope(child: TaulApp()));
+    });
+  } else {
+    runApp(const ProviderScope(child: TaulApp()));
   }
-
-  runApp(const ProviderScope(child: TaulApp()));
 }
 
 /// Desktop tray setup. Gracefully falls back if tray isn't available.
 Future<void> _initDesktopTray() async {
   try {
     await windowManager.ensureInitialized();
-    await windowManager.setPreventClose(true);
     await _initSystemTray();
   } catch (e) {
-    // System tray no disponible — la app funciona igual
     // System tray no disponible — la app funciona igual
   }
 }
@@ -59,9 +59,6 @@ Future<void> _initSystemTray() async {
       _showWindow();
     }
   });
-
-  // Close button intercepted by window_manager → hide to tray
-  windowManager.addListener(_WindowListener());
 }
 
 // ---------------------------------------------------------------------------
@@ -75,15 +72,4 @@ Future<void> _showWindow() async {
 
 void _exitApp() {
   exit(0);
-}
-
-// ---------------------------------------------------------------------------
-// Window event listener — intercept close → hide instead
-// ---------------------------------------------------------------------------
-
-class _WindowListener extends WindowListener {
-  @override
-  void onWindowClose() {
-    windowManager.hide();
-  }
 }
