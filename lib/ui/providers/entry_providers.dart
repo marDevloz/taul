@@ -221,7 +221,7 @@ final taskStatusFilterProvider = StateProvider<TaskStatusFilter?>((ref) => null)
 final selectedTagFilterProvider = StateProvider<String?>((ref) => null);
 
 /// Whether to exclude archived entries from the main list.
-final excludeArchivedProvider = StateProvider<bool>((ref) => false);
+final excludeArchivedProvider = StateProvider<bool>((ref) => true);
 
 /// Todos los tags únicos de entradas no eliminadas.
 /// Ordenados por frecuencia de uso (más usado primero).

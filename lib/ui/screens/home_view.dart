@@ -133,7 +133,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                                       entry.id,
                                     ),
                                     isFavorito:
-                                        entry.metadata['favorito'] == 'true',
+                                        entry.tags.contains('favorito'),
                                     isArchivado:
                                         entry.tags.contains('archivado'),
                                     onLongPress: () =>
@@ -479,6 +479,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
   }
 
   AppBar _buildNormalAppBar() {
+    final excludeArchived = ref.watch(excludeArchivedProvider);
     return AppBar(
       title: GestureDetector(
         onTap: () => _showShortcuts(context),
@@ -496,6 +497,14 @@ class _HomeViewState extends ConsumerState<HomeView> {
             } else {
               ref.read(isSearchOpenProvider.notifier).state = true;
             }
+          },
+        ),
+        IconButton(
+          icon: Icon(excludeArchived ? Icons.archive_outlined : Icons.archive),
+          tooltip: excludeArchived ? 'Archivados' : 'Ocultar archivados',
+          onPressed: () {
+            ref.read(excludeArchivedProvider.notifier).state =
+                !excludeArchived;
           },
         ),
         IconButton(
@@ -579,14 +588,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
   }
 
   Future<void> _toggleCardFavorito(WidgetRef ref, Entry entry) async {
-    final isFav = entry.metadata['favorito'] == 'true';
-    final updatedMeta = Map<String, String>.from(entry.metadata);
-    if (isFav) {
-      updatedMeta.remove('favorito');
-    } else {
-      updatedMeta['favorito'] = 'true';
-    }
-    await ref.read(updateEntryProvider).call(entry, metadata: updatedMeta);
+    await ref.read(toggleEntryTagProvider).call(entry, 'favorito');
     ref.invalidate(entryDetailProvider(entry.id));
     ref.invalidate(entryListProvider);
     ref.invalidate(filteredEntriesProvider);
@@ -603,17 +605,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
     final entries = _resolveSelectedEntries();
     final ref = this.ref;
     for (final entry in entries) {
-      final isFav = entry.metadata['favorito'] == 'true';
-      final updatedMeta = Map<String, String>.from(entry.metadata);
-      if (isFav) {
-        updatedMeta.remove('favorito');
-      } else {
-        updatedMeta['favorito'] = 'true';
-      }
-      await ref.read(updateEntryProvider).call(
-        entry,
-        metadata: updatedMeta,
-      );
+      await ref.read(toggleEntryTagProvider).call(entry, 'favorito');
     }
     ref.invalidate(entryListProvider);
     ref.invalidate(filteredEntriesProvider);
