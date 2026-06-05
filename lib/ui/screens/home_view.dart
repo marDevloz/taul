@@ -549,6 +549,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
 
   Future<void> _toggleCompletado(WidgetRef ref, Entry entry) async {
     await ref.read(markAsCompletedProvider).call(entry);
+    ref.invalidate(entryDetailProvider(entry.id));
     ref.invalidate(entryListProvider);
     ref.invalidate(filteredEntriesProvider);
   }

@@ -482,13 +482,21 @@ class _NoteContent extends ConsumerWidget {
               ),
               if (entry.completedAt != null) ...[
                 const SizedBox(width: 8),
-                Chip(
-                  label: const Text('Completada', style: TextStyle(fontSize: 12)),
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  backgroundColor: Colors.green.withValues(alpha: 0.15),
-                  avatar: const Icon(Icons.check_circle, size: 14, color: Colors.green),
+                SizedBox(
+                  height: 28,
+                  child: TextButton.icon(
+                    onPressed: () async {
+                      await ref.read(markAsCompletedProvider).call(entry);
+                      ref.invalidate(entryDetailProvider(entry.id));
+                      ref.invalidate(filteredEntriesProvider);
+                    },
+                    icon: const Icon(Icons.check_circle, size: 16, color: Colors.green),
+                    label: const Text('Completada', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      foregroundColor: Colors.green,
+                    ),
+                  ),
                 ),
               ],
               if (entry.type == EntryType.task && entry.completedAt == null) ...[
