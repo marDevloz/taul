@@ -132,11 +132,21 @@ class _HomeViewState extends ConsumerState<HomeView> {
                                     isSelected: _selectedEntryIds.contains(
                                       entry.id,
                                     ),
+                                    isFavorito:
+                                        entry.metadata['favorito'] == 'true',
+                                    isArchivado:
+                                        entry.tags.contains('archivado'),
                                     onLongPress: () =>
                                         _enterSelectMode(entry.id),
                                     onToggleCompletado: _isSelectMode
                                         ? null
                                         : () => _toggleCompletado(ref, entry),
+                                    onToggleFavorito: _isSelectMode
+                                        ? null
+                                        : () => _toggleCardFavorito(ref, entry),
+                                    onToggleArchivado: _isSelectMode
+                                        ? null
+                                        : () => _toggleCardArchivado(ref, entry),
                                     onToggle: _isSelectMode
                                         ? () => _toggleSelection(entry.id)
                                         : () {
@@ -510,17 +520,31 @@ class _HomeViewState extends ConsumerState<HomeView> {
   }
 
   AppBar _buildSelectAppBar() {
+    final count = _selectedEntryIds.length;
     return AppBar(
       leading: IconButton(
         icon: const Icon(Icons.close),
         onPressed: _exitSelectMode,
       ),
-      title: Text('${_selectedEntryIds.length} seleccionados'),
+      title: Text('$count seleccionados'),
       actions: [
-        TextButton(
-          onPressed: _selectedEntryIds.length >= 2 ? _navigateToMerge : null,
-          child: const Text('Combinar'),
-        ),
+        if (count >= 1) ...[
+          IconButton(
+            icon: const Icon(Icons.star_outline_rounded),
+            tooltip: 'Favorito',
+            onPressed: () => _batchToggleFavorito(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.archive_outlined),
+            tooltip: 'Archivar',
+            onPressed: () => _batchToggleArchivado(),
+          ),
+        ],
+        if (count >= 2)
+          TextButton(
+            onPressed: _navigateToMerge,
+            child: const Text('Combinar'),
+          ),
         TextButton(onPressed: _exitSelectMode, child: const Text('Cancelar')),
       ],
     );
@@ -552,6 +576,67 @@ class _HomeViewState extends ConsumerState<HomeView> {
     ref.invalidate(entryDetailProvider(entry.id));
     ref.invalidate(entryListProvider);
     ref.invalidate(filteredEntriesProvider);
+  }
+
+  Future<void> _toggleCardFavorito(WidgetRef ref, Entry entry) async {
+    final isFav = entry.metadata['favorito'] == 'true';
+    final updatedMeta = Map<String, String>.from(entry.metadata);
+    if (isFav) {
+      updatedMeta.remove('favorito');
+    } else {
+      updatedMeta['favorito'] = 'true';
+    }
+    await ref.read(updateEntryProvider).call(entry, metadata: updatedMeta);
+    ref.invalidate(entryDetailProvider(entry.id));
+    ref.invalidate(entryListProvider);
+    ref.invalidate(filteredEntriesProvider);
+  }
+
+  Future<void> _toggleCardArchivado(WidgetRef ref, Entry entry) async {
+    await ref.read(toggleEntryTagProvider).call(entry, 'archivado');
+    ref.invalidate(entryDetailProvider(entry.id));
+    ref.invalidate(entryListProvider);
+    ref.invalidate(filteredEntriesProvider);
+  }
+
+  Future<void> _batchToggleFavorito() async {
+    final entries = _resolveSelectedEntries();
+    final ref = this.ref;
+    for (final entry in entries) {
+      final isFav = entry.metadata['favorito'] == 'true';
+      final updatedMeta = Map<String, String>.from(entry.metadata);
+      if (isFav) {
+        updatedMeta.remove('favorito');
+      } else {
+        updatedMeta['favorito'] = 'true';
+      }
+      await ref.read(updateEntryProvider).call(
+        entry,
+        metadata: updatedMeta,
+      );
+    }
+    ref.invalidate(entryListProvider);
+    ref.invalidate(filteredEntriesProvider);
+    _exitSelectMode();
+  }
+
+  Future<void> _batchToggleArchivado() async {
+    final entries = _resolveSelectedEntries();
+    final ref = this.ref;
+    for (final entry in entries) {
+      await ref.read(toggleEntryTagProvider).call(entry, 'archivado');
+    }
+    ref.invalidate(entryListProvider);
+    ref.invalidate(filteredEntriesProvider);
+    _exitSelectMode();
+  }
+
+  List<Entry> _resolveSelectedEntries() {
+    final entriesAsync = ref.read(entrySearchProvider).isEmpty
+        ? ref.read(filteredEntriesProvider)
+        : ref.read(searchResultsProvider);
+    final entries = entriesAsync.valueOrNull ?? [];
+    return entries.where((e) => _selectedEntryIds.contains(e.id)).toList();
   }
 
   void _exitSelectMode() {
