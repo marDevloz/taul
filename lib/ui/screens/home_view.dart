@@ -614,6 +614,7 @@ class _ShortcutsSheet extends StatelessWidget {
       ('!idea', 'Idea'),
       ('Término:def', 'Glosario'),
       ('servicio*user*pass[*url]', 'Credencial'),
+      ('[] Tarea', 'Una línea (o varias)'),
       ('-#tag', 'Tags'),
     ];
 
