@@ -1,0 +1,58 @@
+name: Release Windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.19.0'   # ajustá a tu versión del pubspec
+          cache: true
+
+      - name: Install Inno Setup
+        run: |
+          winget install --id JRSoftware.InnoSetup --silent --accept-package-agreements
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Windows Release
+        run: flutter build windows --release
+
+      - name: Compile Installer
+        run: |
+          $iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          & $iscc installer/setup.iss
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Taul-v*.exe
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact (fallback)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: taul-installer
+          path: dist/Taul-v*.exe
+          retention-days: 7
