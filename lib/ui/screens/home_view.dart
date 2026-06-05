@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/constants.dart';
+import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/services/merge_service.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/providers/color_providers.dart';
@@ -133,6 +134,9 @@ class _HomeViewState extends ConsumerState<HomeView> {
                                     ),
                                     onLongPress: () =>
                                         _enterSelectMode(entry.id),
+                                    onToggleCompletado: _isSelectMode
+                                        ? null
+                                        : () => _toggleCompletado(ref, entry),
                                     onToggle: _isSelectMode
                                         ? () => _toggleSelection(entry.id)
                                         : () {
@@ -541,6 +545,12 @@ class _HomeViewState extends ConsumerState<HomeView> {
         _selectedEntryIds.add(id);
       }
     });
+  }
+
+  Future<void> _toggleCompletado(WidgetRef ref, Entry entry) async {
+    await ref.read(markAsCompletedProvider).call(entry);
+    ref.invalidate(entryListProvider);
+    ref.invalidate(filteredEntriesProvider);
   }
 
   void _exitSelectMode() {

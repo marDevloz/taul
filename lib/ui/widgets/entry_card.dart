@@ -22,6 +22,7 @@ class EntryCard extends StatelessWidget {
   final VoidCallback? onLongPress;
   final VoidCallback? onToggleFavorito;
   final VoidCallback? onToggleArchivado;
+  final VoidCallback? onToggleCompletado;
   final bool isFavorito;
   final bool isArchivado;
 
@@ -42,6 +43,7 @@ class EntryCard extends StatelessWidget {
     this.onLongPress,
     this.onToggleFavorito,
     this.onToggleArchivado,
+    this.onToggleCompletado,
     this.isFavorito = false,
     this.isArchivado = false,
   });
@@ -191,6 +193,22 @@ class EntryCard extends StatelessWidget {
                   trailing: trailingAction ?? Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Completar toggle (solo tareas)
+                      if (onToggleCompletado != null && entry.type == EntryType.task)
+                        GestureDetector(
+                          onTap: onToggleCompletado,
+                          child: Icon(
+                            entry.completedAt != null
+                                ? Icons.check_circle
+                                : Icons.check_circle_outline,
+                            size: 20,
+                            color: entry.completedAt != null
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      if (onToggleCompletado != null && entry.type == EntryType.task)
+                        const SizedBox(width: 4),
                       // Favorito toggle
                       if (onToggleFavorito != null)
                         GestureDetector(
