@@ -21,7 +21,7 @@ class TagSettingsDao extends DatabaseAccessor<AppDatabase>
       into(tagSettings).insertOnConflictUpdate(
         TagSettingsCompanion.insert(
           name: name,
-          color: Value.absentIfNull(color),
+          color: Value(color),
           isSecure: Value(isSecure),
           isSystem: Value(isSystem),
         ),
