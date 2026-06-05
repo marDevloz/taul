@@ -70,10 +70,7 @@ class EntryCard extends StatelessWidget {
     return RichTextHelper.documentToPlainText(doc);
   }
 
-  bool get _isExpandable => !_isCompact && entry.type != EntryType.credential;
-
-  bool get _isCompact =>
-      entry.type == EntryType.task && entry.completedAt != null;
+  bool get _isExpandable => entry.type != EntryType.credential;
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +86,7 @@ class EntryCard extends StatelessWidget {
       onDoubleTap: isSecure ? onDoubleTapGated ?? onTap : onTap,
       onLongPress: onLongPress,
       child: Card(
-        margin: EdgeInsets.symmetric(vertical: _isCompact ? 2 : 4),
+        margin: const EdgeInsets.symmetric(vertical: 4),
         color: Colors.transparent,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -150,14 +147,7 @@ class EntryCard extends StatelessWidget {
                     entry.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      decoration: _isCompact
-                          ? TextDecoration.lineThrough
-                          : null,
-                      color: _isCompact
-                          ? theme.colorScheme.onSurfaceVariant
-                          : null,
-                    ),
+                    style: theme.textTheme.titleSmall,
                   ),
                   subtitle: subtitle ?? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,10 +169,10 @@ class EntryCard extends StatelessWidget {
                             ),
                           ],
                         )
-                      else if (!isExpanded && !_isCompact)
+                      else if (!isExpanded)
                         Text(
                           _displayContent,
-                          maxLines: _isCompact ? 1 : 2,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall,
                         ),
@@ -373,14 +363,7 @@ class EntryCard extends StatelessWidget {
                     entry.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      decoration: _isCompact
-                          ? TextDecoration.lineThrough
-                          : null,
-                      color: _isCompact
-                          ? theme.colorScheme.onSurfaceVariant
-                          : null,
-                    ),
+                    style: theme.textTheme.titleSmall,
                   ),
                   const SizedBox(height: 4),
                   if (isSecure)
