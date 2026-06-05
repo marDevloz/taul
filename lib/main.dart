@@ -24,7 +24,7 @@ Future<void> _initDesktopTray() async {
   try {
     await windowManager.ensureInitialized();
     await _initSystemTray();
-  } catch (e) {
+  } catch (_) {
     // System tray no disponible — la app funciona igual
   }
 }
