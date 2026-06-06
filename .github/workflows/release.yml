@@ -39,10 +39,23 @@ jobs:
           $iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
           & $iscc installer/setup.iss
 
+      - name: Generate manifest.json
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v'
+          $exeName = "Taul-v$version-setup.exe"
+          $manifest = @{
+            version = $version
+            url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$exeName"
+            notes = "Consultá las release notes en GitHub para conocer las novedades."
+          } | ConvertTo-Json
+          Set-Content -Path "dist/manifest.json" -Value $manifest
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/Taul-v*.exe
+          files: |
+            dist/Taul-v*.exe
+            dist/manifest.json
           generate_release_notes: true
           draft: false
           prerelease: false
@@ -54,5 +67,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: taul-installer
-          path: dist/Taul-v*.exe
+          path: |
+            dist/Taul-v*.exe
+            dist/manifest.json
           retention-days: 7

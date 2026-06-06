@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:taul/core/auto_updater.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/providers/theme_provider.dart';
 import 'package:taul/ui/screens/home_view.dart';
@@ -13,6 +14,10 @@ import 'package:taul/ui/screens/user_manual_screen.dart';
 import 'package:taul/ui/screens/trash_screen.dart';
 import 'package:taul/ui/widgets/inactivity_detector.dart';
 import 'package:taul/ui/widgets/keyboard_shortcuts.dart';
+import 'package:taul/ui/widgets/update_dialog.dart';
+
+/// Tracks whether the startup update check has been dispatched.
+final _updateCheckDoneProvider = StateProvider<bool>((ref) => false);
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -68,6 +73,15 @@ class TaulApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final lockStatus = ref.watch(appLockProvider);
     final router = ref.watch(routerProvider);
+    final updateCheckDone = ref.watch(_updateCheckDoneProvider);
+
+    // Dispatch one-time update check after first frame when unlocked
+    if (!updateCheckDone && lockStatus == AppLockStatus.unlocked) {
+      ref.read(_updateCheckDoneProvider.notifier).state = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleAutoUpdate(context, ref);
+      });
+    }
 
     return MaterialApp.router(
       title: 'Taúl',
@@ -117,5 +131,69 @@ class _LockScreenWrapper extends StatelessWidget {
         OverlayEntry(builder: (_) => const LockScreen()),
       ],
     );
+  }
+}
+
+/// Chequea si hay actualización disponible y maneja la respuesta del usuario.
+Future<void> _handleAutoUpdate(BuildContext context, WidgetRef ref) async {
+  final service = ref.read(updateServiceProvider);
+  final manifest = await service.checkForUpdate();
+  if (manifest == null || !context.mounted) return;
+
+  final action = await showUpdateDialog(context, manifest);
+  if (!context.mounted || action == null) return;
+
+  switch (action) {
+    case UpdateDialogAction.download:
+      await _downloadAndInstall(context, service, manifest);
+    case UpdateDialogAction.skip:
+      await service.skipVersion(manifest.version);
+    case UpdateDialogAction.later:
+      break;
+  }
+}
+
+/// Descarga el installer, muestra feedback y lo ejecuta.
+Future<void> _downloadAndInstall(
+  BuildContext context,
+  UpdateService service,
+  UpdateManifest manifest,
+) async {
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Row(
+        children: [
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          SizedBox(width: 12),
+          Text('Descargando actualización...'),
+        ],
+      ),
+      duration: Duration(seconds: 30),
+    ),
+  );
+
+  try {
+    final path = await service.downloadInstaller(manifest.url);
+    if (!context.mounted) return;
+    await service.installUpdate(path);
+    // Si llegamos acá el installer falló (no cerró la app)
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al instalar la actualización')),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al descargar: $e')),
+      );
+    }
   }
 }
