@@ -60,7 +60,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (_, __) => const AboutScreen(),
               ),
             ],
-          },
+          ),
     );
   }
 }
