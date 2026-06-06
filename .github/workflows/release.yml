@@ -26,7 +26,7 @@ jobs:
 
       - name: Install Inno Setup
         run: |
-          winget install --id JRSoftware.InnoSetup --silent --accept-package-agreements
+          choco install innosetup --no-progress -y
 
       - name: Get dependencies
         run: flutter pub get
