@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/credential_parser.dart';
 import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/ui/providers/entry_draft_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/widgets/rich_text_editor.dart';
 
@@ -30,12 +31,52 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
   EntryType? _detectedType;
   EntryType? _manualType;
   var _isSaving = false;
+  var _didSaveSuccessfully = false;
+  late final EntryDraftNotifier _draftNotifier;
 
   EntryType get _effectiveType => _manualType ?? _detectedType ?? EntryType.note;
   bool get _isManual => _manualType != null;
 
   @override
+  void initState() {
+    super.initState();
+    _draftNotifier = ref.read(entryDraftProvider.notifier);
+    final draft = ref.read(entryDraftProvider);
+    if (draft != null) {
+      _titleCtrl.text = draft.title;
+      _tagsCtrl.text = draft.tags;
+      _richContent = draft.content;
+      _manualType = draft.manualType;
+      if (draft.content.isNotEmpty) {
+        _detectTypeFromContent(draft.content);
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    if (!_didSaveSuccessfully) {
+      final hasContent = _titleCtrl.text.isNotEmpty ||
+          _richContent.isNotEmpty ||
+          _tagsCtrl.text.isNotEmpty;
+      // Notifier may already be disposed during widget tree cleanup;
+      // silently drop the draft save — user input loss is acceptable
+      // in this edge case (app/route teardown).
+      if (hasContent) {
+        try {
+          _draftNotifier.save(EntryDraft(
+            title: _titleCtrl.text,
+            content: _richContent,
+            tags: _tagsCtrl.text,
+            manualType: _manualType,
+          ));
+        } catch (_) {}
+      } else {
+        try {
+          _draftNotifier.clear();
+        } catch (_) {}
+      }
+    }
     _titleCtrl.dispose();
     _tagsCtrl.dispose();
     super.dispose();
@@ -201,6 +242,8 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
             metadata: metadata,
             tags: tags,
           );
+      _didSaveSuccessfully = true;
+      _draftNotifier.clear();
       ref.invalidate(entryListProvider);
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -311,7 +354,7 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
           const Text('Contenido', style: TextStyle(fontSize: 12)),
           const SizedBox(height: 4),
           RichTextEditor(
-            initialContent: '',
+            initialContent: _richContent,
             onChanged: (v) => setState(() {
               _richContent = v;
               _detectTypeFromContent(v);
