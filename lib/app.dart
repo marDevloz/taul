@@ -11,6 +11,7 @@ import 'package:taul/ui/screens/lock_screen.dart';
 import 'package:taul/ui/screens/settings_screen.dart';
 import 'package:taul/ui/screens/tag_management_screen.dart';
 import 'package:taul/ui/screens/user_manual_screen.dart';
+import 'package:taul/ui/screens/about_screen.dart';
 import 'package:taul/ui/screens/trash_screen.dart';
 import 'package:taul/ui/widgets/inactivity_detector.dart';
 import 'package:taul/ui/widgets/keyboard_shortcuts.dart';
@@ -53,64 +54,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                 name: 'manual',
                 builder: (_, __) => const UserManualScreen(),
               ),
+              GoRoute(
+                path: 'about',
+                name: 'about',
+                builder: (_, __) => const AboutScreen(),
+              ),
             ],
-          ),
-          GoRoute(
-            path: '/trash',
-            name: 'trash',
-            builder: (_, __) => const TrashScreen(),
-          ),
-        ],
-      ),
-    ],
-  );
-});
-
-class TaulApp extends ConsumerWidget {
-  const TaulApp({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final lockStatus = ref.watch(appLockProvider);
-    final router = ref.watch(routerProvider);
-    final updateCheckDone = ref.watch(_updateCheckDoneProvider);
-
-    // Dispatch one-time update check after first frame when unlocked
-    if (!updateCheckDone && lockStatus == AppLockStatus.unlocked) {
-      ref.read(_updateCheckDoneProvider.notifier).state = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _handleAutoUpdate(context, ref);
-      });
-    }
-
-    return MaterialApp.router(
-      title: 'Taúl',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.teal,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
-      themeMode: ref.watch(themeModeProvider),
-      routerConfig: router,
-      debugShowCheckedModeBanner: false,
-      localizationsDelegates: FlutterQuillLocalizations.localizationsDelegates,
-      builder: (context, child) {
-        if (lockStatus == AppLockStatus.checking) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        if (lockStatus == AppLockStatus.locked) {
-          return const _LockScreenWrapper();
-        }
-        return InactivityDetector(child: child!);
-      },
+          },
     );
   }
 }

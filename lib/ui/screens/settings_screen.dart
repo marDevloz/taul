@@ -127,6 +127,13 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: 'Guía rápida y referencia de funciones',
             onTap: () => context.push('/settings/manual'),
           ),
+          _actionTile(
+            context,
+            icon: Icons.info_outline,
+            title: 'Acerca de',
+            subtitle: 'Versión, autor y tecnología',
+            onTap: () => context.push('/settings/about'),
+          ),
           const Divider(),
           // Danger Zone
           _sectionHeader(context, 'Zona de Peligro'),
