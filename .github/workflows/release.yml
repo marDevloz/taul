@@ -38,7 +38,16 @@ jobs:
 
       - name: Compile Installer
         run: |
-          $iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          $paths = @(
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "$env:ProgramW6432\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $null
+          foreach ($p in $paths) { if (Test-Path $p) { $iscc = $p; break } }
+          if (-not $iscc) { throw "ISCC.exe not found. Inno Setup may not be installed correctly." }
+          Write-Host "Found ISCC.exe at: $iscc"
           & $iscc installer/setup.iss
 
       - name: Generate manifest.json
