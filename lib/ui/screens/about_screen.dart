@@ -1,8 +1,98 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/auto_updater.dart';
+import 'package:taul/ui/widgets/update_dialog.dart';
 
-class AboutScreen extends StatelessWidget {
+class AboutScreen extends ConsumerStatefulWidget {
   const AboutScreen({super.key});
+
+  @override
+  ConsumerState<AboutScreen> createState() => _AboutScreenState();
+}
+
+class _AboutScreenState extends ConsumerState<AboutScreen> {
+  bool _isChecking = false;
+
+  Future<void> _checkForUpdates() async {
+    setState(() => _isChecking = true);
+
+    try {
+      final service = ref.read(updateServiceProvider);
+      final manifest = await service.checkForUpdate();
+
+      if (!mounted) return;
+
+      if (manifest == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ya tenés la versión más reciente.')),
+        );
+        return;
+      }
+
+      final action = await showUpdateDialog(context, manifest);
+      if (!mounted || action == null) return;
+
+      switch (action) {
+        case UpdateDialogAction.download:
+          await _downloadAndInstall(service, manifest);
+        case UpdateDialogAction.skip:
+          await service.skipVersion(manifest.version);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Versión ${manifest.version} saltada.'),
+              ),
+            );
+          }
+        case UpdateDialogAction.later:
+          break;
+      }
+    } finally {
+      if (mounted) setState(() => _isChecking = false);
+    }
+  }
+
+  Future<void> _downloadAndInstall(
+    UpdateService service,
+    UpdateManifest manifest,
+  ) async {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Text('Descargando actualización...'),
+          ],
+        ),
+        duration: Duration(seconds: 30),
+      ),
+    );
+
+    try {
+      final path = await service.downloadInstaller(manifest.url);
+      if (!mounted) return;
+      await service.installUpdate(path);
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error al instalar la actualización')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al descargar: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +142,24 @@ class AboutScreen extends StatelessWidget {
                 color: colorScheme.onSecondaryContainer,
                 fontWeight: FontWeight.w600,
               ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // ── Buscar actualizaciones ──
+          OutlinedButton.icon(
+            onPressed: _isChecking ? null : _checkForUpdates,
+            icon: _isChecking
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.system_update_outlined, size: 20),
+            label: Text(
+              _isChecking
+                  ? 'Buscando actualizaciones…'
+                  : 'Buscar actualizaciones',
             ),
           ),
           const SizedBox(height: 32),

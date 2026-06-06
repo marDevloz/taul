@@ -83,8 +83,8 @@ class TaulApp extends ConsumerWidget {
 
     // Dispatch one-time update check after first frame when unlocked
     if (!updateCheckDone && lockStatus == AppLockStatus.unlocked) {
-      ref.read(_updateCheckDoneProvider.notifier).state = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(_updateCheckDoneProvider.notifier).state = true;
         _handleAutoUpdate(context, ref);
       });
     }
