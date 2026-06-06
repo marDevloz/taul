@@ -61,6 +61,37 @@ class RichTextHelper {
     return (clean: clean, tags: tags);
   }
 
+  /// Strips a plain text [prefix] from the beginning of Delta JSON [jsonContent].
+  ///
+  /// The prefix is matched against the concatenated plain text of all Delta
+  /// insert operations from the start. Matched characters are removed while
+  /// preserving formatting attributes on the remaining text.
+  static String stripPrefix(String jsonContent, String prefix) {
+    if (prefix.isEmpty || jsonContent.isEmpty) return jsonContent;
+
+    final doc = getDocument(jsonContent);
+    final ops = doc.toDelta().toJson();
+
+    final result = <Map<String, dynamic>>[];
+    var remaining = prefix.length;
+    for (final op in ops) {
+      if (op['insert'] is String && remaining > 0) {
+        var text = op['insert'] as String;
+        if (text.length <= remaining) {
+          remaining -= text.length;
+          continue; // skip entire op — fully consumed by prefix
+        }
+        text = text.substring(remaining);
+        remaining = 0;
+        result.add({...op, 'insert': text});
+      } else {
+        result.add(op);
+      }
+    }
+
+    return jsonEncode(result);
+  }
+
   /// Removes all `-#tagName` markers from rich text (Delta JSON) content.
   ///
   /// Iterates each Delta operation and strips the exact `-#tagName` text

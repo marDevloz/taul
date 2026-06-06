@@ -63,6 +63,17 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
   ({String clean, List<String> tags}) _extractTags(String raw) =>
       RichTextHelper.extractTags(raw);
 
+  /// Strips both the `Title# ` prefix and `-#tag` markers from the rich text
+  /// content. Used by note and fallback-credential cases where the content
+  /// is stored as Delta JSON and the title prefix must not appear in the body.
+  String _stripTitleAndTags(List<String> contentTags, String titlePrefix) {
+    var stripped = RichTextHelper.stripTagsFromContent(_richContent, contentTags);
+    if (titlePrefix.isNotEmpty) {
+      stripped = RichTextHelper.stripPrefix(stripped, '$titlePrefix# ');
+    }
+    return stripped;
+  }
+
   // ---------------------------------------------------------------------------
   // Auto-detección de tipo desde el contenido
   // ---------------------------------------------------------------------------
@@ -162,7 +173,7 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
         } else {
           // No se pudo parsear como credencial — guardar como nota
           type = EntryType.note;
-          content = RichTextHelper.stripTagsFromContent(_richContent, contentTags);
+          content = _stripTitleAndTags(contentTags, parsedTitle);
         }
       case EntryType.task:
         content = RichTextHelper.stripTagsFromContent(_richContent, contentTags);
@@ -175,7 +186,7 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
           ]);
         }
       case EntryType.note:
-        content = RichTextHelper.stripTagsFromContent(_richContent, contentTags);
+        content = _stripTitleAndTags(contentTags, parsedTitle);
     }
 
     setState(() => _isSaving = true);
