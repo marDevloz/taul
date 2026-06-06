@@ -12,11 +12,42 @@ void main() {
   // Desktop tray — async init before app starts
   if (Platform.isWindows) {
     _initDesktopTray().whenComplete(() {
-      runApp(const ProviderScope(child: TaulApp()));
+      runApp(const ProviderScope(child: _WindowApp()));
     });
   } else {
     runApp(const ProviderScope(child: TaulApp()));
   }
+}
+
+/// Wrapper que escucha el cierre de ventana y sale realmente.
+class _WindowApp extends StatefulWidget {
+  const _WindowApp();
+
+  @override
+  State<_WindowApp> createState() => _WindowAppState();
+}
+
+class _WindowAppState extends State<_WindowApp> with WindowListener {
+  @override
+  void initState() {
+    super.initState();
+    windowManager.addListener(this);
+  }
+
+  @override
+  void dispose() {
+    windowManager.removeListener(this);
+    super.dispose();
+  }
+
+  @override
+  void onWindowClose() async {
+    await windowManager.destroy();
+    exit(0);
+  }
+
+  @override
+  Widget build(BuildContext context) => const TaulApp();
 }
 
 /// Desktop tray setup. Gracefully falls back if tray isn't available.
