@@ -108,107 +108,115 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header con selector de tipo
-          Row(
-            children: [
-              const Icon(Icons.add, size: 20),
-              const SizedBox(width: 8),
-              Text('Nueva entrada', style: theme.textTheme.titleMedium),
-              const Spacer(),
-              PopupMenuButton<EntryType?>(
-                onSelected: _controller.setManualType,
-                tooltip: 'Cambiar tipo',
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: state.isManual
-                        ? theme.colorScheme.primaryContainer
-                        : theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(_iconForType(state.effectiveType), size: 14),
-                      const SizedBox(width: 4),
-                      Text(_labelForType(state.effectiveType), style: const TextStyle(fontSize: 11)),
-                      const SizedBox(width: 2),
-                      Icon(Icons.arrow_drop_down, size: 14, color: theme.colorScheme.onSurfaceVariant),
-                    ],
-                  ),
-                ),
-                itemBuilder: (_) => [
-                  ...EntryType.values
-                      .where((t) => t != EntryType.credential)
-                      .map(
-                        (t) => PopupMenuItem(
-                          value: t,
+          // Formulario: ocupa el espacio vertical disponible
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header con selector de tipo
+                Row(
+                  children: [
+                    const Icon(Icons.add, size: 20),
+                    const SizedBox(width: 8),
+                    Text('Nueva entrada', style: theme.textTheme.titleMedium),
+                    const Spacer(),
+                    PopupMenuButton<EntryType?>(
+                      onSelected: _controller.setManualType,
+                      tooltip: 'Cambiar tipo',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: state.isManual
+                              ? theme.colorScheme.primaryContainer
+                              : theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_iconForType(state.effectiveType), size: 14),
+                            const SizedBox(width: 4),
+                            Text(_labelForType(state.effectiveType), style: const TextStyle(fontSize: 11)),
+                            const SizedBox(width: 2),
+                            Icon(Icons.arrow_drop_down, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                          ],
+                        ),
+                      ),
+                      itemBuilder: (_) => [
+                        ...EntryType.values
+                            .where((t) => t != EntryType.credential)
+                            .map(
+                              (t) => PopupMenuItem(
+                                value: t,
+                                child: ListTile(
+                                  dense: true,
+                                  leading: Icon(_iconForType(t), size: 18),
+                                  title: Text(_labelForType(t), style: const TextStyle(fontSize: 13)),
+                                  trailing: state.effectiveType == t && state.isManual
+                                      ? Icon(Icons.check, size: 16, color: theme.colorScheme.primary)
+                                      : null,
+                                ),
+                              ),
+                            ),
+                        const PopupMenuDivider(),
+                        PopupMenuItem(
+                          value: null,
                           child: ListTile(
                             dense: true,
-                            leading: Icon(_iconForType(t), size: 18),
-                            title: Text(_labelForType(t), style: const TextStyle(fontSize: 13)),
-                            trailing: state.effectiveType == t && state.isManual
+                            leading: const Icon(Icons.sync, size: 18),
+                            title: const Text('Auto', style: TextStyle(fontSize: 13)),
+                            subtitle: const Text('detectar del contenido', style: TextStyle(fontSize: 11)),
+                            trailing: !state.isManual
                                 ? Icon(Icons.check, size: 16, color: theme.colorScheme.primary)
                                 : null,
                           ),
                         ),
-                      ),
-                  const PopupMenuDivider(),
-                  PopupMenuItem(
-                    value: null,
-                    child: ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.sync, size: 18),
-                      title: const Text('Auto', style: TextStyle(fontSize: 13)),
-                      subtitle: const Text('detectar del contenido', style: TextStyle(fontSize: 11)),
-                      trailing: !state.isManual
-                          ? Icon(Icons.check, size: 16, color: theme.colorScheme.primary)
-                          : null,
+                      ],
                     ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Título
+                TextField(
+                  controller: _titleCtrl,
+                  onChanged: _controller.setTitle,
+                  decoration: const InputDecoration(
+                    labelText: 'Título',
+                    hintText: 'o escribí Titulo# en el contenido',
+                    border: OutlineInputBorder(),
                   ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+                ),
+                const SizedBox(height: 12),
 
-          // Título
-          TextField(
-            controller: _titleCtrl,
-            onChanged: _controller.setTitle,
-            decoration: const InputDecoration(
-              labelText: 'Título',
-              hintText: 'o escribí Titulo# en el contenido',
-              border: OutlineInputBorder(),
+                // Tags (arriba del editor)
+                TextField(
+                  controller: _tagsCtrl,
+                  onChanged: _controller.setTags,
+                  decoration: const InputDecoration(
+                    labelText: 'Tags',
+                    hintText: 'o usá -#tag en el contenido',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Contenido rich text (con scroll interno)
+                const Text('Contenido', style: TextStyle(fontSize: 12)),
+                const SizedBox(height: 4),
+                Expanded(
+                  child: RichTextEditor(
+                    initialContent: state.content,
+                    onChanged: _controller.detectTypeFromContent,
+                  ),
+                ),
+              ],
             ),
           ),
+
+          // Botones (siempre visibles al final)
           const SizedBox(height: 12),
-
-          // Contenido rich text
-          const Text('Contenido', style: TextStyle(fontSize: 12)),
-          const SizedBox(height: 4),
-          RichTextEditor(
-            initialContent: state.content,
-            onChanged: _controller.detectTypeFromContent,
-          ),
-          const SizedBox(height: 12),
-
-          // Tags
-          TextField(
-            controller: _tagsCtrl,
-            onChanged: _controller.setTags,
-            decoration: const InputDecoration(
-              labelText: 'Tags',
-              hintText: 'o usá -#tag en el contenido',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Botones
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [

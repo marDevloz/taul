@@ -289,78 +289,93 @@ class EntryDetailView extends ConsumerWidget {
               bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
             ),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.edit_note, size: 20),
-                    const SizedBox(width: 8),
-                    Text('Editar entrada', style: Theme.of(ctx).textTheme.titleMedium),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: titleCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Título',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                RichTextEditor(
-                  initialContent: entry.content,
-                  onChanged: (v) => setLocalState(() => richContent = v),
-                ),
-                const SizedBox(height: 12),
-                _TagsAutocompleteField(
-                  controller: tagsCtrl,
-                  ref: ref,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Text('Tipo:', style: Theme.of(ctx).textTheme.bodySmall),
-                    const SizedBox(width: 8),
-                    PopupMenuButton<EntryType>(
-                      onSelected: (t) => setLocalState(() => selectedType = t),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(_iconForType(selectedType), size: 14),
-                            const SizedBox(width: 4),
-                            Text(_labelForType(selectedType), style: const TextStyle(fontSize: 11)),
-                            const SizedBox(width: 2),
-                            Icon(Icons.arrow_drop_down, size: 14, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
-                          ],
+                // Formulario: ocupa el espacio disponible
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.edit_note, size: 20),
+                          const SizedBox(width: 8),
+                          Text('Editar entrada', style: Theme.of(ctx).textTheme.titleMedium),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: titleCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Título',
+                          border: OutlineInputBorder(),
                         ),
                       ),
-                      itemBuilder: (_) => EntryType.values
-                          .where((t) => t != EntryType.credential)
-                          .map(
-                            (t) => PopupMenuItem(
-                              value: t,
-                              child: ListTile(
-                                dense: true,
-                                leading: Icon(_iconForType(t), size: 18),
-                                title: Text(_labelForType(t), style: const TextStyle(fontSize: 13)),
-                                trailing: selectedType == t
-                                    ? Icon(Icons.check, size: 16, color: Theme.of(ctx).colorScheme.primary)
-                                    : null,
+                      const SizedBox(height: 12),
+                      // Tags (arriba del editor)
+                      _TagsAutocompleteField(
+                        controller: tagsCtrl,
+                        ref: ref,
+                      ),
+                      const SizedBox(height: 12),
+                      // Tipo
+                      Row(
+                        children: [
+                          Text('Tipo:', style: Theme.of(ctx).textTheme.bodySmall),
+                          const SizedBox(width: 8),
+                          PopupMenuButton<EntryType>(
+                            onSelected: (t) => setLocalState(() => selectedType = t),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(_iconForType(selectedType), size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(_labelForType(selectedType), style: const TextStyle(fontSize: 11)),
+                                  const SizedBox(width: 2),
+                                  Icon(Icons.arrow_drop_down, size: 14, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+                                ],
                               ),
                             ),
-                          )
-                          .toList(),
-                    ),
-                  ],
+                            itemBuilder: (_) => EntryType.values
+                                .where((t) => t != EntryType.credential)
+                                .map(
+                                  (t) => PopupMenuItem(
+                                    value: t,
+                                    child: ListTile(
+                                      dense: true,
+                                      leading: Icon(_iconForType(t), size: 18),
+                                      title: Text(_labelForType(t), style: const TextStyle(fontSize: 13)),
+                                      trailing: selectedType == t
+                                          ? Icon(Icons.check, size: 16, color: Theme.of(ctx).colorScheme.primary)
+                                          : null,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Contenido rich text (con scroll interno)
+                      const Text('Contenido', style: TextStyle(fontSize: 12)),
+                      const SizedBox(height: 4),
+                      Expanded(
+                        child: RichTextEditor(
+                          initialContent: entry.content,
+                          onChanged: (v) => setLocalState(() => richContent = v),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 20),
+
+                // Botones (siempre visibles al final)
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [

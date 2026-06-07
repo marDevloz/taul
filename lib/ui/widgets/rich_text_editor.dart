@@ -93,11 +93,9 @@ class _RichTextEditorState extends State<RichTextEditor> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final screenHeight = MediaQuery.of(context).size.height;
-    final maxH = widget.maxHeight ?? screenHeight * 0.6; // 60% of screen height
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (widget.showToolbar)
@@ -136,10 +134,9 @@ class _RichTextEditorState extends State<RichTextEditor> {
             ),
           ),
         if (widget.showToolbar) const SizedBox(height: 8),
-        GestureDetector(
-          onTap: _requestFocus,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxH),
+        Expanded(
+          child: GestureDetector(
+            onTap: _requestFocus,
             child: Container(
               decoration: BoxDecoration(
                 border: Border.all(color: theme.colorScheme.outline),
@@ -153,8 +150,6 @@ class _RichTextEditorState extends State<RichTextEditor> {
                 config: QuillEditorConfig(
                   placeholder: 'Escribí algo...',
                   padding: EdgeInsets.zero,
-                  minHeight: 120,
-                  maxHeight: maxH - 16, // account for padding
                 ),
               ),
             ),
