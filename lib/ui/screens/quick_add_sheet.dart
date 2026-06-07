@@ -48,6 +48,77 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     _onTextChanged(text);
   }
 
+  void _showQuickCommands(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Comandos rápidos'),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _CommandEntry(
+                icon: Icons.description,
+                label: 'Nota',
+                syntax: 'Texto libre',
+                description: 'Sin prefijo — se guarda como nota simple.',
+              ),
+              Divider(),
+              _CommandEntry(
+                icon: Icons.lightbulb,
+                label: 'Idea',
+                syntax: '!idea genial',
+                description: 'Empezá con ! para crear una idea.',
+              ),
+              Divider(),
+              _CommandEntry(
+                icon: Icons.checklist,
+                label: 'Tarea',
+                syntax: '[ ] Comprar leche',
+                description: 'Usá [ ] o [x] al inicio para crear una tarea.',
+              ),
+              Divider(),
+              _CommandEntry(
+                icon: Icons.book,
+                label: 'Glosario',
+                syntax: 'Término:definición',
+                description: 'Usá : para separar término de su definición.',
+              ),
+              Divider(),
+              _CommandEntry(
+                icon: Icons.lock,
+                label: 'Credencial',
+                syntax: 'servicio*user*pass*url(opcional)',
+                description: 'Separado por *. Se guarda cifrada.',
+              ),
+              Divider(),
+              _CommandEntry(
+                icon: Icons.label,
+                label: 'Tags',
+                syntax: ' -#tag1 -#tag2',
+                description: 'Agregá -# al final para etiquetar.',
+              ),
+              Divider(),
+              _CommandEntry(
+                icon: Icons.title,
+                label: 'Título',
+                syntax: 'Título# contenido',
+                description: 'Texto antes del primer # se usa como título.',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _setType(EntryType? type) {
     if (type == EntryType.credential) {
       Navigator.pop(context);
@@ -192,6 +263,10 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
       }
     });
 
+    final hintText = state.detectedType != null
+        ? 'Ej: ${_typeHints[state.detectedType]}'
+        : 'Escribí algo...';
+
     return Padding(
       padding: EdgeInsets.only(
         left: 12,
@@ -208,6 +283,12 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
             children: [
               Text('Nueva entrada', style: Theme.of(context).textTheme.titleMedium),
               const Spacer(),
+              // Botón de comandos rápidos
+              IconButton(
+                icon: const Icon(Icons.help_outline, size: 20),
+                tooltip: 'Comandos rápidos',
+                onPressed: () => _showQuickCommands(context),
+              ),
               // Selector de tipo — compacto
               PopupMenuButton<EntryType>(
                 onSelected: _setType,
@@ -265,8 +346,31 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
           ),
           const SizedBox(height: 6),
 
-          // Hints compactos
-          if (state.detectedType == null)
+          // Ayuda contextual según tipo detectado
+          if (state.detectedType != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(_iconForType(state.detectedType!), size: 14,
+                      color: Theme.of(context).colorScheme.secondary),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Detectado: ${_labelForType(state.detectedType!)} — ${_typeHints[state.detectedType]}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSecondaryContainer,
+                        ),
+                  ),
+                ],
+              ),
+            )
+          else
             Wrap(
               spacing: 4,
               runSpacing: 2,
@@ -304,20 +408,15 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                 ),
               ],
             ),
-          if (state.detectedType != null)
-            Text(
-              _typeHints[state.detectedType]!,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
-            ),
           const SizedBox(height: 6),
 
-          // Text input — estilo papel de notas
+          // Text input — con hint dinámico según tipo detectado
           TextField(
             controller: _textCtrl,
             autofocus: true,
             onChanged: _onTextChanged,
             decoration: InputDecoration(
-              hintText: 'Escribí algo...',
+              hintText: hintText,
               border: const OutlineInputBorder(),
               filled: true,
               fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
@@ -392,6 +491,63 @@ class _PreviewChip extends StatelessWidget {
           Icon(icon, size: 12),
           const SizedBox(width: 4),
           Text(label, style: const TextStyle(fontSize: 11)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Entrada individual en el diálogo de comandos rápidos.
+class _CommandEntry extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String syntax;
+  final String description;
+
+  const _CommandEntry({
+    required this.icon,
+    required this.label,
+    required this.syntax,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  syntax,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  description,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
