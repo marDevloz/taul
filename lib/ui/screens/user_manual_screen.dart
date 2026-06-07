@@ -95,7 +95,19 @@ class UserManualScreen extends StatelessWidget {
       ],
     ),
 
-    // ── 3. Referencia de etiquetas ──
+    // ── 3. Editor de texto enriquecido ──
+    _ManualSection(
+      title: 'Editor de texto enriquecido',
+      icon: Icons.edit_note_outlined,
+      paragraphs: [
+        _p([_t('El formulario de creación/edición completa (') , _b('Ctrl+N'), _t(') usa un editor de texto enriquecido con barra de formato (negrita, cursiva, listas, etc.).')]),
+        _p([_b('Scroll automático'), _t(': cuando el contenido supera el 60% de la altura de la pantalla, el editor activa scroll interno. '), _b('No hay límite de longitud de texto'), _t(' — podés escribir todo lo que necesites; el área visible se limita para que el formulario no crezca fuera de pantalla.')]),
+        _p([_b('Barra de formato'), _t(': incluye negrita, cursiva, subrayado, tachado, listas con viñetas y numeradas. Podés aplicar formato seleccionando texto y tocando el botón correspondiente.')]),
+        _p([_b('Atajos del editor'), _t(': '), _b('Ctrl+B'), _t(' negrita, '), _b('Ctrl+I'), _t(' cursiva, '), _b('Ctrl+U'), _t(' subrayado.')]),
+      ],
+    ),
+
+    // ── 4. Referencia de etiquetas ──
     _ManualSection(
       title: 'Referencia de etiquetas',
       icon: Icons.label_outline,
@@ -108,7 +120,7 @@ class UserManualScreen extends StatelessWidget {
       ],
     ),
 
-    // ── 4. Combinar entradas ──
+    // ── 5. Combinar entradas ──
     _ManualSection(
       title: 'Combinar entradas',
       icon: Icons.merge_type,
@@ -120,7 +132,7 @@ class UserManualScreen extends StatelessWidget {
       ],
     ),
 
-    // ── 5. Protección de credenciales ──
+    // ── 6. Protección de credenciales ──
     _ManualSection(
       title: 'Protección de credenciales',
       icon: Icons.lock_outline,
@@ -134,7 +146,7 @@ class UserManualScreen extends StatelessWidget {
       ],
     ),
 
-    // ── 6. Atajos de teclado ──
+    // ── 7. Atajos de teclado ──
     _ManualSection(
       title: 'Atajos de teclado',
       icon: Icons.keyboard,
@@ -150,6 +162,10 @@ class UserManualScreen extends StatelessWidget {
         _bp([_b('Delete'), _t(' — mover la entrada a la papelera')]),
         _bp([_b('Ctrl + ← / →'), _t(' — entrada anterior / siguiente')]),
         _bp([_b('Ctrl + Tab / Shift + Tab'), _t(' — entrada siguiente / anterior')]),
+        _p([_b('En editor de texto enriquecido')]),
+        _bp([_b('Ctrl + B'), _t(' — negrita')]),
+        _bp([_b('Ctrl + I'), _t(' — cursiva')]),
+        _bp([_b('Ctrl + U'), _t(' — subrayado')]),
         _p([
           _i('Nota: '),
           _t('todos los atajos usan '),
@@ -159,7 +175,7 @@ class UserManualScreen extends StatelessWidget {
       ],
     ),
 
-    // ── 7. Resumen de configuración ──
+    // ── 8. Resumen de configuración ──
     _ManualSection(
       title: 'Resumen de configuración',
       icon: Icons.settings,

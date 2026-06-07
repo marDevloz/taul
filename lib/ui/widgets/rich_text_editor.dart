@@ -16,11 +16,16 @@ class RichTextEditor extends StatefulWidget {
   /// Whether to show the formatting toolbar.
   final bool showToolbar;
 
+  /// Maximum height of the editor content area. When exceeded, scrolling is enabled.
+  /// Defaults to 60% of the screen height.
+  final double? maxHeight;
+
   const RichTextEditor({
     super.key,
     this.initialContent = '',
     this.onChanged,
     this.showToolbar = true,
+    this.maxHeight,
   });
 
   @override
@@ -88,6 +93,8 @@ class _RichTextEditorState extends State<RichTextEditor> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final maxH = widget.maxHeight ?? screenHeight * 0.6; // 60% of screen height
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -131,20 +138,24 @@ class _RichTextEditorState extends State<RichTextEditor> {
         if (widget.showToolbar) const SizedBox(height: 8),
         GestureDetector(
           onTap: _requestFocus,
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: theme.colorScheme.outline),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            padding: const EdgeInsets.all(8),
-            child: QuillEditor.basic(
-              controller: _controller,
-              focusNode: _focusNode,
-              scrollController: _scrollController,
-              config: const QuillEditorConfig(
-                placeholder: 'Escribí algo...',
-                padding: EdgeInsets.zero,
-                minHeight: 120,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxH),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: theme.colorScheme.outline),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              padding: const EdgeInsets.all(8),
+              child: QuillEditor.basic(
+                controller: _controller,
+                focusNode: _focusNode,
+                scrollController: _scrollController,
+                config: QuillEditorConfig(
+                  placeholder: 'Escribí algo...',
+                  padding: EdgeInsets.zero,
+                  minHeight: 120,
+                  maxHeight: maxH - 16, // account for padding
+                ),
               ),
             ),
           ),
