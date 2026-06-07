@@ -234,6 +234,28 @@ final selectedTagFilterProvider = StateProvider<String?>((ref) => null);
 /// Whether to exclude archived entries from the main list.
 final excludeArchivedProvider = StateProvider<bool>((ref) => true);
 
+/// Cuenta cuántas entradas no eliminadas usan cada tag (case-insensitive).
+/// Ej: {'pendiente': 12, 'caribetech': 5, 'taúl': 3}
+final tagUsageCountProvider = Provider.autoDispose<Map<String, int>>((ref) {
+  final entries = ref.watch(entryListProvider).valueOrNull ?? [];
+  final counts = <String, int>{};
+  for (final e in entries) {
+    for (final tag in e.tags) {
+      final lower = tag.toLowerCase();
+      counts[lower] = (counts[lower] ?? 0) + 1;
+    }
+  }
+  return counts;
+});
+
+/// Provider para eliminar una tag de todas las entradas que la usan.
+/// Se usa junto con deleteTagSettingProvider cuando se confirma la
+/// eliminación de una tag que está en uso.
+final removeTagFromEntriesProvider = Provider<Future<void> Function(String)>((ref) {
+  final dao = ref.watch(daoProvider);
+  return (String tagName) => dao.removeTagFromAllEntries(tagName);
+});
+
 /// Todos los tags únicos de entradas no eliminadas.
 /// Ordenados por frecuencia de uso (más usado primero).
 final tagsListProvider = Provider<List<String>>((ref) {

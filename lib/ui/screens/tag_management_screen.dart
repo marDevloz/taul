@@ -302,11 +302,35 @@ class _TagSettingTile extends ConsumerWidget {
   }
 
   Future<void> _showDeleteConfirmation(BuildContext context) async {
+    final usageCount = ref.read(tagUsageCountProvider)[setting.name.toLowerCase()] ?? 0;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar etiqueta'),
-        content: Text('¿Eliminar la etiqueta "${setting.name}"?'),
+        content: usageCount > 0
+            ? RichText(
+                text: TextSpan(
+                  style: Theme.of(ctx).textTheme.bodyMedium,
+                  children: [
+                    TextSpan(
+                      text: 'La etiqueta "${setting.name}" está siendo usada por ',
+                    ),
+                    TextSpan(
+                      text: '$usageCount entrada${usageCount == 1 ? '' : 's'}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(ctx).colorScheme.error,
+                      ),
+                    ),
+                    const TextSpan(
+                      text: '.\n\nSi la eliminás, se quitará de todas esas '
+                          'entradas y no se podrá recuperar.',
+                    ),
+                  ],
+                ),
+              )
+            : Text('¿Eliminar la etiqueta "${setting.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -326,7 +350,10 @@ class _TagSettingTile extends ConsumerWidget {
     if (confirmed == true && context.mounted) {
       final deleteUseCase = ref.read(deleteTagSettingProvider);
       await deleteUseCase.call(setting.name);
+      final removeTag = ref.read(removeTagFromEntriesProvider);
+      await removeTag(setting.name);
       ref.invalidate(tagSettingsListProvider);
+      ref.invalidate(entryListProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Etiqueta "${setting.name}" eliminada')),

@@ -31,6 +31,42 @@ class EntryDao {
     return entry;
   }
 
+  /// Removes a tag from all entries that use it. Updates both the JSON tags
+  /// column and the FTS index. Does NOT call _syncTags (avoids recreating
+  /// a deleted TagSetting).
+  Future<void> removeTagFromAllEntries(String tagName) async {
+    final all = await (_database.select(_database.entries)).get();
+    for (final row in all) {
+      final tags = List<String>.from(jsonDecode(row.tags) as List);
+      final originalLen = tags.length;
+      tags.removeWhere((t) => t.toLowerCase() == tagName.toLowerCase());
+      if (tags.length != originalLen) {
+        await (_database.update(_database.entries)
+          ..where((t) => t.id.equals(row.id)))
+          .write(db.EntriesCompanion(
+            tags: Value(jsonEncode(tags)),
+            updatedAt: Value(DateTime.now()),
+          ));
+        // Update FTS index so search remains accurate
+        try {
+          await _database.customStatement(
+            'DELETE FROM entries_fts WHERE id = ?',
+            [row.id],
+          );
+          await _database.customInsert(
+            'INSERT INTO entries_fts (id, title, content, tags) VALUES (?, ?, ?, ?)',
+            variables: [
+              Variable.withString(row.id),
+              Variable.withString(row.title),
+              Variable.withString(row.content),
+              Variable.withString(tags.join(' ')),
+            ],
+          );
+        } catch (_) {}
+      }
+    }
+  }
+
   Future<void> delete(String id) async {
     await (_database.delete(_database.entries)
       ..where((t) => t.id.equals(id)))
