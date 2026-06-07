@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
@@ -35,12 +36,18 @@ class EntryDao {
   /// column and the FTS index. Does NOT call _syncTags (avoids recreating
   /// a deleted TagSetting).
   Future<void> removeTagFromAllEntries(String tagName) async {
+    debugPrint('[DEBUG] removeTagFromAllEntries("$tagName"): starting');
     final all = await (_database.select(_database.entries)).get();
+    debugPrint('[DEBUG] removeTagFromAllEntries: total entries=${all.length}');
+    var updatedCount = 0;
     for (final row in all) {
       final tags = List<String>.from(jsonDecode(row.tags) as List);
       final originalLen = tags.length;
       tags.removeWhere((t) => t.toLowerCase() == tagName.toLowerCase());
       if (tags.length != originalLen) {
+        debugPrint('[DEBUG] removeTagFromAllEntries: removing "$tagName" '
+            'from entry ${row.id} (tags: ${row.tags} -> ${jsonEncode(tags)})');
+        updatedCount++;
         await (_database.update(_database.entries)
           ..where((t) => t.id.equals(row.id)))
           .write(db.EntriesCompanion(
@@ -65,6 +72,7 @@ class EntryDao {
         } catch (_) {}
       }
     }
+    debugPrint('[DEBUG] removeTagFromAllEntries: updated $updatedCount entries');
   }
 
   Future<void> delete(String id) async {
