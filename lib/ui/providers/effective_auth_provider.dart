@@ -11,7 +11,7 @@ final effectiveAuthProvider = Provider.family<bool, String>((ref, entryId) {
 
   final tagMap = ref.watch(tagSettingsMapProvider);
   for (final tag in entry.tags) {
-    final setting = tagMap[tag];
+    final setting = tagMap[tag.toLowerCase()];
     if (setting != null && setting.isSecure) return true;
   }
   return false;
@@ -25,7 +25,7 @@ final hasSecureTagProvider = Provider.family<bool, String>((ref, entryId) {
 
   final tagMap = ref.watch(tagSettingsMapProvider);
   for (final tag in entry.tags) {
-    final setting = tagMap[tag];
+    final setting = tagMap[tag.toLowerCase()];
     if (setting != null && setting.isSecure) return true;
   }
   return false;

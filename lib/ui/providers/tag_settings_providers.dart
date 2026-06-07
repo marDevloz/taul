@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/domain/entities/tag_setting.dart';
 import 'package:taul/domain/usecases/get_tag_settings.dart';
@@ -25,13 +24,8 @@ final tagSettingsListProvider = FutureProvider.autoDispose<List<TagSetting>>((re
 /// Canonical tag→color map from tag_settings table (replaces entry-scanned version)
 final tagSettingsMapProvider = Provider.autoDispose<Map<String, TagSetting>>((ref) {
   final tags = ref.watch(tagSettingsListProvider).valueOrNull ?? [];
-  final result = {for (final t in tags) t.name: t};
-
-  // DEBUG: mostrar todas las tags cargadas con sus colores
-  final entries = result.entries.map((e) => '${e.key}=${e.value.color}').join(', ');
-  debugPrint('[DEBUG] tagSettingsMapProvider loaded: $entries');
-
-  return result;
+  // Usamos lowercase como clave para que las búsquedas con .toLowerCase() matcheen
+  return {for (final t in tags) t.name.toLowerCase(): t};
 });
 
 /// System tags from tag_settings table.

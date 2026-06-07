@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/shared/tag_color_mixer.dart';
@@ -26,15 +25,8 @@ final entryDisplayColorProvider =
       .map(parseHex)
       .toList();
 
-  // DEBUG: mostrar colores matched para entry
-  debugPrint('[DEBUG] entryDisplayColorProvider($entryId): '
-      'entry.tags=${entry.tags}, '
-      'tagMap keys=${tagMap.keys.toList()}, '
-      'matched=$matched');
-
   if (matched.isEmpty) return TagPalette.defaultGrey;
   final mixed = TagColorMixer.mix(matched);
-  debugPrint('[DEBUG] entryDisplayColorProvider($entryId): mixed=$mixed');
   return mixed;
 });
 
@@ -47,20 +39,13 @@ final entryDisplayColorProvider =
 final tagColorForEntryProvider =
     Provider.autoDispose.family<Color?, (String entryId, String tag)>(
   (ref, params) {
-    final (entryId, tag) = params;
+    final (_, tag) = params;
     final tagMap = ref.watch(tagSettingsMapProvider);
     final setting = tagMap[tag.toLowerCase()];
     final hex = setting?.color;
 
-    // DEBUG: mostrar qué color resuelve para cada tag
-    debugPrint('[DEBUG] tagColorForEntryProvider(entry=$entryId, tag=$tag): '
-        'in tagMap=${tagMap.containsKey(tag.toLowerCase())}, '
-        'color=$hex, '
-        'isSystem=${setting?.isSystem}');
-
     if (hex == null) return null;
     final color = parseHex(hex);
-    debugPrint('[DEBUG] tagColorForEntryProvider -> color=$color');
     return color;
   },
 );
