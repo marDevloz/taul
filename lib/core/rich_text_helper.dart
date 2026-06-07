@@ -66,11 +66,16 @@ class RichTextHelper {
   /// The prefix is matched against the concatenated plain text of all Delta
   /// insert operations from the start. Matched characters are removed while
   /// preserving formatting attributes on the remaining text.
+  /// If the actual content doesn't start with [prefix], returns [jsonContent] unchanged.
   static String stripPrefix(String jsonContent, String prefix) {
     if (prefix.isEmpty || jsonContent.isEmpty) return jsonContent;
 
     final doc = getDocument(jsonContent);
     final ops = doc.toDelta().toJson();
+
+    // Validar que el texto plano realmente empiece con el prefijo
+    final plainText = documentToPlainText(doc);
+    if (!plainText.startsWith(prefix)) return jsonContent;
 
     final result = <Map<String, dynamic>>[];
     var remaining = prefix.length;

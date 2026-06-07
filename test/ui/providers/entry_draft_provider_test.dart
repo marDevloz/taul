@@ -5,14 +5,14 @@ import 'package:taul/ui/providers/entry_draft_provider.dart';
 
 void main() {
   group('EntryDraftNotifier', () {
-    test('initial state should be null (no draft)', () {
+    test('should_be_null_when_no_draft', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
       expect(container.read(entryDraftProvider), isNull);
     });
 
-    test('save should set state with the provided draft', () {
+    test('should_set_state_when_save_called', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
@@ -33,7 +33,7 @@ void main() {
       expect(saved.manualType, EntryType.note);
     });
 
-    test('save should overwrite previous draft', () {
+    test('should_overwrite_previous_draft_when_save_called_twice', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
@@ -52,7 +52,7 @@ void main() {
       expect(saved!.title, 'Second');
     });
 
-    test('state should reflect the current draft', () {
+    test('should_reflect_saved_draft_when_read', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
@@ -69,7 +69,7 @@ void main() {
       expect(container.read(entryDraftProvider), draft);
     });
 
-    test('clear should reset state to null', () {
+    test('should_be_null_when_clear_called', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
@@ -85,7 +85,7 @@ void main() {
       expect(container.read(entryDraftProvider), isNull);
     });
 
-    test('should allow manualType to be null', () {
+    test('should_allow_null_when_manual_type_is_null', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 

@@ -140,11 +140,11 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
         if (RichTextHelper.startsWithTaskMarker(rest)) {
           // [] / [ ] / - [ ] → tarea
           _detectedType = EntryType.task;
-        } else if (RegExp(r'\S\*\S').hasMatch(rest)) {
-          // * rodeado de NO espacios en ambos lados → credencial
+        } else if (RegExp(r'\w+\*\w+\*\w+').hasMatch(rest)) {
+          // formato credencial: campo*campo*campo (mínimo 2 asteriscos) → credencial
           _detectedType = EntryType.credential;
-        } else if (RegExp(r'\b\w{2,}:(?!//)\S').hasMatch(rest)) {
-          // palabra de 2+ letras seguida de : (no //) → glosario
+        } else if (RegExp(r'\b\w{2,}:(?!//)\s*\S').hasMatch(rest)) {
+          // palabra de 2+ letras seguida de : (no //), opcional espacio → glosario
           _detectedType = EntryType.glossary;
         } else {
           _detectedType = EntryType.note;
