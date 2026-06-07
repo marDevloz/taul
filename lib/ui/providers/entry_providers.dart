@@ -26,6 +26,8 @@ import 'package:taul/infrastructure/export/import_service.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
+import 'package:taul/ui/controllers/create_entry_controller.dart';
+import 'package:taul/ui/providers/entry_draft_provider.dart';
 import 'package:taul/ui/screens/credential_protection_controller.dart';
 
 // --- App lock state ---
@@ -144,6 +146,15 @@ final importServiceProvider = Provider<ImportService>((ref) {
 
 final createEntryProvider = Provider<CreateEntry>((ref) {
   return CreateEntry(repository: ref.watch(entryRepositoryProvider));
+});
+
+final createEntryControllerProvider =
+    StateNotifierProvider<CreateEntryController, CreateEntryState>((ref) {
+  return CreateEntryController(
+    createEntry: ref.watch(createEntryProvider),
+    draftNotifier: ref.watch(entryDraftProvider.notifier),
+    ref: ref,
+  );
 });
 
 final getEntryProvider = Provider<GetEntry>((ref) {

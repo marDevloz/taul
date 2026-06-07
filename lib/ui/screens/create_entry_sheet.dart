@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:taul/core/credential_parser.dart';
-import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/ui/controllers/create_entry_controller.dart';
 import 'package:taul/ui/providers/entry_draft_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/widgets/rich_text_editor.dart';
@@ -25,28 +24,34 @@ class CreateEntrySheet extends ConsumerStatefulWidget {
 class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
   final _titleCtrl = TextEditingController();
   final _tagsCtrl = TextEditingController();
-  String _richContent = '';
-  EntryType? _detectedType;
-  EntryType? _manualType;
-  bool _isSaving = false;
   bool _didSaveSuccessfully = false;
   late final EntryDraftNotifier _draftNotifier;
-
-  EntryType get _effectiveType => _manualType ?? _detectedType ?? EntryType.note;
-  bool get _isManual => _manualType != null;
+  late final CreateEntryController _controller;
+  CreateEntryState? _pendingDisposeState;
 
   @override
   void initState() {
     super.initState();
     _draftNotifier = ref.read(entryDraftProvider.notifier);
+    _controller = ref.read(createEntryControllerProvider.notifier);
+    _pendingDisposeState = ref.read(createEntryControllerProvider);
+
+    // Diferir restauración de draft para evitar modificar providers
+    // durante la construcción del árbol en tests.
+    Future.microtask(() {
+      if (!mounted) return;
+      _restoreDraft();
+    });
+  }
+
+  void _restoreDraft() {
     final draft = ref.read(entryDraftProvider);
     if (draft != null) {
       _titleCtrl.text = draft.title;
       _tagsCtrl.text = draft.tags;
-      _richContent = draft.content;
-      _manualType = draft.manualType;
+      _controller.loadDraft(draft);
       if (draft.content.isNotEmpty) {
-        _detectTypeFromContent(draft.content);
+        _controller.detectTypeFromContent(draft.content);
       }
     }
   }
@@ -55,18 +60,15 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
   void dispose() {
     if (!_didSaveSuccessfully) {
       final hasContent = _titleCtrl.text.isNotEmpty ||
-          _richContent.isNotEmpty ||
+          _pendingDisposeState!.content.isNotEmpty ||
           _tagsCtrl.text.isNotEmpty;
-      // Notifier may already be disposed during widget tree cleanup;
-      // silently drop the draft save — user input loss is acceptable
-      // in this edge case (app/route teardown).
       if (hasContent) {
         try {
           _draftNotifier.save(EntryDraft(
             title: _titleCtrl.text,
-            content: _richContent,
+            content: _pendingDisposeState!.content,
             tags: _tagsCtrl.text,
-            manualType: _manualType,
+            manualType: _pendingDisposeState!.manualType,
           ));
         } catch (_) {}
       } else {
@@ -81,194 +83,22 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
   }
 
   // ---------------------------------------------------------------------------
-  // Parsing helpers (ported from QuickAddSheet)
-  // ---------------------------------------------------------------------------
-
-  /// Busca "Title# " al inicio del texto y devuelve title + el resto.
-  /// El separador es `#` solo — tags ahora usan `-#` así que no hay colisión.
-  ({String title, String rest}) _splitTitle(String raw) {
-    for (int i = 0; i < raw.length; i++) {
-      if (raw[i] == '#' && i + 1 < raw.length && raw[i + 1] == ' ') {
-        return (
-          title: raw.substring(0, i).trim(),
-          rest: raw.substring(i + 1).trim(),
-        );
-      }
-    }
-    return (title: '', rest: raw);
-  }
-
-  /// Extrae los `-#tag` de un texto y devuelve el texto limpio + los tags.
-  ({String clean, List<String> tags}) _extractTags(String raw) =>
-      RichTextHelper.extractTags(raw);
-
-  /// Strips both the `Title# ` prefix and `-#tag` markers from the rich text
-  /// content. Used by note and fallback-credential cases where the content
-  /// is stored as Delta JSON and the title prefix must not appear in the body.
-  /// Order matters: strip title prefix FIRST (from original _richContent),
-  /// then strip tags. Stripping tags first can alter whitespace and break
-  /// the prefix match (e.g. "Meeting -#tag# " → "Meeting  # " after tag removal).
-  String _stripTitleAndTags(List<String> contentTags, String titlePrefix) {
-    var stripped = _richContent;
-    if (titlePrefix.isNotEmpty) {
-      stripped = RichTextHelper.stripPrefix(stripped, '$titlePrefix# ');
-    }
-    stripped = RichTextHelper.stripTagsFromContent(stripped, contentTags);
-    return stripped;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Auto-detección de tipo desde el contenido
-  // ---------------------------------------------------------------------------
-
-  void _detectTypeFromContent(String jsonContent) {
-    _detectedType = null; // resetear cuando se limpia el contenido
-    if (jsonContent.isEmpty) return;
-    try {
-      final plainText = RichTextHelper.documentToPlainText(
-        RichTextHelper.getDocument(jsonContent),
-      ).trim();
-      if (plainText.isEmpty) return;
-
-      // Detectar idea ANTES del split Title#: el ! debe estar al inicio del contenido real
-      if (plainText.startsWith('!') && plainText.length > 1 && plainText[1] != ' ') {
-        _detectedType = EntryType.idea;
-      } else {
-        // Ignorar Title# para el resto de detecciones
-        final rest = _splitTitle(plainText).rest;
-
-        if (RichTextHelper.startsWithTaskMarker(rest)) {
-          // [] / [ ] / - [ ] → tarea
-          _detectedType = EntryType.task;
-        } else if (RegExp(r'\w+\*\w+\*\w+').hasMatch(rest)) {
-          // formato credencial: campo*campo*campo (mínimo 2 asteriscos) → credencial
-          _detectedType = EntryType.credential;
-        } else if (RegExp(r'\b\w{2,}:(?!//)\s*\S').hasMatch(rest)) {
-          // palabra de 2+ letras seguida de : (no //), opcional espacio → glosario
-          _detectedType = EntryType.glossary;
-        } else {
-          _detectedType = EntryType.note;
-        }
-      }
-    } catch (_) {
-      // JSON malformado — silencioso, el tipo queda null
-    }
-  }
-
-  /// Setea el tipo manualmente desde el PopupMenuButton.
-  /// `null` significa "Auto" (usa el detectado).
-  void _setType(EntryType? type) {
-    setState(() => _manualType = type);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Save con parsing completo (igual que QuickAddSheet)
-  // ---------------------------------------------------------------------------
-
-  Future<void> _save() async {
-    final rawPlainText = RichTextHelper.documentToPlainText(
-      RichTextHelper.getDocument(_richContent),
-    ).trim();
-    final manualTitle = _titleCtrl.text.trim();
-    if (rawPlainText.isEmpty && manualTitle.isEmpty) return;
-
-    // Extraer -#tags del contenido
-    final extracted = _extractTags(rawPlainText);
-    final text = extracted.clean;
-    final contentTags = extracted.tags;
-
-    // Extraer Title# del contenido
-    final parsed = _splitTitle(text);
-    final parsedTitle = parsed.title;
-    final body = parsed.rest;
-
-    // Title: manual overridea el extraído del contenido
-    final title = manualTitle.isNotEmpty ? manualTitle : parsedTitle;
-
-    // Tags: unir manuales + extraídos (sin duplicados)
-    final manualTags = _tagsCtrl.text
-        .split(',')
-        .map((t) => t.trim())
-        .where((t) => t.isNotEmpty)
-        .toList();
-    final tags = {...manualTags, ...contentTags}.toList();
-
-    var type = _effectiveType;
-    String content;
-    Map<String, String> metadata = {};
-    String? secret;
-    bool requiresAuth = false;
-
-    switch (type) {
-      case EntryType.idea:
-        // Sacar el ! del inicio
-        content = body.startsWith('!') ? body.substring(1).trim() : body;
-      case EntryType.glossary:
-        content = RichTextHelper.formatForGlossary(body);
-      case EntryType.credential:
-        final parsedCred = CredentialParser.parse(rawPlainText);
-        if (parsedCred != null) {
-          content = parsedCred.username.isNotEmpty
-              ? 'Usuario: ${parsedCred.username}'
-              : parsedCred.service;
-          metadata = {
-            if (parsedCred.username.isNotEmpty) 'username': parsedCred.username,
-            if (parsedCred.url.isNotEmpty) 'url': parsedCred.url,
-          };
-          secret = parsedCred.password;
-          requiresAuth = true;
-          tags.addAll(parsedCred.tags.where((t) => !tags.contains(t)));
-        } else {
-          // No se pudo parsear como credencial — guardar como nota
-          type = EntryType.note;
-          content = _stripTitleAndTags(contentTags, parsedTitle);
-        }
-      case EntryType.task:
-        content = _stripTitleAndTags(contentTags, parsedTitle);
-        // Si el contenido plano empieza con [] lo limpiamos también
-        if (RichTextHelper.startsWithTaskMarker(body)) {
-          final marker = body.substring(
-            0,
-            body.length - RichTextHelper.stripTaskMarker(body).length,
-          );
-          content = RichTextHelper.stripPrefix(content, marker);
-        }
-      case EntryType.note:
-        content = _stripTitleAndTags(contentTags, parsedTitle);
-    }
-
-    setState(() => _isSaving = true);
-
-    try {
-      await ref.read(createEntryProvider).call(
-            title: title,
-            content: content,
-            type: type,
-            secret: secret,
-            requiresAuth: requiresAuth,
-            metadata: metadata,
-            tags: tags,
-          );
-      _didSaveSuccessfully = true;
-      _draftNotifier.clear();
-      ref.invalidate(entryListProvider);
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar: $e')),
-      );
-    }
-  }
-
-  // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final state = ref.watch(createEntryControllerProvider);
+
+    // Escuchar errores y mostrar snackbar
+    ref.listen(createEntryControllerProvider.select((s) => s.error), (_, error) {
+      if (error != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
+      }
+    });
 
     return Padding(
       padding: EdgeInsets.only(
@@ -289,12 +119,12 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
               Text('Nueva entrada', style: theme.textTheme.titleMedium),
               const Spacer(),
               PopupMenuButton<EntryType?>(
-                onSelected: _setType,
+                onSelected: _controller.setManualType,
                 tooltip: 'Cambiar tipo',
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _isManual
+                    color: state.isManual
                         ? theme.colorScheme.primaryContainer
                         : theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(12),
@@ -302,9 +132,9 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(_iconForType(_effectiveType), size: 14),
+                      Icon(_iconForType(state.effectiveType), size: 14),
                       const SizedBox(width: 4),
-                      Text(_labelForType(_effectiveType), style: const TextStyle(fontSize: 11)),
+                      Text(_labelForType(state.effectiveType), style: const TextStyle(fontSize: 11)),
                       const SizedBox(width: 2),
                       Icon(Icons.arrow_drop_down, size: 14, color: theme.colorScheme.onSurfaceVariant),
                     ],
@@ -320,7 +150,7 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
                             dense: true,
                             leading: Icon(_iconForType(t), size: 18),
                             title: Text(_labelForType(t), style: const TextStyle(fontSize: 13)),
-                            trailing: _effectiveType == t && _isManual
+                            trailing: state.effectiveType == t && state.isManual
                                 ? Icon(Icons.check, size: 16, color: theme.colorScheme.primary)
                                 : null,
                           ),
@@ -334,7 +164,7 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
                       leading: const Icon(Icons.sync, size: 18),
                       title: const Text('Auto', style: TextStyle(fontSize: 13)),
                       subtitle: const Text('detectar del contenido', style: TextStyle(fontSize: 11)),
-                      trailing: !_isManual
+                      trailing: !state.isManual
                           ? Icon(Icons.check, size: 16, color: theme.colorScheme.primary)
                           : null,
                     ),
@@ -348,6 +178,7 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
           // Título
           TextField(
             controller: _titleCtrl,
+            onChanged: _controller.setTitle,
             decoration: const InputDecoration(
               labelText: 'Título',
               hintText: 'o escribí Titulo# en el contenido',
@@ -360,17 +191,15 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
           const Text('Contenido', style: TextStyle(fontSize: 12)),
           const SizedBox(height: 4),
           RichTextEditor(
-            initialContent: _richContent,
-            onChanged: (v) => setState(() {
-              _richContent = v;
-              _detectTypeFromContent(v);
-            }),
+            initialContent: state.content,
+            onChanged: _controller.detectTypeFromContent,
           ),
           const SizedBox(height: 12),
 
           // Tags
           TextField(
             controller: _tagsCtrl,
+            onChanged: _controller.setTags,
             decoration: const InputDecoration(
               labelText: 'Tags',
               hintText: 'o usá -#tag en el contenido',
@@ -384,13 +213,13 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
-                onPressed: _isSaving ? null : () => Navigator.pop(context),
+                onPressed: state.isSaving ? null : () => Navigator.pop(context),
                 child: const Text('Cancelar'),
               ),
               const SizedBox(width: 8),
               FilledButton(
-                onPressed: _isSaving ? null : _save,
-                child: _isSaving
+                onPressed: state.isSaving ? null : _save,
+                child: state.isSaving
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Text('Guardar'),
               ),
@@ -399,6 +228,22 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
         ],
       ),
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Save
+  // ---------------------------------------------------------------------------
+
+  Future<void> _save() async {
+    try {
+      final saved = await _controller.save();
+      if (saved) {
+        _didSaveSuccessfully = true;
+        if (mounted) Navigator.pop(context);
+      }
+    } catch (_) {
+      // Error is handled by the ref.listen above
+    }
   }
 
   // ---------------------------------------------------------------------------
