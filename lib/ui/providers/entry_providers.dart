@@ -249,9 +249,9 @@ final tagUsageCountProvider = Provider.autoDispose<Map<String, int>>((ref) {
 });
 
 /// Provider para eliminar una tag de todas las entradas que la usan.
-/// Se usa junto con deleteTagSettingProvider cuando se confirma la
-/// eliminación de una tag que está en uso.
-final removeTagFromEntriesProvider = Provider<Future<void> Function(String)>((ref) {
+/// Devuelve los IDs de las entradas afectadas para invalidar sus detail providers.
+final removeTagFromEntriesProvider =
+    Provider<Future<List<String>> Function(String)>((ref) {
   final dao = ref.watch(daoProvider);
   return (String tagName) => dao.removeTagFromAllEntries(tagName);
 });

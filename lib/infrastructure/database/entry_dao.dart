@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
@@ -34,20 +33,17 @@ class EntryDao {
 
   /// Removes a tag from all entries that use it. Updates both the JSON tags
   /// column and the FTS index. Does NOT call _syncTags (avoids recreating
-  /// a deleted TagSetting).
-  Future<void> removeTagFromAllEntries(String tagName) async {
-    debugPrint('[DEBUG] removeTagFromAllEntries("$tagName"): starting');
+  /// a deleted TagSetting). Returns the list of affected entry IDs so callers
+  /// can invalidate their detail providers.
+  Future<List<String>> removeTagFromAllEntries(String tagName) async {
     final all = await (_database.select(_database.entries)).get();
-    debugPrint('[DEBUG] removeTagFromAllEntries: total entries=${all.length}');
-    var updatedCount = 0;
+    final affected = <String>[];
     for (final row in all) {
       final tags = List<String>.from(jsonDecode(row.tags) as List);
       final originalLen = tags.length;
       tags.removeWhere((t) => t.toLowerCase() == tagName.toLowerCase());
       if (tags.length != originalLen) {
-        debugPrint('[DEBUG] removeTagFromAllEntries: removing "$tagName" '
-            'from entry ${row.id} (tags: ${row.tags} -> ${jsonEncode(tags)})');
-        updatedCount++;
+        affected.add(row.id);
         await (_database.update(_database.entries)
           ..where((t) => t.id.equals(row.id)))
           .write(db.EntriesCompanion(
@@ -72,7 +68,7 @@ class EntryDao {
         } catch (_) {}
       }
     }
-    debugPrint('[DEBUG] removeTagFromAllEntries: updated $updatedCount entries');
+    return affected;
   }
 
   Future<void> delete(String id) async {

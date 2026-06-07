@@ -304,10 +304,6 @@ class _TagSettingTile extends ConsumerWidget {
   Future<void> _showDeleteConfirmation(BuildContext context) async {
     final counts = ref.read(tagUsageCountProvider);
     final usageCount = counts[setting.name.toLowerCase()] ?? 0;
-    debugPrint('[DEBUG] _showDeleteConfirmation: setting.name="${setting.name}"'
-        ', lower="${setting.name.toLowerCase()}"'
-        ', counts=$counts'
-        ', usageCount=$usageCount');
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -353,14 +349,13 @@ class _TagSettingTile extends ConsumerWidget {
     );
 
     if (confirmed == true && context.mounted) {
-      debugPrint('[DEBUG] _showDeleteConfirmation: delete confirmed, '
-          'setting.name="${setting.name}"');
       final deleteUseCase = ref.read(deleteTagSettingProvider);
       await deleteUseCase.call(setting.name);
-      debugPrint('[DEBUG] _showDeleteConfirmation: tag_setting deleted');
       final removeTag = ref.read(removeTagFromEntriesProvider);
-      await removeTag(setting.name);
-      debugPrint('[DEBUG] _showDeleteConfirmation: removeTag completed');
+      final affectedIds = await removeTag(setting.name);
+      for (final id in affectedIds) {
+        ref.invalidate(entryDetailProvider(id));
+      }
       ref.invalidate(tagSettingsListProvider);
       ref.invalidate(entryListProvider);
       if (context.mounted) {
