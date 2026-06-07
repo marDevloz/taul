@@ -270,10 +270,11 @@ class EntryDetailView extends ConsumerWidget {
   }
 
   void _showNoteEdit(BuildContext context, WidgetRef ref, Entry entry) {
+    final rootContext = context;
     final titleCtrl = TextEditingController(text: entry.title);
     final tagsCtrl = TextEditingController(text: entry.tags.join(', '));
     showModalBottomSheet(
-      context: context,
+      context: rootContext,
       isScrollControlled: true,
       builder: (ctx) {
         var selectedType = entry.type;
@@ -322,28 +323,38 @@ class EntryDetailView extends ConsumerWidget {
                         children: [
                           Text('Tipo:', style: Theme.of(ctx).textTheme.bodySmall),
                           const SizedBox(width: 8),
-                          PopupMenuButton<EntryType>(
-                            onSelected: (t) => setLocalState(() => selectedType = t),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(12),
+                            PopupMenuButton<EntryType>(
+                              onSelected: (t) {
+                                if (t == EntryType.credential) {
+                                  Navigator.pop(ctx);
+                                  showModalBottomSheet(
+                                    context: rootContext,
+                                    isScrollControlled: true,
+                                    builder: (_) => CredentialFormSheet(entry: entry),
+                                  );
+                                } else {
+                                  setLocalState(() => selectedType = t);
+                                }
+                              },
+                              child: Container(
+                                constraints: const BoxConstraints(minWidth: 110),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(_iconForType(selectedType), size: 14),
+                                    const SizedBox(width: 4),
+                                    Text(_labelForType(selectedType), style: const TextStyle(fontSize: 12)),
+                                    const SizedBox(width: 4),
+                                    Icon(Icons.arrow_drop_down, size: 16, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+                                  ],
+                                ),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(_iconForType(selectedType), size: 14),
-                                  const SizedBox(width: 4),
-                                  Text(_labelForType(selectedType), style: const TextStyle(fontSize: 11)),
-                                  const SizedBox(width: 2),
-                                  Icon(Icons.arrow_drop_down, size: 14, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
-                                ],
-                              ),
-                            ),
-                            itemBuilder: (_) => EntryType.values
-                                .where((t) => t != EntryType.credential)
-                                .map(
+                              itemBuilder: (_) => EntryType.values.map(
                                   (t) => PopupMenuItem(
                                     value: t,
                                     child: ListTile(

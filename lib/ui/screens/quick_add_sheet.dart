@@ -5,6 +5,7 @@ import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/controllers/create_entry_controller.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/screens/credential_form_sheet.dart';
 
 class QuickAddSheet extends ConsumerStatefulWidget {
   final Future<void> Function()? onCredentialRequested;
@@ -47,7 +48,16 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   }
 
   void _setType(EntryType? type) {
-    _controller.setManualType(type);
+    if (type == EntryType.credential) {
+      Navigator.pop(context);
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => const CredentialFormSheet(),
+      );
+    } else {
+      _controller.setManualType(type);
+    }
   }
 
   void _onTextChanged(String text) {
@@ -200,7 +210,8 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                 onSelected: _setType,
                 tooltip: 'Cambiar tipo',
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  constraints: const BoxConstraints(minWidth: 110),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                   decoration: BoxDecoration(
                     color: state.isManual
                         ? Theme.of(context).colorScheme.primaryContainer
@@ -212,14 +223,14 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                     children: [
                       Icon(_iconForType(state.effectiveType), size: 14),
                       const SizedBox(width: 4),
-                      Text(_labelForType(state.effectiveType), style: const TextStyle(fontSize: 11)),
-                      const SizedBox(width: 2),
-                      Icon(Icons.arrow_drop_down, size: 14, color: Colors.grey.shade600),
+                      Text(_labelForType(state.effectiveType), style: const TextStyle(fontSize: 12)),
+                      const SizedBox(width: 4),
+                      Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey.shade600),
                     ],
                   ),
                 ),
                 itemBuilder: (_) => [
-                  ...EntryType.values.where((t) => t != EntryType.credential).map(
+                  ...EntryType.values.map(
                     (t) => PopupMenuItem(
                       value: t,
                       child: ListTile(

@@ -4,6 +4,7 @@ import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/controllers/create_entry_controller.dart';
 import 'package:taul/ui/providers/entry_draft_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/screens/credential_form_sheet.dart';
 import 'package:taul/ui/widgets/rich_text_editor.dart';
 
 /// Full entry creation sheet with title, rich text editor, tags, and type.
@@ -122,10 +123,22 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
                     Text('Nueva entrada', style: theme.textTheme.titleMedium),
                     const Spacer(),
                     PopupMenuButton<EntryType?>(
-                      onSelected: _controller.setManualType,
+                      onSelected: (value) {
+                        if (value == EntryType.credential) {
+                          Navigator.pop(context);
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            builder: (_) => const CredentialFormSheet(),
+                          );
+                        } else {
+                          _controller.setManualType(value);
+                        }
+                      },
                       tooltip: 'Cambiar tipo',
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        constraints: const BoxConstraints(minWidth: 110),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                         decoration: BoxDecoration(
                           color: state.isManual
                               ? theme.colorScheme.primaryContainer
@@ -137,16 +150,14 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
                           children: [
                             Icon(_iconForType(state.effectiveType), size: 14),
                             const SizedBox(width: 4),
-                            Text(_labelForType(state.effectiveType), style: const TextStyle(fontSize: 11)),
-                            const SizedBox(width: 2),
-                            Icon(Icons.arrow_drop_down, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                            Text(_labelForType(state.effectiveType), style: const TextStyle(fontSize: 12)),
+                            const SizedBox(width: 4),
+                            Icon(Icons.arrow_drop_down, size: 16, color: theme.colorScheme.onSurfaceVariant),
                           ],
                         ),
                       ),
                       itemBuilder: (_) => [
-                        ...EntryType.values
-                            .where((t) => t != EntryType.credential)
-                            .map(
+                        ...EntryType.values.map(
                               (t) => PopupMenuItem(
                                 value: t,
                                 child: ListTile(
