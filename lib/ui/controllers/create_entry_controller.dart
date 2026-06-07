@@ -6,6 +6,7 @@ import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/domain/usecases/create_entry.dart';
 import 'package:taul/ui/providers/entry_draft_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/providers/tag_settings_providers.dart';
 
 part 'create_entry_controller.freezed.dart';
 
@@ -294,6 +295,8 @@ class CreateEntryController extends StateNotifier<CreateEntryState> {
       );
       _draftNotifier.clear();
       _ref.invalidate(entryListProvider);
+      _ref.invalidate(tagSettingsListProvider);
+      _ref.invalidate(tagSettingsMapProvider);
       state = state.copyWith(isSaving: false);
       return true;
     } catch (e) {

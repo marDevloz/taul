@@ -5,6 +5,7 @@ import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/controllers/create_entry_controller.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
 
 class QuickAddSheet extends ConsumerStatefulWidget {
@@ -154,6 +155,8 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
               );
         }
         ref.invalidate(entryListProvider);
+        ref.invalidate(tagSettingsListProvider);
+        ref.invalidate(tagSettingsMapProvider);
         if (mounted) Navigator.pop(context);
       } catch (e) {
         setState(() => _multiTaskSaving = false);

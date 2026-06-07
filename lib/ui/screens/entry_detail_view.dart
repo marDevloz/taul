@@ -431,6 +431,8 @@ class EntryDetailView extends ConsumerWidget {
                                 );
                                 ref.invalidate(entryDetailProvider(entryId));
                                 ref.invalidate(entryListProvider);
+                                ref.invalidate(tagSettingsListProvider);
+                                ref.invalidate(tagSettingsMapProvider);
                                 if (ctx.mounted) Navigator.pop(ctx);
                               } catch (e) {
                                 setLocalState(() => isSaving = false);
@@ -633,6 +635,7 @@ class _NoteContent extends ConsumerWidget {
         isSystem: existingIsSystem,
       );
       ref.invalidate(tagSettingsListProvider);
+      ref.invalidate(tagSettingsMapProvider);
     }
   }
 }
@@ -1141,6 +1144,7 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
         isSystem: existingIsSystem,
       );
       ref.invalidate(tagSettingsListProvider);
+      ref.invalidate(tagSettingsMapProvider);
     }
   }
 }

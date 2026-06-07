@@ -243,6 +243,7 @@ class _TagSettingTile extends ConsumerWidget {
       isSystem: setting.isSystem,
     );
     ref.invalidate(tagSettingsListProvider);
+    ref.invalidate(tagSettingsMapProvider);
   }
 
   Future<void> _showRenameDialog(BuildContext context) async {
