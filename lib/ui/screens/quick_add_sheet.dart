@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/credential_parser.dart';
 import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/ui/controllers/create_entry_controller.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
 class QuickAddSheet extends ConsumerStatefulWidget {
@@ -15,10 +16,9 @@ class QuickAddSheet extends ConsumerStatefulWidget {
 }
 
 class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
-  final _controller = TextEditingController();
-  EntryType? _detectedType;
-  EntryType? _manualType;
-  bool _isSaving = false;
+  final _textCtrl = TextEditingController();
+  bool _multiTaskSaving = false;
+  late final CreateEntryController _controller;
 
   static const _typeHints = {
     EntryType.note: 'Texto libre',
@@ -28,78 +28,46 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     EntryType.credential: 'servicio*user*pass*url(opcional) -#tag',
   };
 
-  /// Tipo efectivo: si el usuario eligió uno manual, ese; si no, el auto-detectado.
-  EntryType get _effectiveType => _manualType ?? _detectedType ?? EntryType.note;
-
-  bool get _isManual => _manualType != null;
-
-  void _selectHint(String text) {
-    _controller.text = text;
-    _controller.selection = TextSelection.collapsed(offset: text.length);
-    _onTextChanged(text);
-  }
-
-  void _setType(EntryType? type) {
-    setState(() => _manualType = type);
+  @override
+  void initState() {
+    super.initState();
+    _controller = ref.read(createEntryControllerProvider.notifier);
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _textCtrl.dispose();
     super.dispose();
   }
 
-  /// Busca "Title# " al inicio del texto y devuelve title + el resto.
-  /// El separador es `#` solo — tags ahora usan `-#` así que no hay colisión.
-  /// Ej: "Salsa# !idea genial" → (title:"Salsa", rest:"!idea genial")
-  ({String title, String rest}) _splitTitle(String raw) {
-    for (int i = 0; i < raw.length; i++) {
-      if (raw[i] == '#' && i + 1 < raw.length && raw[i + 1] == ' ') {
-        return (
-          title: raw.substring(0, i).trim(),
-          rest: raw.substring(i + 1).trim(),
-        );
-      }
-    }
-    return (title: '', rest: raw);
+  void _selectHint(String text) {
+    _textCtrl.text = text;
+    _textCtrl.selection = TextSelection.collapsed(offset: text.length);
+    _onTextChanged(text);
+  }
+
+  void _setType(EntryType? type) {
+    _controller.setManualType(type);
   }
 
   void _onTextChanged(String text) {
-    // Ignorar el Title# para la detección de tipo
-    final rest = _splitTitle(text).rest;
-    setState(() {
-      if (rest.startsWith('!')) {
-        _detectedType = EntryType.idea;
-      } else if (RichTextHelper.startsWithTaskMarker(rest)) {
-        _detectedType = EntryType.task;
-      } else if (rest.contains('*')) {
-        _detectedType = EntryType.credential;
-      } else if (RegExp(r'\w:').hasMatch(rest)) {
-        // Detect "word:" pattern for glossary (no space before :)
-        _detectedType = EntryType.glossary;
-      } else {
-        _detectedType = EntryType.note;
-      }
-    });
+    final doc = RichTextHelper.plainTextToDocument(text);
+    final deltaJson = RichTextHelper.documentToJson(doc);
+    _controller.detectTypeFromContent(deltaJson);
   }
 
-  /// Extrae los -#tags de un texto y devuelve el texto limpio + los tags.
-  /// El formato exacto es `-#tag` — el `-` antes de `#` es el marker.
-  /// Los tags pueden contener guiones: `-#gol-caracol`.
-  ({String clean, List<String> tags}) _extractTags(String raw) =>
-      RichTextHelper.extractTags(raw);
-
-  /// Vista previa del parseo: muestra tipo detectado, título y tags.
+  /// Vista previa del parseo: computada localmente del texto plano
+  /// para evitar round-trip Delta JSON en cada tecla.
   Widget _buildParsePreview() {
-    final rawText = _controller.text.trim();
+    final rawText = _textCtrl.text.trim();
     if (rawText.isEmpty) return const SizedBox.shrink();
 
-    final extracted = _extractTags(rawText);
-    final parsed = _splitTitle(extracted.clean);
-    final type = _effectiveType;
+    final state = ref.read(createEntryControllerProvider);
+    final extracted = CreateEntryController.extractTags(rawText);
+    final parsed = CreateEntryController.splitTitle(extracted.clean);
+    final type = state.effectiveType;
     final tags = extracted.tags;
 
-    // Build preview chips
     final chips = <Widget>[];
 
     // Type chip
@@ -157,18 +125,17 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   }
 
   Future<void> _save() async {
-    final rawText = _controller.text.trim();
+    final rawText = _textCtrl.text.trim();
     if (rawText.isEmpty) return;
-
-    setState(() => _isSaving = true);
 
     // --- Multi-task: varias líneas con []  → cada una es una entrada Tarea ---
     final taskLines = RichTextHelper.extractTaskLines(rawText);
     if (taskLines.isNotEmpty) {
+      setState(() => _multiTaskSaving = true);
       try {
         for (final line in taskLines) {
           final clean = RichTextHelper.stripTaskMarker(line).trim();
-          final extracted = _extractTags(clean);
+          final extracted = CreateEntryController.extractTags(clean);
           await ref.read(createEntryProvider).call(
                 title: extracted.clean,
                 content: extracted.clean,
@@ -179,7 +146,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
         ref.invalidate(entryListProvider);
         if (mounted) Navigator.pop(context);
       } catch (e) {
-        setState(() => _isSaving = false);
+        setState(() => _multiTaskSaving = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error al guardar: $e')),
@@ -189,83 +156,28 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
       return;
     }
 
-    // --- Single entry ---
-    final extracted = _extractTags(rawText);
-    final text = extracted.clean;
-    List<String> tags = extracted.tags;
-
-    final parsed = _splitTitle(text);
-    String entryTitle = parsed.title;
-    final body = parsed.rest;
-
-    var type = _effectiveType;
-    String content;
-    Map<String, String> metadata = {};
-    String? secret;
-    bool requiresAuth = false;
-
-    switch (type) {
-      case EntryType.idea:
-        content = body.startsWith('!') ? body.substring(1).trim() : body;
-      case EntryType.glossary:
-        final splitIdx = body.indexOf(':');
-        if (splitIdx >= 0) {
-          if (entryTitle.isEmpty) {
-            entryTitle = body.substring(0, splitIdx).trim();
-          }
-          content = body.substring(splitIdx + 1).trim();
-        } else {
-          content = body;
-        }
-      case EntryType.credential:
-        final parsedCred = CredentialParser.parse(rawText);
-        if (parsedCred != null) {
-          if (entryTitle.isEmpty) entryTitle = parsedCred.service;
-          content = parsedCred.username.isNotEmpty
-              ? 'Usuario: ${parsedCred.username}'
-              : parsedCred.service;
-          metadata = {
-            if (parsedCred.username.isNotEmpty) 'username': parsedCred.username,
-            if (parsedCred.url.isNotEmpty) 'url': parsedCred.url,
-          };
-          secret = parsedCred.password;
-          requiresAuth = true;
-          tags = {...tags, ...parsedCred.tags}.toList();
-        } else {
-          type = EntryType.note;
-          content = body;
-        }
-      case EntryType.note:
-        content = body;
-      case EntryType.task:
-        content = RichTextHelper.stripTaskMarker(body).trim();
-    }
-
+    // --- Single entry via controller ---
     try {
-      await ref.read(createEntryProvider).call(
-            title: entryTitle,
-            content: content,
-            type: type,
-            secret: secret,
-            requiresAuth: requiresAuth,
-            metadata: metadata,
-            tags: tags,
-          );
-      ref.invalidate(entryListProvider);
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      setState(() => _isSaving = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar: $e')),
-        );
-      }
+      final saved = await _controller.save();
+      if (saved && mounted) Navigator.pop(context);
+    } catch (_) {
+      // Error is shown via the ref.listen in build
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final detectedType = _detectedType;
+    final state = ref.watch(createEntryControllerProvider);
+    final isSaving = state.isSaving || _multiTaskSaving;
+
+    // Escuchar errores y mostrar snackbar (para single-entry path)
+    ref.listen(createEntryControllerProvider.select((s) => s.error), (_, error) {
+      if (error != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
+      }
+    });
 
     return Padding(
       padding: EdgeInsets.only(
@@ -290,7 +202,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _isManual
+                    color: state.isManual
                         ? Theme.of(context).colorScheme.primaryContainer
                         : Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(12),
@@ -298,9 +210,9 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(_iconForType(_effectiveType), size: 14),
+                      Icon(_iconForType(state.effectiveType), size: 14),
                       const SizedBox(width: 4),
-                      Text(_labelForType(_effectiveType), style: const TextStyle(fontSize: 11)),
+                      Text(_labelForType(state.effectiveType), style: const TextStyle(fontSize: 11)),
                       const SizedBox(width: 2),
                       Icon(Icons.arrow_drop_down, size: 14, color: Colors.grey.shade600),
                     ],
@@ -314,7 +226,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                         dense: true,
                         leading: Icon(_iconForType(t), size: 18),
                         title: Text(_labelForType(t), style: const TextStyle(fontSize: 13)),
-                        trailing: _effectiveType == t
+                        trailing: state.effectiveType == t && state.isManual
                             ? Icon(Icons.check, size: 16, color: Theme.of(context).colorScheme.primary)
                             : null,
                       ),
@@ -328,7 +240,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                       leading: const Icon(Icons.sync, size: 18),
                       title: const Text('Auto', style: TextStyle(fontSize: 13)),
                       subtitle: const Text('detectar automáticamente', style: TextStyle(fontSize: 11)),
-                      trailing: !_isManual
+                      trailing: !state.isManual
                           ? Icon(Icons.check, size: 16, color: Theme.of(context).colorScheme.primary)
                           : null,
                     ),
@@ -340,7 +252,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
           const SizedBox(height: 6),
 
           // Hints compactos
-          if (detectedType == null)
+          if (state.detectedType == null)
             Wrap(
               spacing: 4,
               runSpacing: 2,
@@ -378,16 +290,16 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                 ),
               ],
             ),
-          if (detectedType != null)
+          if (state.detectedType != null)
             Text(
-              _typeHints[detectedType]!,
+              _typeHints[state.detectedType]!,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
             ),
           const SizedBox(height: 6),
 
           // Text input — estilo papel de notas
           TextField(
-            controller: _controller,
+            controller: _textCtrl,
             autofocus: true,
             onChanged: _onTextChanged,
             decoration: InputDecoration(
@@ -408,11 +320,11 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
 
           // Save button
           FilledButton.icon(
-            onPressed: _isSaving ? null : _save,
-            icon: _isSaving
+            onPressed: isSaving ? null : _save,
+            icon: isSaving
                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.save),
-            label: Text(_isSaving ? 'Guardando...' : 'Guardar'),
+            label: Text(isSaving ? 'Guardando...' : 'Guardar'),
           ),
         ],
       ),
