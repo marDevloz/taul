@@ -6,18 +6,14 @@ import 'package:taul/ui/providers/entry_draft_provider.dart';
 void main() {
   group('EntryDraftNotifier', () {
     test('initial state should be null (no draft)', () {
-      final container = ProviderContainer(
-        overrides: [entryDraftProvider.overrideWith((ref) => EntryDraftNotifier())],
-      );
+      final container = ProviderContainer();
       addTearDown(container.dispose);
 
       expect(container.read(entryDraftProvider), isNull);
     });
 
     test('save should set state with the provided draft', () {
-      final container = ProviderContainer(
-        overrides: [entryDraftProvider.overrideWith((ref) => EntryDraftNotifier())],
-      );
+      final container = ProviderContainer();
       addTearDown(container.dispose);
 
       final draft = EntryDraft(
@@ -38,9 +34,7 @@ void main() {
     });
 
     test('save should overwrite previous draft', () {
-      final container = ProviderContainer(
-        overrides: [entryDraftProvider.overrideWith((ref) => EntryDraftNotifier())],
-      );
+      final container = ProviderContainer();
       addTearDown(container.dispose);
 
       container.read(entryDraftProvider.notifier).save(EntryDraft(
@@ -58,14 +52,12 @@ void main() {
       expect(saved!.title, 'Second');
     });
 
-    test('restore should return the current draft', () {
-      final container = ProviderContainer(
-        overrides: [entryDraftProvider.overrideWith((ref) => EntryDraftNotifier())],
-      );
+    test('state should reflect the current draft', () {
+      final container = ProviderContainer();
       addTearDown(container.dispose);
 
       // No draft yet
-      expect(container.read(entryDraftProvider.notifier).restore(), isNull);
+      expect(container.read(entryDraftProvider), isNull);
 
       final draft = EntryDraft(
         title: 'Draft',
@@ -74,13 +66,11 @@ void main() {
       );
       container.read(entryDraftProvider.notifier).save(draft);
 
-      expect(container.read(entryDraftProvider.notifier).restore(), draft);
+      expect(container.read(entryDraftProvider), draft);
     });
 
     test('clear should reset state to null', () {
-      final container = ProviderContainer(
-        overrides: [entryDraftProvider.overrideWith((ref) => EntryDraftNotifier())],
-      );
+      final container = ProviderContainer();
       addTearDown(container.dispose);
 
       container.read(entryDraftProvider.notifier).save(EntryDraft(
@@ -96,9 +86,7 @@ void main() {
     });
 
     test('should allow manualType to be null', () {
-      final container = ProviderContainer(
-        overrides: [entryDraftProvider.overrideWith((ref) => EntryDraftNotifier())],
-      );
+      final container = ProviderContainer();
       addTearDown(container.dispose);
 
       container.read(entryDraftProvider.notifier).save(EntryDraft(

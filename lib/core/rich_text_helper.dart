@@ -100,6 +100,11 @@ class RichTextHelper {
   static String stripTagsFromContent(String jsonContent, List<String> tagNames) {
     if (tagNames.isEmpty || jsonContent.isEmpty) return jsonContent;
 
+    // Ordenar por longitud descendente: tags largos primero para evitar
+    // que un tag prefijo (ej. "work") corrompa a uno más largo ("working").
+    final sortedTags = List<String>.from(tagNames)
+      ..sort((a, b) => b.length.compareTo(a.length));
+
     final doc = getDocument(jsonContent);
     final ops = doc.toDelta().toJson();
 
@@ -108,7 +113,7 @@ class RichTextHelper {
       if (op['insert'] is String) {
         var text = op['insert'] as String;
         final original = text;
-        for (final tag in tagNames) {
+        for (final tag in sortedTags) {
           text = text.replaceAll('-#$tag', '');
         }
         if (text.isEmpty) continue; // remove empty operations

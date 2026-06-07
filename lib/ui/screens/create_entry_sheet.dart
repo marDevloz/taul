@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/credential_parser.dart';
@@ -27,11 +25,11 @@ class CreateEntrySheet extends ConsumerStatefulWidget {
 class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
   final _titleCtrl = TextEditingController();
   final _tagsCtrl = TextEditingController();
-  var _richContent = '';
+  String _richContent = '';
   EntryType? _detectedType;
   EntryType? _manualType;
-  var _isSaving = false;
-  var _didSaveSuccessfully = false;
+  bool _isSaving = false;
+  bool _didSaveSuccessfully = false;
   late final EntryDraftNotifier _draftNotifier;
 
   EntryType get _effectiveType => _manualType ?? _detectedType ?? EntryType.note;
@@ -107,11 +105,15 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
   /// Strips both the `Title# ` prefix and `-#tag` markers from the rich text
   /// content. Used by note and fallback-credential cases where the content
   /// is stored as Delta JSON and the title prefix must not appear in the body.
+  /// Order matters: strip title prefix FIRST (from original _richContent),
+  /// then strip tags. Stripping tags first can alter whitespace and break
+  /// the prefix match (e.g. "Meeting -#tag# " → "Meeting  # " after tag removal).
   String _stripTitleAndTags(List<String> contentTags, String titlePrefix) {
-    var stripped = RichTextHelper.stripTagsFromContent(_richContent, contentTags);
+    var stripped = _richContent;
     if (titlePrefix.isNotEmpty) {
       stripped = RichTextHelper.stripPrefix(stripped, '$titlePrefix# ');
     }
+    stripped = RichTextHelper.stripTagsFromContent(stripped, contentTags);
     return stripped;
   }
 
@@ -120,32 +122,37 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
   // ---------------------------------------------------------------------------
 
   void _detectTypeFromContent(String jsonContent) {
+    _detectedType = null; // resetear cuando se limpia el contenido
     if (jsonContent.isEmpty) return;
-    final plainText = RichTextHelper.documentToPlainText(
-      RichTextHelper.getDocument(jsonContent),
-    ).trim();
-    if (plainText.isEmpty) return;
+    try {
+      final plainText = RichTextHelper.documentToPlainText(
+        RichTextHelper.getDocument(jsonContent),
+      ).trim();
+      if (plainText.isEmpty) return;
 
-    // Ignorar Title# para la detección de tipo
-    final rest = _splitTitle(plainText).rest;
-
-    setState(() {
-      if (rest.startsWith('!') && rest.length > 1 && rest[1] != ' ') {
-        // ! seguido de NO espacio → idea
+      // Detectar idea ANTES del split Title#: el ! debe estar al inicio del contenido real
+      if (plainText.startsWith('!') && plainText.length > 1 && plainText[1] != ' ') {
         _detectedType = EntryType.idea;
-      } else if (RichTextHelper.startsWithTaskMarker(rest)) {
-        // [] / [ ] / - [ ] → tarea
-        _detectedType = EntryType.task;
-      } else if (RegExp(r'\S\*\S').hasMatch(rest)) {
-        // * rodeado de NO espacios en ambos lados → credencial
-        _detectedType = EntryType.credential;
-      } else if (RegExp(r'\w:\S').hasMatch(rest)) {
-        // palabra seguida de : sin espacio antes ni después → glosario
-        _detectedType = EntryType.glossary;
       } else {
-        _detectedType = EntryType.note;
+        // Ignorar Title# para el resto de detecciones
+        final rest = _splitTitle(plainText).rest;
+
+        if (RichTextHelper.startsWithTaskMarker(rest)) {
+          // [] / [ ] / - [ ] → tarea
+          _detectedType = EntryType.task;
+        } else if (RegExp(r'\S\*\S').hasMatch(rest)) {
+          // * rodeado de NO espacios en ambos lados → credencial
+          _detectedType = EntryType.credential;
+        } else if (RegExp(r'\b\w{2,}:(?!//)\S').hasMatch(rest)) {
+          // palabra de 2+ letras seguida de : (no //) → glosario
+          _detectedType = EntryType.glossary;
+        } else {
+          _detectedType = EntryType.note;
+        }
       }
-    });
+    } catch (_) {
+      // JSON malformado — silencioso, el tipo queda null
+    }
   }
 
   /// Setea el tipo manualmente desde el PopupMenuButton.
@@ -217,14 +224,14 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
           content = _stripTitleAndTags(contentTags, parsedTitle);
         }
       case EntryType.task:
-        content = RichTextHelper.stripTagsFromContent(_richContent, contentTags);
+        content = _stripTitleAndTags(contentTags, parsedTitle);
         // Si el contenido plano empieza con [] lo limpiamos también
         if (RichTextHelper.startsWithTaskMarker(body)) {
-          final plainContent = RichTextHelper.stripTaskMarker(body);
-          // Regenerar rich content sin el marker
-          content = jsonEncode([
-            {'insert': '$plainContent\n'},
-          ]);
+          final marker = body.substring(
+            0,
+            body.length - RichTextHelper.stripTaskMarker(body).length,
+          );
+          content = RichTextHelper.stripPrefix(content, marker);
         }
       case EntryType.note:
         content = _stripTitleAndTags(contentTags, parsedTitle);
@@ -247,12 +254,11 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
       ref.invalidate(entryListProvider);
       if (mounted) Navigator.pop(context);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isSaving = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar: $e')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al guardar: $e')),
+      );
     }
   }
 

@@ -25,9 +25,13 @@ class EntryDraft with _$EntryDraft {
 class EntryDraftNotifier extends StateNotifier<EntryDraft?> {
   EntryDraftNotifier() : super(null);
 
-  void save(EntryDraft draft) => state = draft;
-  EntryDraft? restore() => state;
-  void clear() => state = null;
+  void save(EntryDraft draft) {
+    state = draft;
+  }
+
+  void clear() {
+    state = null;
+  }
 }
 
 // ---------------------------------------------------------------------------
