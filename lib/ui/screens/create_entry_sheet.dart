@@ -255,6 +255,12 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
                     hintText: state.detectedType != null
                         ? _typeHints[state.detectedType]
                         : null,
+                    allTags: ref.watch(tagSettingsListProvider).valueOrNull,
+                    selectedTags: state.tags
+                        .split(',')
+                        .map((t) => t.trim())
+                        .where((t) => t.isNotEmpty)
+                        .toList(),
                   ),
                 ),
               ],

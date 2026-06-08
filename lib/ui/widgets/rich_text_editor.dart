@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:taul/core/rich_text_helper.dart';
+import 'package:taul/domain/entities/tag_setting.dart';
+import 'package:taul/ui/widgets/tag_suggestions.dart';
 
 /// A rich text editor using flutter_quill with a compact formatting toolbar.
 ///
 /// Manages its own [QuillController] internally. Exposes the content as
 /// Delta JSON via [onChanged].
+///
+/// When [allTags] is provided, typing `-#` in the content triggers
+/// a single inline tag suggestion chip below the editor.
 class RichTextEditor extends StatefulWidget {
   /// Initial content (legacy plain text or Delta JSON).
   final String initialContent;
@@ -26,6 +31,12 @@ class RichTextEditor extends StatefulWidget {
   /// Hint text shown below the toolbar (e.g. format guide).
   final String? hintText;
 
+  /// Available tags for inline `-#tag` autocomplete suggestions.
+  final List<TagSetting>? allTags;
+
+  /// Tags already assigned to this entry (excluded from suggestions).
+  final List<String> selectedTags;
+
   const RichTextEditor({
     super.key,
     this.initialContent = '',
@@ -34,6 +45,8 @@ class RichTextEditor extends StatefulWidget {
     this.maxHeight,
     this.placeholder = 'Escribí algo...',
     this.hintText,
+    this.allTags,
+    this.selectedTags = const [],
   });
 
   @override
@@ -89,6 +102,53 @@ class _RichTextEditorState extends State<RichTextEditor> {
     _focusNode.requestFocus();
   }
 
+  /// Extracts the plain text after the last `-#` on the current line.
+  /// Returns the partial tag text the user is typing, or null if not in a `-#` context.
+  String? _extractCurrentHashTag() {
+    final plainText = _controller.document.toPlainText();
+    final selection = _controller.selection;
+    if (!selection.isCollapsed) return null;
+
+    // Get text from start of current line to cursor
+    final cursorOffset = selection.end;
+    final textBeforeCursor = plainText.substring(0, cursorOffset);
+
+    // Find last `-#` before cursor
+    final lastHashTag = textBeforeCursor.lastIndexOf('-#');
+    if (lastHashTag == -1) return null;
+
+    // Check there's no space between `-#` and cursor (single word)
+    final afterHash = textBeforeCursor.substring(lastHashTag + 2);
+    if (afterHash.contains(' ')) return null;
+
+    return afterHash;
+  }
+
+  /// Replaces the current `-#partial` with `-#tagName ` in the document.
+  void _acceptTagSuggestion(String tagName) {
+    final plainText = _controller.document.toPlainText();
+    final selection = _controller.selection;
+    if (!selection.isCollapsed) return;
+
+    final cursorOffset = selection.end;
+    final textBeforeCursor = plainText.substring(0, cursorOffset);
+    final lastHashTag = textBeforeCursor.lastIndexOf('-#');
+    if (lastHashTag == -1) return;
+
+    final replacement = '-#$tagName ';
+    final replaceFrom = lastHashTag;
+    final replaceTo = cursorOffset;
+
+    // Use Quill's replace to maintain document integrity
+    final newOffset = replaceFrom + replacement.length;
+    _controller.replaceText(
+      replaceFrom,
+      replaceTo - replaceFrom,
+      replacement,
+      TextSelection.collapsed(offset: newOffset),
+    );
+  }
+
   @override
   void dispose() {
     _controller.removeListener(_onControllerChanged);
@@ -102,8 +162,26 @@ class _RichTextEditorState extends State<RichTextEditor> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // Compute tag suggestion for `-#` autocomplete
+    final currentPartialTag = widget.allTags != null
+        ? _extractCurrentHashTag()
+        : null;
+
+    String? suggestedTagName;
+    if (currentPartialTag != null && currentPartialTag.isNotEmpty) {
+      final suggestions = filterTagSuggestions(
+        query: currentPartialTag,
+        allTags: widget.allTags!,
+        selectedTags: widget.selectedTags,
+        maxSuggestions: 1,
+      );
+      if (suggestions.isNotEmpty) {
+        suggestedTagName = suggestions.first.name;
+      }
+    }
+
     return Column(
-      mainAxisSize: MainAxisSize.max,
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (widget.showToolbar)
@@ -160,27 +238,62 @@ class _RichTextEditorState extends State<RichTextEditor> {
           ),
         if (widget.hintText != null && widget.hintText!.isNotEmpty)
           const SizedBox(height: 6),
-        Expanded(
-          child: GestureDetector(
-            onTap: _requestFocus,
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: theme.colorScheme.outline),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              padding: const EdgeInsets.all(8),
-              child: QuillEditor.basic(
-                controller: _controller,
-                focusNode: _focusNode,
-                scrollController: _scrollController,
-                config: QuillEditorConfig(
-                  placeholder: widget.placeholder,
-                  padding: EdgeInsets.zero,
-                ),
+        // Editor
+        GestureDetector(
+          onTap: _requestFocus,
+          child: Container(
+            constraints: BoxConstraints(
+              minHeight: 150,
+              maxHeight: widget.maxHeight ?? MediaQuery.of(context).size.height * 0.6,
+            ),
+            decoration: BoxDecoration(
+              border: Border.all(color: theme.colorScheme.outline),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            padding: const EdgeInsets.all(8),
+            child: QuillEditor.basic(
+              controller: _controller,
+              focusNode: _focusNode,
+              scrollController: _scrollController,
+              config: QuillEditorConfig(
+                placeholder: widget.placeholder,
+                padding: EdgeInsets.zero,
               ),
             ),
           ),
         ),
+        // Inline `-#tag` suggestion chip
+        if (suggestedTagName != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: GestureDetector(
+              onTap: () {
+                _acceptTagSuggestion(suggestedTagName!);
+                _requestFocus();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add, size: 14, color: theme.colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      '-#$suggestedTagName',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
