@@ -4,7 +4,7 @@ import 'package:taul/ui/widgets/tag_suggestions.dart';
 
 /// A text input with autocomplete suggestions for tags.
 ///
-/// Shows matching tags as a dropdown below the input as the user types.
+/// Shows matching tags as a fixed-height dropdown below the input as the user types.
 /// Tapping a suggestion appends it to the comma-separated tag list.
 /// If the typed text doesn't match any existing tag, a "Crear tag" option is shown.
 class TagAutocompleteInput extends StatefulWidget {
@@ -39,7 +39,8 @@ class _TagAutocompleteInputState extends State<TagAutocompleteInput> {
   @override
   void didUpdateWidget(covariant TagAutocompleteInput oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialText != widget.initialText && widget.initialText != _controller.text) {
+    if (oldWidget.initialText != widget.initialText &&
+        widget.initialText != _controller.text) {
       _controller.text = widget.initialText;
     }
   }
@@ -87,7 +88,10 @@ class _TagAutocompleteInputState extends State<TagAutocompleteInput> {
     );
 
     final showSuggestions = _focusNode.hasFocus &&
-        (_currentInput.isNotEmpty || suggestions.isNotEmpty);
+        (suggestions.isNotEmpty || _currentInput.isNotEmpty);
+
+    final itemCount = suggestions.length +
+        (_currentInput.isNotEmpty && !hasExactMatch ? 1 : 0);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -103,22 +107,21 @@ class _TagAutocompleteInputState extends State<TagAutocompleteInput> {
             border: OutlineInputBorder(),
           ),
         ),
-        if (showSuggestions && (suggestions.isNotEmpty || _currentInput.isNotEmpty))
-          Material(
-            child: Container(
-              constraints: const BoxConstraints(maxHeight: 200),
-              margin: const EdgeInsets.only(top: 4),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
-                ),
+        if (showSuggestions && itemCount > 0)
+          SizedBox(
+            height: (itemCount * 48.0).clamp(0.0, 200.0),
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(8),
+              child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-              ),
-              child: ListView(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                children: [
-                  ...suggestions.map((tag) => ListTile(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: itemCount,
+                  itemBuilder: (context, index) {
+                    if (index < suggestions.length) {
+                      final tag = suggestions[index];
+                      return ListTile(
                         dense: true,
                         visualDensity: VisualDensity.compact,
                         leading: tag.color != null
@@ -136,9 +139,9 @@ class _TagAutocompleteInputState extends State<TagAutocompleteInput> {
                           style: const TextStyle(fontSize: 14),
                         ),
                         onTap: () => _selectTag(tag.name),
-                      )),
-                  if (_currentInput.isNotEmpty && !hasExactMatch)
-                    ListTile(
+                      );
+                    }
+                    return ListTile(
                       dense: true,
                       visualDensity: VisualDensity.compact,
                       leading: const Icon(Icons.add_circle_outline, size: 16),
@@ -151,8 +154,9 @@ class _TagAutocompleteInputState extends State<TagAutocompleteInput> {
                         ),
                       ),
                       onTap: () => _selectTag(_currentInput),
-                    ),
-                ],
+                    );
+                  },
+                ),
               ),
             ),
           ),
