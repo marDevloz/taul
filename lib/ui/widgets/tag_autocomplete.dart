@@ -125,7 +125,9 @@ class _TagAutocompleteInputState extends State<TagAutocompleteInput> {
                             ? CircleAvatar(
                                 radius: 8,
                                 backgroundColor: Color(
-                                  int.parse('FF${tag.color}'),
+                                  int.parse(
+                                    'FF${tag.color!.replaceFirst('#', '')}',
+                                  ),
                                 ),
                               )
                             : const Icon(Icons.tag, size: 16),
