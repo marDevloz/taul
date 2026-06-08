@@ -15,6 +15,7 @@ import 'package:go_router/go_router.dart';
 import 'package:taul/core/constants.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/domain/entities/tag_setting.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/ui/providers/color_providers.dart';
@@ -23,6 +24,7 @@ import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
 import 'package:taul/ui/widgets/rich_text_display.dart';
 import 'package:taul/ui/widgets/rich_text_editor.dart';
+import 'package:taul/ui/widgets/tag_suggestions.dart';
 import 'package:taul/ui/widgets/master_password_recovery_dialog.dart';
 import 'package:taul/ui/widgets/palette_picker.dart';
 
@@ -273,6 +275,7 @@ class EntryDetailView extends ConsumerWidget {
     final rootContext = context;
     final titleCtrl = TextEditingController(text: entry.title);
     final tagsCtrl = TextEditingController(text: entry.tags.join(', '));
+    final editorKey = GlobalKey<RichTextEditorState>();
     showModalBottomSheet(
       context: rootContext,
       isScrollControlled: true,
@@ -280,176 +283,273 @@ class EntryDetailView extends ConsumerWidget {
         var selectedType = entry.type;
         var isSaving = false;
         var richContent = entry.content;
+        String? editorHashTagPartial;
+        String tagsFieldPartial = '';
 
         return StatefulBuilder(
-          builder: (context, setLocalState) => Padding(
-            padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              top: 24,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-            ),
-            child: Column(
-              children: [
-                // Formulario: ocupa el espacio disponible
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.edit_note, size: 20),
-                          const SizedBox(width: 8),
-                          Text('Editar entrada', style: Theme.of(ctx).textTheme.titleMedium),
-                        ],
+          builder: (context, setLocalState) {
+            // Compute unified suggestion
+            final allTags = ref.watch(tagSettingsListProvider).valueOrNull ?? [];
+            final selectedTagList = tagsCtrl.text
+                .split(',')
+                .map((t) => t.trim())
+                .where((t) => t.isNotEmpty)
+                .toList();
+
+            TagSetting? suggestion;
+            if (editorHashTagPartial != null && editorHashTagPartial!.isNotEmpty) {
+              final suggestions = filterTagSuggestions(
+                query: editorHashTagPartial!,
+                allTags: allTags,
+                selectedTags: selectedTagList,
+                maxSuggestions: 1,
+              );
+              if (suggestions.isNotEmpty) suggestion = suggestions.first;
+            }
+            if (suggestion == null && tagsFieldPartial.isNotEmpty) {
+              final suggestions = filterTagSuggestions(
+                query: tagsFieldPartial,
+                allTags: allTags,
+                selectedTags: selectedTagList,
+                maxSuggestions: 1,
+              );
+              if (suggestions.isNotEmpty) suggestion = suggestions.first;
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 24,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.75,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        const Icon(Icons.edit_note, size: 20),
+                        const SizedBox(width: 8),
+                        Text('Editar entrada', style: Theme.of(ctx).textTheme.titleMedium),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 1. Título
+                    TextField(
+                      controller: titleCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Título',
+                        border: OutlineInputBorder(),
                       ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: titleCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Título',
-                          border: OutlineInputBorder(),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 2. Tipo
+                    Row(
+                      children: [
+                        Text('Tipo:', style: Theme.of(ctx).textTheme.bodySmall),
+                        const SizedBox(width: 8),
+                        PopupMenuButton<EntryType>(
+                          onSelected: (t) {
+                            if (t == EntryType.credential) {
+                              Navigator.pop(ctx);
+                              showModalBottomSheet(
+                                context: rootContext,
+                                isScrollControlled: true,
+                                builder: (_) => CredentialFormSheet(entry: entry),
+                              );
+                            } else {
+                              setLocalState(() => selectedType = t);
+                            }
+                          },
+                          child: Container(
+                            constraints: const BoxConstraints(minWidth: 110),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(_iconForType(selectedType), size: 14),
+                                const SizedBox(width: 4),
+                                Text(_labelForType(selectedType), style: const TextStyle(fontSize: 12)),
+                                const SizedBox(width: 4),
+                                Icon(Icons.arrow_drop_down, size: 16, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+                              ],
+                            ),
+                          ),
+                          itemBuilder: (_) => EntryType.values.map(
+                            (t) => PopupMenuItem(
+                              value: t,
+                              child: ListTile(
+                                dense: true,
+                                leading: Icon(_iconForType(t), size: 18),
+                                title: Text(_labelForType(t), style: const TextStyle(fontSize: 13)),
+                                trailing: selectedType == t
+                                    ? Icon(Icons.check, size: 16, color: Theme.of(ctx).colorScheme.primary)
+                                    : null,
+                              ),
+                            ),
+                          ).toList(),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 3. Contenido (rich text)
+                    const Text('Contenido', style: TextStyle(fontSize: 12)),
+                    const SizedBox(height: 4),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 120, maxHeight: 200),
+                      child: RichTextEditor(
+                        key: editorKey,
+                        initialContent: entry.content,
+                        onChanged: (v) {
+                          setLocalState(() => richContent = v);
+                          // Detect -# tag
+                          final partial = editorKey.currentState?.extractCurrentHashTag();
+                          if (partial != editorHashTagPartial) {
+                            setLocalState(() => editorHashTagPartial = partial);
+                          }
+                        },
                       ),
-                      const SizedBox(height: 12),
-                      // Tags (arriba del editor)
-                      _TagsAutocompleteField(
-                        controller: tagsCtrl,
-                        ref: ref,
-                      ),
-                      const SizedBox(height: 12),
-                      // Tipo
-                      Row(
-                        children: [
-                          Text('Tipo:', style: Theme.of(ctx).textTheme.bodySmall),
-                          const SizedBox(width: 8),
-                            PopupMenuButton<EntryType>(
-                              onSelected: (t) {
-                                if (t == EntryType.credential) {
-                                  Navigator.pop(ctx);
-                                  showModalBottomSheet(
-                                    context: rootContext,
-                                    isScrollControlled: true,
-                                    builder: (_) => CredentialFormSheet(entry: entry),
-                                  );
-                                } else {
-                                  setLocalState(() => selectedType = t);
-                                }
-                              },
-                              child: Container(
-                                constraints: const BoxConstraints(minWidth: 110),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(_iconForType(selectedType), size: 14),
-                                    const SizedBox(width: 4),
-                                    Text(_labelForType(selectedType), style: const TextStyle(fontSize: 12)),
-                                    const SizedBox(width: 4),
-                                    Icon(Icons.arrow_drop_down, size: 16, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
-                                  ],
+                    ),
+                    const SizedBox(height: 4),
+
+                    // 4. Unified autocomplete suggestion
+                    if (suggestion != null)
+                      GestureDetector(
+                        onTap: () {
+                          if (editorHashTagPartial != null) {
+                            editorKey.currentState?.acceptTagSuggestion(suggestion!.name);
+                            setLocalState(() => editorHashTagPartial = null);
+                          } else {
+                            final currentText = tagsCtrl.text;
+                            final parts = currentText.split(',');
+                            if (parts.length > 1) {
+                              parts[parts.length - 1] = ' ${suggestion!.name},';
+                            } else {
+                              parts[parts.length - 1] = '${suggestion!.name},';
+                            }
+                            final newText = parts.join(',');
+                            tagsCtrl.text = newText;
+                            tagsCtrl.selection = TextSelection.fromPosition(
+                              TextPosition(offset: newText.length),
+                            );
+                            setLocalState(() => tagsFieldPartial = '');
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Theme.of(ctx).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add, size: 14, color: Theme.of(ctx).colorScheme.primary),
+                              const SizedBox(width: 4),
+                              Text(
+                                suggestion.name,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Theme.of(ctx).colorScheme.onPrimaryContainer,
                                 ),
                               ),
-                              itemBuilder: (_) => EntryType.values.map(
-                                  (t) => PopupMenuItem(
-                                    value: t,
-                                    child: ListTile(
-                                      dense: true,
-                                      leading: Icon(_iconForType(t), size: 18),
-                                      title: Text(_labelForType(t), style: const TextStyle(fontSize: 13)),
-                                      trailing: selectedType == t
-                                          ? Icon(Icons.check, size: 16, color: Theme.of(ctx).colorScheme.primary)
-                                          : null,
-                                    ),
-                                  ),
-                                )
-                                .toList(),
+                            ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // Contenido rich text (con scroll interno)
-                      const Text('Contenido', style: TextStyle(fontSize: 12)),
-                      const SizedBox(height: 4),
-                      Expanded(
-                        child: RichTextEditor(
-                          initialContent: entry.content,
-                          onChanged: (v) => setLocalState(() => richContent = v),
                         ),
                       ),
-                    ],
-                  ),
-                ),
 
-                // Botones (siempre visibles al final)
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: isSaving ? null : () => Navigator.pop(ctx),
-                      child: const Text('Cancelar'),
+                    // 5. Tags
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: tagsCtrl,
+                      onChanged: (text) {
+                        final parts = text.split(',');
+                        final partial = parts.last.trim();
+                        setLocalState(() => tagsFieldPartial = partial);
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Tags',
+                        hintText: 'separados por coma',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: isSaving
-                          ? null
-                          : () async {
-                              setLocalState(() => isSaving = true);
-                              try {
-                                // Extraer -#tag del contenido rich text
-                                final plainText = RichTextHelper.documentToPlainText(
-                                  RichTextHelper.getDocument(richContent),
-                                );
-                                final extracted = RichTextHelper.extractTags(plainText);
-                                final contentTags = extracted.tags;
-                                final content = RichTextHelper.stripTagsFromContent(
-                                  richContent,
-                                  contentTags,
-                                );
 
-                                // Tags manuales (campo separado por coma)
-                                final manualTags = tagsCtrl.text
-                                    .split(',')
-                                    .map((t) => t.trim())
-                                    .where((t) => t.isNotEmpty)
-                                    .toList();
+                    // Buttons
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: isSaving ? null : () => Navigator.pop(ctx),
+                          child: const Text('Cancelar'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  setLocalState(() => isSaving = true);
+                                  try {
+                                    final plainText = RichTextHelper.documentToPlainText(
+                                      RichTextHelper.getDocument(richContent),
+                                    );
+                                    final extracted = RichTextHelper.extractTags(plainText);
+                                    final contentTags = extracted.tags;
+                                    final content = RichTextHelper.stripTagsFromContent(
+                                      richContent,
+                                      contentTags,
+                                    );
 
-                                // Merge sin duplicados
-                                final tags = {...manualTags, ...contentTags}.toList();
+                                    final manualTags = tagsCtrl.text
+                                        .split(',')
+                                        .map((t) => t.trim())
+                                        .where((t) => t.isNotEmpty)
+                                        .toList();
 
-                                await ref.read(updateEntryProvider).call(
-                                  entry,
-                                  title: titleCtrl.text,
-                                  content: content,
-                                  tags: tags,
-                                  type: selectedType,
-                                );
-                                ref.invalidate(entryDetailProvider(entryId));
-                                ref.invalidate(entryListProvider);
-                                ref.invalidate(tagSettingsListProvider);
-                                ref.invalidate(tagSettingsMapProvider);
-                                if (ctx.mounted) Navigator.pop(ctx);
-                              } catch (e) {
-                                setLocalState(() => isSaving = false);
-                                if (ctx.mounted) {
-                                  ScaffoldMessenger.of(ctx).showSnackBar(
-                                    SnackBar(content: Text('Error al guardar: $e')),
-                                  );
-                                }
-                              }
-                            },
-                      child: Text(isSaving ? 'Guardando...' : 'Guardar'),
+                                    final tags = {...manualTags, ...contentTags}.toList();
+
+                                    await ref.read(updateEntryProvider).call(
+                                      entry,
+                                      title: titleCtrl.text,
+                                      content: content,
+                                      tags: tags,
+                                      type: selectedType,
+                                    );
+                                    ref.invalidate(entryDetailProvider(entryId));
+                                    ref.invalidate(entryListProvider);
+                                    ref.invalidate(tagSettingsListProvider);
+                                    ref.invalidate(tagSettingsMapProvider);
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                  } catch (e) {
+                                    setLocalState(() => isSaving = false);
+                                    if (ctx.mounted) {
+                                      ScaffoldMessenger.of(ctx).showSnackBar(
+                                        SnackBar(content: Text('Error al guardar: $e')),
+                                      );
+                                    }
+                                  }
+                                },
+                          child: Text(isSaving ? 'Guardando...' : 'Guardar'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -1146,94 +1246,5 @@ class _CredentialContentState extends ConsumerState<_CredentialContent> {
       ref.invalidate(tagSettingsListProvider);
       ref.invalidate(tagSettingsMapProvider);
     }
-  }
-}
-
-/// Autocomplete field for tags inside the entry edit bottom sheet.
-///
-/// Provides real-time tag suggestions from [tagsListProvider] with a 300ms
-/// debounce, minimum 1-char threshold, and max 6 visible suggestions.
-class _TagsAutocompleteField extends StatefulWidget {
-  final TextEditingController controller;
-  final WidgetRef ref;
-
-  const _TagsAutocompleteField({
-    required this.controller,
-    required this.ref,
-  });
-
-  @override
-  State<_TagsAutocompleteField> createState() => _TagsAutocompleteFieldState();
-}
-
-class _TagsAutocompleteFieldState extends State<_TagsAutocompleteField> {
-  List<String> _suggestions = [];
-  Timer? _debounceTimer;
-
-  @override
-  void dispose() {
-    _debounceTimer?.cancel();
-    super.dispose();
-  }
-
-  void _onChanged(String value) {
-    _debounceTimer?.cancel();
-    setState(() => _suggestions = []);
-    if (value.trim().isEmpty) return;
-
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      final allTags = widget.ref.read(tagsListProvider);
-      final filtered = allTags
-          .where((t) => t.toLowerCase().contains(value.toLowerCase()))
-          .take(6)
-          .toList();
-      setState(() => _suggestions = filtered);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Autocomplete<String>(
-      optionsBuilder: (TextEditingValue value) {
-        return _suggestions;
-      },
-      fieldViewBuilder: (
-        BuildContext context,
-        TextEditingController autocompleteController,
-        FocusNode focusNode,
-        VoidCallback onFieldSubmitted,
-      ) {
-        return TextField(
-          controller: widget.controller,
-          focusNode: focusNode,
-          onChanged: (String text) {
-            _onChanged(text);
-            // Keep the Autocomplete's own controller in sync so its
-            // internal listener triggers optionsBuilder.
-            autocompleteController.text = text;
-            autocompleteController.selection =
-                TextSelection.collapsed(offset: text.length);
-          },
-          decoration: const InputDecoration(
-            labelText: 'Tags (opcional)',
-            hintText: 'separados por coma: dev, personal',
-            border: OutlineInputBorder(),
-          ),
-        );
-      },
-      onSelected: (String value) {
-        _debounceTimer?.cancel();
-        _suggestions = [];
-        final currentText = widget.controller.text;
-        final newText = currentText.isNotEmpty &&
-                !currentText.endsWith(', ') &&
-                !currentText.endsWith(',')
-            ? '$currentText, $value, '
-            : '$currentText$value, ';
-        widget.controller.text = newText;
-        widget.controller.selection =
-            TextSelection.collapsed(offset: newText.length);
-      },
-    );
   }
 }
