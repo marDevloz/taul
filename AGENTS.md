@@ -45,3 +45,10 @@
 - Ignore analyzer warnings
 - Commit commented-out code
 - Use `async` on void main()
+
+## Release Process
+- **NEVER create GitHub releases manually** — always use CI workflow via tag push
+- Three version sources must stay in sync: `pubspec.yaml`, `auto_updater.dart` (`appVersion`), `installer/setup.iss` (`MyAppVersion`)
+- Release command: `git tag -a vX.Y.Z -m "..." && git push origin vX.Y.Z`
+- The CI workflow (`release.yml`) auto-builds Flutter, compiles Inno Setup installer, generates `manifest.json` with correct exe filename, and creates the GitHub release with both assets
+- Manual releases bypass this logic → manifest.json and installer filename mismatch → auto-updater fails with 404
