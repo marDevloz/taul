@@ -323,10 +323,7 @@ class EntryDetailView extends ConsumerWidget {
                 top: 24,
                 bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
               ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(ctx).size.height * 0.75,
-                ),
+              child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
