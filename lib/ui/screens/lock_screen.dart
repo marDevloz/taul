@@ -1,5 +1,11 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:taul/core/constants.dart';
+import 'package:taul/infrastructure/security/db_migration_service.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/encrypted_db_bootstrap.dart';
 import 'package:taul/infrastructure/security/lockout_service.dart';
@@ -211,20 +217,78 @@ class _LockScreenState extends ConsumerState<LockScreen> {
         salt: salt,
       );
 
-      if (wrappedDekHex != null && wrappedDekHex.isNotEmpty) {
+      Uint8List masterKey;
+
+      if (dbEncrypted) {
+        // DB is encrypted — unwrap DEK from bootstrap
         final dek = await authService.unwrapStorageKey(
           payload: EncryptionPayload(
-            ciphertextHex: wrappedDekHex,
+            ciphertextHex: wrappedDekHex!,
             nonceHex: wrappedNonceHex ?? '',
             tagHex: wrappedTagHex ?? '',
           ),
           kek: kek,
         );
-        ref.read(masterPasswordProvider.notifier).setMasterPassword(dek);
+        masterKey = dek;
       } else {
-        // Pre-migration: cache the KEK directly as the master key
-        ref.read(masterPasswordProvider.notifier).setMasterPassword(kek);
+        // DB is unencrypted — check if migration is needed
+        final store = ref.read(masterPasswordStoreProvider);
+        final config = await store.readFull();
+
+        final hasDek = config != null &&
+            config.encryptedStorageKeyHex != null &&
+            config.encryptedStorageKeyHex!.isNotEmpty;
+
+        if (config != null && !hasDek) {
+          // Old user: has master password but no DEK → migrate
+          setState(() => _loading = true); // Keep loading state
+          final dbFolder = await getApplicationDocumentsDirectory();
+          final dbFile = File('${dbFolder.path}/${AppConstants.databaseName}');
+          final migrationService = DbMigrationService();
+
+          final dek = await migrationService.migrateExistingUser(
+            dbFile: dbFile,
+            oldKey: kek,
+            authService: authService,
+            store: store,
+            config: config,
+          );
+
+          if (dek != null) {
+            // Migration succeeded — save bootstrap and cache DEK
+            final wrapped = await authService.wrapStorageKey(dek: dek, kek: kek);
+            await EncryptedDbBootstrap.save(
+              saltHex: config.saltHex,
+              hashHex: config.hashHex,
+              wrappedDekHex: wrapped.ciphertextHex,
+              wrappedNonceHex: wrapped.nonceHex,
+              wrappedTagHex: wrapped.tagHex,
+              hint: config.passwordHint,
+            );
+            ref.invalidate(masterPasswordConfigProvider);
+            masterKey = dek;
+          } else {
+            // Migration failed — fall back to old behavior (KEK as master key)
+            masterKey = kek;
+          }
+        } else if (config != null && hasDek) {
+          // Has wrapped DEK but DB not encrypted — just encrypt DB
+          final dek = await authService.unwrapStorageKey(
+            payload: EncryptionPayload(
+              ciphertextHex: config.encryptedStorageKeyHex!,
+              nonceHex: config.encryptedStorageKeyNonceHex ?? '',
+              tagHex: config.encryptedStorageKeyTagHex ?? '',
+            ),
+            kek: kek,
+          );
+          masterKey = dek;
+        } else {
+          // No config — fall back to KEK
+          masterKey = kek;
+        }
       }
+
+      ref.read(masterPasswordProvider.notifier).setMasterPassword(masterKey);
 
       if (!context.mounted) return;
       ref.read(appLockProvider.notifier).unlock();

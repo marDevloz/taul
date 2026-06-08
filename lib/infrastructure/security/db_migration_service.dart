@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:logger/logger.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:taul/core/constants.dart';
+import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:taul/infrastructure/security/master_password_store.dart';
 
 /// Migrates an unencrypted SQLite database to an encrypted one using the
 /// SQLCipher-documented plaintext -> encrypted export flow.
@@ -138,6 +140,144 @@ class DbMigrationService {
       if (await backupFile.exists()) await backupFile.delete();
 
       return false;
+    }
+  }
+
+  /// Migrates an existing user who has a master password but an unencrypted DB.
+  ///
+  /// This handles users who set up a master password before DB encryption
+  /// was available. The old scheme used the KEK directly as the master key
+  /// for entry encryption. We need to:
+  /// 1. Generate a new DEK
+  /// 2. Re-encrypt all entries' secrets from oldKey to new DEK
+  /// 3. Save the wrapped DEK to master_password_config
+  /// 4. Encrypt the DB via sqlcipher_export
+  /// 5. Return the new DEK
+  ///
+  /// [oldKey] is the current master key (KEK derived from password).
+  /// [authService] is needed for encrypt/decrypt operations.
+  /// [store] is needed to save the wrapped DEK.
+  ///
+  /// Returns the new DEK, or null if migration wasn't needed or failed.
+  Future<Uint8List?> migrateExistingUser({
+    required File dbFile,
+    required Uint8List oldKey,
+    required EntryAuthService authService,
+    required MasterPasswordStore store,
+    required MasterPasswordFullConfig config,
+  }) async {
+    if (!dbFile.existsSync()) return null;
+
+    if (isEncrypted(dbFile)) {
+      _log.d('DB is already encrypted, skipping existing user migration');
+      return null;
+    }
+
+    // Check if migration is needed: no wrapped DEK means old user
+    final hasDek = config.encryptedStorageKeyHex != null &&
+        config.encryptedStorageKeyHex!.isNotEmpty;
+    if (hasDek) {
+      _log.d('User already has wrapped DEK, no re-encryption needed');
+      return null;
+    }
+
+    _log.i('Starting existing user migration: re-encrypt entries + encrypt DB');
+
+    // Step 1: Generate new DEK
+    final dek = authService.generateStorageKey();
+    _log.d('Generated new DEK');
+
+    // Step 2: Re-encrypt entries from oldKey to dek
+    final reEncryptedCount = await _reEncryptEntries(
+      dbFile: dbFile,
+      oldKey: oldKey,
+      newKey: dek,
+      authService: authService,
+    );
+    _log.d('Re-encrypted $reEncryptedCount entries');
+
+    // Step 3: Save wrapped DEK to master_password_config (before DB encryption)
+    final wrapped = await authService.wrapStorageKey(dek: dek, kek: oldKey);
+    await store.saveEncryptedStorageKey(
+      keyHex: wrapped.ciphertextHex,
+      nonceHex: wrapped.nonceHex,
+      tagHex: wrapped.tagHex,
+    );
+    _log.d('Saved wrapped DEK to master_password_config');
+
+    // Step 4: Encrypt the DB
+    final migrated = await migrateToEncrypted(dbFile: dbFile, dek: dek);
+    if (!migrated) {
+      _log.e('DB encryption failed during existing user migration');
+      return null;
+    }
+
+    _log.i('Existing user migration completed successfully');
+    return dek;
+  }
+
+  /// Re-encrypts all entries with encryptedSecret from [oldKey] to [newKey].
+  ///
+  /// This runs on the unencrypted DB before sqlcipher_export.
+  /// Returns the number of entries re-encrypted.
+  Future<int> _reEncryptEntries({
+    required File dbFile,
+    required Uint8List oldKey,
+    required Uint8List newKey,
+    required EntryAuthService authService,
+  }) async {
+    final db = sqlite3.open(dbFile.path);
+    try {
+      final entries = db.select(
+        'SELECT id, encrypted_secret, cipher_nonce, cipher_tag '
+        'FROM entries WHERE encrypted_secret IS NOT NULL',
+      );
+
+      var count = 0;
+      for (final row in entries) {
+        final id = row['id'] as String;
+        final ciphertextHex = row['encrypted_secret'] as String;
+        final nonceHex = row['cipher_nonce'] as String;
+        final tagHex = row['cipher_tag'] as String;
+
+        try {
+          // Decrypt with old key
+          final plaintext = await authService.decryptSecret(
+            payload: EncryptionPayload(
+              ciphertextHex: ciphertextHex,
+              nonceHex: nonceHex,
+              tagHex: tagHex,
+            ),
+            masterKey: oldKey,
+          );
+
+          // Encrypt with new DEK
+          final newPayload = await authService.encryptSecret(
+            plaintext: plaintext,
+            masterKey: newKey,
+          );
+
+          // Update entry
+          db.execute(
+            'UPDATE entries SET encrypted_secret = ?, cipher_nonce = ?, cipher_tag = ? WHERE id = ?',
+            [
+              newPayload.ciphertextHex,
+              newPayload.nonceHex,
+              newPayload.tagHex,
+              id,
+            ],
+          );
+          count++;
+        } catch (e) {
+          _log.w('Failed to re-encrypt entry $id', error: e);
+          // Continue with other entries — this entry will be inaccessible
+          // but at least the rest of the data is preserved.
+        }
+      }
+
+      return count;
+    } finally {
+      db.dispose();
     }
   }
 }
