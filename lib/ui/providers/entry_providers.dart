@@ -22,6 +22,7 @@ import 'package:taul/infrastructure/database/tag_settings_dao.dart';
 import 'package:taul/infrastructure/database/tag_settings_repository_impl.dart';
 import 'package:taul/domain/repositories/i_tag_settings_repository.dart';
 import 'package:taul/infrastructure/export/export_service.dart';
+import 'package:taul/infrastructure/export/encrypted_export_service.dart';
 import 'package:taul/infrastructure/export/import_service.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -110,7 +111,10 @@ final masterPasswordProvider =
 
 // --- Infrastructure providers ---
 
-final databaseProvider = Provider<db.AppDatabase>((ref) => db.AppDatabase());
+final databaseProvider = Provider<db.AppDatabase>((ref) {
+  final dek = ref.watch(masterPasswordProvider);
+  return db.AppDatabase(dek: dek);
+});
 
 final daoProvider = Provider<EntryDao>((ref) => EntryDao(ref.watch(databaseProvider)));
 final entryAuthServiceProvider = Provider<EntryAuthService>((ref) => EntryAuthService());
@@ -140,6 +144,12 @@ final tagSettingsRepositoryProvider = Provider<ITagSettingsRepository>((ref) {
 
 final exportServiceProvider = Provider<ExportService>((ref) {
   return ExportService();
+});
+
+final encryptedExportServiceProvider = Provider<EncryptedExportService>((ref) {
+  return EncryptedExportService(
+    authService: ref.watch(entryAuthServiceProvider),
+  );
 });
 
 final importServiceProvider = Provider<ImportService>((ref) {

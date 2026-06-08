@@ -11,6 +11,7 @@ import 'package:taul/ui/providers/theme_provider.dart';
 import 'package:taul/ui/screens/credential_protection_controller.dart';
 import 'package:taul/ui/screens/master_password_setup_dialog.dart';
 import 'package:taul/ui/widgets/delete_mp_dialog.dart';
+import 'package:taul/ui/widgets/export_passphrase_dialog.dart';
 import 'package:taul/ui/widgets/hint_edit_dialog.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -631,11 +632,9 @@ class SettingsScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Exportar datos'),
         content: const Text(
-          'Este archivo contiene todas tus entradas, incluyendo '
-          'credenciales cifradas con tu Contraseña Maestra.\n\n'
-          'Los datos cifrados solo pueden leerse desde Taúl con la '
-          'contraseña correcta, pero el archivo en sí no está protegido '
-          'con contraseña.\n\n'
+          'Este archivo contiene todas tus entradas, '
+          'cifrado con una contraseña que elegís ahora.\n\n'
+          'Sin esa contraseña, el archivo es inútil.\n\n'
           'No compartas este archivo a menos que sea estrictamente necesario.',
         ),
         actions: [
@@ -652,30 +651,41 @@ class SettingsScreen extends ConsumerWidget {
     );
     if (proceed != true) return;
 
-    // 1. Progress dialog
+    // 1. Passphrase dialog
+    if (!context.mounted) return;
+    final passphrase = await showDialog<String>(
+      context: context,
+      builder: (_) => const ExportPassphraseDialog(),
+    );
+    if (passphrase == null || passphrase.isEmpty) return;
+
+    // 2. Progress dialog
     if (!context.mounted) return;
     _showProgressDialog(context, 'Exportando datos...');
 
     try {
-      // 2. Get all active entries
+      // 3. Get all active entries
       final entries = await ref.read(entryListProvider.future);
       if (!context.mounted) return;
 
-      // 3. Generate JSON
-      final exportService = ref.read(exportServiceProvider);
-      final json = exportService.exportToJson(entries);
+      // 4. Encrypt and generate JSON
+      final encryptedExportService = ref.read(encryptedExportServiceProvider);
+      final json = await encryptedExportService.exportEncrypted(
+        entries: entries,
+        passphrase: passphrase,
+      );
 
-      // 4. Dismiss progress
+      // 5. Dismiss progress
       if (context.mounted) Navigator.of(context).pop();
 
-      // 5. Save file via FilePicker
-      final savedPath = await exportService.saveToFile(json, context);
+      // 6. Save file via FilePicker
+      final savedPath = await encryptedExportService.saveEncryptedToFile(json, context);
 
-      // 6. Snackbar
+      // 7. Snackbar
       if (!context.mounted) return;
       if (savedPath != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Exportación guardada en $savedPath')),
+          SnackBar(content: Text('Exportación cifrada guardada en $savedPath')),
         );
       }
     } catch (e) {
