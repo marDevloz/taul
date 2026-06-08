@@ -1,0 +1,65 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Project: taul — Personal knowledge vault (Flutter desktop app)
+  Stack: Flutter SDK ^3.11.0, Dart, Riverpod (flutter_riverpod ^2.6.1), Drift/SQLite/FTS5 (drift ^2.25.1)
+  Architecture: Clean Architecture (domain/ → infrastructure/ → ui/)
+    - domain/: entities, repositories (interfaces), usecases
+    - infrastructure/: database (Drift, DAOs, impls), security (AES-256-GCM + Argon2id)
+    - ui/: providers (Riverpod), screens, widgets
+    - core/: constants, errors
+  State: Riverpod providers (Provider, FutureProvider, StateNotifierProvider)
+  Navigation: go_router ^14.8.1
+  Security: AES-256-GCM via cryptography ^2.7.0, Argon2id key derivation
+  Code gen: freezed ^2.5.8, json_serializable ^6.9.4, drift_dev ^2.25.1, riverpod_generator ^2.6.3
+  Testing: flutter_test, mocktail ^1.0.4, in-memory SQLite via AppDatabase.forTesting()
+  Linting: flutter_lints ^5.0.0, strict analysis_options.yaml
+  Conventions: snake_case files, PascalCase classes, camelCase members, const constructors, final > var
+  CI: Not configured (no GitHub Actions workflows detected)
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - State which layer(s) the change affects (domain / infrastructure / ui / core)
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Reference specific use cases or repositories affected
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+    - Show Riverpod provider structure when UI layer is affected
+  tasks:
+    - Group by layer (domain → infrastructure → ui)
+    - Keep tasks completable in one session
+    - Include test tasks alongside implementation tasks
+  apply:
+    - Follow existing Clean Architecture patterns
+    - Run dart analyze before committing
+    tdd: true
+    test_command: flutter test
+  verify:
+    test_command: flutter test
+    build_command: flutter build
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+
+testing:
+  strict_tdd: true
+  runner: flutter_test
+  runner_command: flutter test
+  layers:
+    unit: true
+    integration: true
+    e2e: false
+  coverage: false
+  coverage_command: ''
+  quality:
+    linter: flutter_lints
+    linter_command: dart analyze
+    type_checker: dartanalyzer
+    type_checker_command: dart analyze
+    formatter: dart format
+    formatter_command: dart format
