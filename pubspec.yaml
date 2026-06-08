@@ -19,7 +19,6 @@ dependencies:
 
   # Database
   drift: ^2.25.1
-  sqlite3_flutter_libs: ^0.5.28
   path_provider: ^2.1.5
   sqlite3: ^2.7.4
   cryptography: ^2.7.0
@@ -63,6 +62,11 @@ dev_dependencies:
 
   # Linting
   flutter_lints: ^5.0.0
+
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc
 
 flutter:
   uses-material-design: true

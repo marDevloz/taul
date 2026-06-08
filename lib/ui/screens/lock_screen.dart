@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:taul/infrastructure/security/encrypted_db_bootstrap.dart';
 import 'package:taul/infrastructure/security/lockout_service.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/widgets/master_password_recovery_dialog.dart';
@@ -146,20 +147,48 @@ class _LockScreenState extends ConsumerState<LockScreen> {
 
     try {
       final authService = ref.read(entryAuthServiceProvider);
-      final store = ref.read(masterPasswordStoreProvider);
-      final config = await store.readFull();
+      final dbEncrypted = await EncryptedDbBootstrap.isEncrypted();
 
-      if (config == null) {
-        // No config at all — shouldn't happen if we're showing the lock screen
-        ref.read(appLockProvider.notifier).unlock();
-        return;
+      String? saltHex;
+      String? hashHex;
+      String? wrappedDekHex;
+      String? wrappedNonceHex;
+      String? wrappedTagHex;
+
+      if (dbEncrypted) {
+        // DB is encrypted — read MP config from SharedPreferences.
+        final bootstrap = await EncryptedDbBootstrap.read();
+        if (bootstrap == null) {
+          ref.read(appLockProvider.notifier).unlock();
+          return;
+        }
+        saltHex = bootstrap.saltHex;
+        hashHex = bootstrap.hashHex;
+        wrappedDekHex = bootstrap.wrappedDekHex;
+        wrappedNonceHex = bootstrap.wrappedNonceHex;
+        wrappedTagHex = bootstrap.wrappedTagHex;
+      } else {
+        // DB is unencrypted — read from DB as before.
+        final store = ref.read(masterPasswordStoreProvider);
+        final config = await store.readFull();
+
+        if (config == null) {
+          ref.read(appLockProvider.notifier).unlock();
+          return;
+        }
+
+        saltHex = config.saltHex;
+        hashHex = config.hashHex;
+        wrappedDekHex = config.encryptedStorageKeyHex;
+        wrappedNonceHex = config.encryptedStorageKeyNonceHex;
+        wrappedTagHex = config.encryptedStorageKeyTagHex;
       }
 
-      final salt = authService.hexToBytes(config.saltHex);
+      final salt = authService.hexToBytes(saltHex);
       final isValid = await authService.verifyMasterPassword(
         password: password,
         salt: salt,
-        expectedHashHex: config.hashHex,
+        expectedHashHex: hashHex,
       );
 
       if (!isValid) {
@@ -182,13 +211,12 @@ class _LockScreenState extends ConsumerState<LockScreen> {
         salt: salt,
       );
 
-      if (config.encryptedStorageKeyHex != null &&
-          config.encryptedStorageKeyHex!.isNotEmpty) {
+      if (wrappedDekHex != null && wrappedDekHex.isNotEmpty) {
         final dek = await authService.unwrapStorageKey(
           payload: EncryptionPayload(
-            ciphertextHex: config.encryptedStorageKeyHex!,
-            nonceHex: config.encryptedStorageKeyNonceHex ?? '',
-            tagHex: config.encryptedStorageKeyTagHex ?? '',
+            ciphertextHex: wrappedDekHex,
+            nonceHex: wrappedNonceHex ?? '',
+            tagHex: wrappedTagHex ?? '',
           ),
           kek: kek,
         );

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:sqlite3/sqlite3.dart';
 import 'package:taul/core/constants.dart';
 import 'package:taul/shared/tag_palette.dart';
 
@@ -15,7 +16,7 @@ part 'app_database.g.dart';
 
 @DriftDatabase(tables: [Entries, MasterPasswordConfig, TagSettings])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  AppDatabase({Uint8List? dek}) : super(_openConnection(dek: dek));
 
   /// Creates an in-memory database for testing.
   AppDatabase.forTesting() : super(NativeDatabase.memory());
@@ -202,10 +203,25 @@ class AppDatabase extends _$AppDatabase {
   }
 }
 
-LazyDatabase _openConnection() {
+LazyDatabase _openConnection({Uint8List? dek}) {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File('${dbFolder.path}/${AppConstants.databaseName}');
-    return NativeDatabase(file);
+    return NativeDatabase.createInBackground(
+      file,
+      setup: (rawDb) {
+        if (dek != null) {
+          assert(_debugCheckHasCipher(rawDb));
+          final keyHex = dek
+              .map((b) => b.toRadixString(16).padLeft(2, '0'))
+              .join();
+          rawDb.execute("PRAGMA key = \"x'$keyHex'\";");
+        }
+      },
+    );
   });
+}
+
+bool _debugCheckHasCipher(Database database) {
+  return database.select('PRAGMA cipher;').isNotEmpty;
 }

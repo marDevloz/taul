@@ -1,7 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:taul/core/constants.dart';
+import 'package:taul/infrastructure/security/db_migration_service.dart';
+import 'package:taul/infrastructure/security/encrypted_db_bootstrap.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/infrastructure/security/lockout_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
@@ -251,6 +256,22 @@ class CredentialProtectionController {
       encryptedStorageKeyTagHex: wrapped.tagHex,
       backupCodeDataJson: backupCodeDataJson,
     );
+
+    // Save bootstrap info so app can decrypt DB on next cold start.
+    await EncryptedDbBootstrap.save(
+      saltHex: _authService.bytesToHex(salt),
+      hashHex: hash,
+      wrappedDekHex: wrapped.ciphertextHex,
+      wrappedNonceHex: wrapped.nonceHex,
+      wrappedTagHex: wrapped.tagHex,
+      hint: setupHint,
+    );
+
+    // Migrate the existing unencrypted database to encrypted.
+    final dbFolder = await getApplicationDocumentsDirectory();
+    final dbFile = File('${dbFolder.path}/${AppConstants.databaseName}');
+    final migrationService = DbMigrationService();
+    await migrationService.migrateToEncrypted(dbFile: dbFile, dek: dek);
 
     _masterPasswordNotifier?.setMasterPassword(dek);
     return dek;
