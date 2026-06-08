@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -187,13 +188,15 @@ Future<void> _downloadAndInstall(
     final path = await service.downloadInstaller(manifest.url);
     if (!context.mounted) return;
     await service.installUpdate(path);
-    // Si llegamos acá el installer falló (no cerró la app)
+    // Installer lanzado — cerrar la app para que pueda sobreescribir archivos
     if (context.mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error al instalar la actualización')),
+        const SnackBar(content: Text('Instalando actualización... Reiniciá la app.')),
       );
     }
+    await Future.delayed(const Duration(seconds: 2));
+    SystemNavigator.pop();
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();

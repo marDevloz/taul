@@ -104,9 +104,10 @@ class UpdateService {
     return destPath;
   }
 
-  /// Ejecuta el installer en modo silencioso.
+  /// Lanza el installer en modo silencioso y retorna inmediatamente.
+  /// El caller debe cerrar la app para que el installer pueda sobreescribir archivos.
   Future<void> installUpdate(String installerPath) async {
-    await Process.run(
+    await Process.start(
       installerPath,
       ['/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS'],
       runInShell: true,

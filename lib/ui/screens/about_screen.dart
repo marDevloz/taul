@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/auto_updater.dart';
 import 'package:taul/ui/widgets/update_dialog.dart';
@@ -78,11 +79,17 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
       final path = await service.downloadInstaller(manifest.url);
       if (!mounted) return;
       await service.installUpdate(path);
+      // Installer lanzado — cerrar la app para que pueda sobreescribir archivos
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al instalar la actualización')),
+          const SnackBar(content: Text('Instalando actualización... Reiniciá la app.')),
         );
+      }
+      // Dar tiempo al snackbar y cerrar
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        SystemNavigator.pop();
       }
     } catch (e) {
       if (mounted) {
