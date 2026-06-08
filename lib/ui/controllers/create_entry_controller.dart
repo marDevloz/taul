@@ -116,7 +116,8 @@ class CreateEntryController extends StateNotifier<CreateEntryState> {
   // ---------------------------------------------------------------------------
 
   /// Updates [content] and [detectedType] from Delta JSON content.
-  /// Logic ported from CreateEntrySheet._detectTypeFromContent.
+  /// Detección optimista: un solo carácter ya sugiere el tipo.
+  /// Si el siguiente carácter no encaja, se actualiza naturalmente.
   void detectTypeFromContent(String jsonContent) {
     if (jsonContent.isEmpty) {
       state = state.copyWith(content: jsonContent, detectedType: null);
@@ -132,26 +133,25 @@ class CreateEntryController extends StateNotifier<CreateEntryState> {
       }
 
       EntryType? detected;
-      // Detectar idea ANTES del split Title#
-      if (plainText.startsWith('!') && plainText.length > 1 && plainText[1] != ' ') {
-        detected = EntryType.idea;
-      } else {
-        // Ignorar Title# para el resto de detecciones
-        final rest = splitTitle(plainText).rest;
 
-        if (RichTextHelper.startsWithTaskMarker(rest)) {
-          detected = EntryType.task;
-        } else if (RegExp(r'\w+\*\w+\*\w+').hasMatch(rest)) {
-          detected = EntryType.credential;
-        } else if (RegExp(r'\b\w{2,}:(?!//)\s*\S').hasMatch(rest)) {
-          detected = EntryType.glossary;
-        } else {
-          detected = EntryType.note;
-        }
+      // Ignorar Title# prefix para detecciones
+      final text = plainText;
+      final rest = splitTitle(text).rest;
+
+      if (text.startsWith('!')) {
+        detected = EntryType.idea;
+      } else if (rest.startsWith('[') || rest.startsWith('[]')) {
+        detected = EntryType.task;
+      } else if (rest.contains('*')) {
+        detected = EntryType.credential;
+      } else if (rest.contains(':') && !rest.contains('://')) {
+        detected = EntryType.glossary;
+      } else {
+        detected = EntryType.note;
       }
+
       state = state.copyWith(content: jsonContent, detectedType: detected);
     } catch (_) {
-      // JSON malformado — detectedType se queda null
       state = state.copyWith(content: jsonContent);
     }
   }

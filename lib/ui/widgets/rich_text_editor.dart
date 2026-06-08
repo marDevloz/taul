@@ -20,12 +20,20 @@ class RichTextEditor extends StatefulWidget {
   /// Defaults to 60% of the screen height.
   final double? maxHeight;
 
+  /// Placeholder text shown when the editor is empty.
+  final String placeholder;
+
+  /// Hint text shown below the toolbar (e.g. format guide).
+  final String? hintText;
+
   const RichTextEditor({
     super.key,
     this.initialContent = '',
     this.onChanged,
     this.showToolbar = true,
     this.maxHeight,
+    this.placeholder = 'Escribí algo...',
+    this.hintText,
   });
 
   @override
@@ -134,6 +142,24 @@ class _RichTextEditorState extends State<RichTextEditor> {
             ),
           ),
         if (widget.showToolbar) const SizedBox(height: 8),
+        // Hint bar — always visible format guide
+        if (widget.hintText != null && widget.hintText!.isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.tertiaryContainer,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              widget.hintText!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onTertiaryContainer,
+              ),
+            ),
+          ),
+        if (widget.hintText != null && widget.hintText!.isNotEmpty)
+          const SizedBox(height: 6),
         Expanded(
           child: GestureDetector(
             onTap: _requestFocus,
@@ -148,7 +174,7 @@ class _RichTextEditorState extends State<RichTextEditor> {
                 focusNode: _focusNode,
                 scrollController: _scrollController,
                 config: QuillEditorConfig(
-                  placeholder: 'Escribí algo...',
+                  placeholder: widget.placeholder,
                   padding: EdgeInsets.zero,
                 ),
               ),

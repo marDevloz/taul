@@ -30,6 +30,14 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
   late final CreateEntryController _controller;
   CreateEntryState? _pendingDisposeState;
 
+  static const _typeHints = {
+    EntryType.note: 'Escribí algo...  -#tag  Título# contenido',
+    EntryType.idea: '!idea genial  -#tag  Título# contenido',
+    EntryType.task: '[] Comprar leche  -#tag  Título# contenido',
+    EntryType.glossary: 'Término: definición  -#tag  Título# contenido',
+    EntryType.credential: 'servicio*user*pass*url  -#tag  Título# contenido',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -64,18 +72,24 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
           _pendingDisposeState!.content.isNotEmpty ||
           _tagsCtrl.text.isNotEmpty;
       if (hasContent) {
-        try {
-          _draftNotifier.save(EntryDraft(
-            title: _titleCtrl.text,
-            content: _pendingDisposeState!.content,
-            tags: _tagsCtrl.text,
-            manualType: _pendingDisposeState!.manualType,
-          ));
-        } catch (_) {}
+        final draft = EntryDraft(
+          title: _titleCtrl.text,
+          content: _pendingDisposeState!.content,
+          tags: _tagsCtrl.text,
+          manualType: _pendingDisposeState!.manualType,
+        );
+        // Diferir para evitar modificar provider durante el unmount del árbol
+        Future.microtask(() {
+          try {
+            _draftNotifier.save(draft);
+          } catch (_) {}
+        });
       } else {
-        try {
-          _draftNotifier.clear();
-        } catch (_) {}
+        Future.microtask(() {
+          try {
+            _draftNotifier.clear();
+          } catch (_) {}
+        });
       }
     }
     _titleCtrl.dispose();
@@ -120,8 +134,23 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
                   children: [
                     const Icon(Icons.add, size: 20),
                     const SizedBox(width: 8),
-                    Text('Nueva entrada', style: theme.textTheme.titleMedium),
-                    const Spacer(),
+                    Expanded(
+                      child: Text('Nueva entrada', style: theme.textTheme.titleMedium),
+                    ),
+                    // Botón ayuda - siempre visible
+                    SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: IconButton(
+                        tooltip: 'Comandos rápidos',
+                        icon: const Icon(Icons.help_outline, size: 20),
+                        onPressed: _showQuickCommands,
+                        style: IconButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
                     PopupMenuButton<EntryType?>(
                       onSelected: (value) {
                         if (value == EntryType.credential) {
@@ -220,6 +249,9 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
                   child: RichTextEditor(
                     initialContent: state.content,
                     onChanged: _controller.detectTypeFromContent,
+                    hintText: state.detectedType != null
+                        ? _typeHints[state.detectedType]
+                        : null,
                   ),
                 ),
               ],
@@ -245,6 +277,70 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Quick commands help
+  // ---------------------------------------------------------------------------
+
+  void _showQuickCommands() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, controller) => Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Comandos rápidos', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView(
+                  controller: controller,
+                  children: const [
+                    _CommandEntry(
+                      prefix: '! ',
+                      example: '!idea genial',
+                      description: 'Crear idea',
+                    ),
+                    _CommandEntry(
+                      prefix: '[] ',
+                      example: '[] Comprar leche',
+                      description: 'Crear tarea (o múltiples líneas con [])',
+                    ),
+                    _CommandEntry(
+                      prefix: '',
+                      example: 'Término: definición',
+                      description: 'Crear glosario',
+                    ),
+                    _CommandEntry(
+                      prefix: '',
+                      example: 'servicio*user*pass*url -#tag',
+                      description: 'Crear credencial (opcional url y tags)',
+                    ),
+                    _CommandEntry(
+                      prefix: 'Título# ',
+                      example: 'Mi título# contenido',
+                      description: 'Título explícito para cualquier tipo',
+                    ),
+                    _CommandEntry(
+                      prefix: '-#',
+                      example: 'texto -#tag1 -#tag2',
+                      description: 'Agregar tags a cualquier entrada',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -287,5 +383,66 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
       EntryType.credential => 'Credencial',
       EntryType.task => 'Tarea',
     };
+  }
+}
+
+/// Widget auxiliar para el diálogo de comandos rápidos.
+class _CommandEntry extends StatelessWidget {
+  final String prefix;
+  final String example;
+  final String description;
+
+  const _CommandEntry({
+    required this.prefix,
+    required this.example,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (prefix.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8, top: 2),
+              child: Text(
+                prefix,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  example,
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
