@@ -7,6 +7,7 @@ import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/domain/repositories/i_entry_repository.dart';
 import 'package:taul/ui/providers/entry_draft_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:taul/ui/screens/create_entry_sheet.dart';
 
 /// Fake repository that never touches the DB.
@@ -77,6 +78,7 @@ void main() {
         overrides: [
           entryRepositoryProvider.overrideWith((ref) => _FakeEntryRepository()),
           entryListProvider.overrideWith((ref) async => []),
+          tagSettingsListProvider.overrideWith((ref) async => []),
           entryDraftProvider.overrideWith((ref) {
             final notifier = EntryDraftNotifier();
             notifier.save(EntryDraft(
@@ -106,6 +108,7 @@ void main() {
         overrides: [
           entryRepositoryProvider.overrideWith((ref) => _FakeEntryRepository()),
           entryListProvider.overrideWith((ref) async => []),
+          tagSettingsListProvider.overrideWith((ref) async => []),
           entryDraftProvider.overrideWith((ref) => EntryDraftNotifier()),
         ],
       );

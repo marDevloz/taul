@@ -4,8 +4,10 @@ import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/controllers/create_entry_controller.dart';
 import 'package:taul/ui/providers/entry_draft_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
 import 'package:taul/ui/widgets/rich_text_editor.dart';
+import 'package:taul/ui/widgets/tag_autocomplete.dart';
 
 /// Full entry creation sheet with title, rich text editor, tags, and type.
 ///
@@ -230,15 +232,16 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
                 ),
                 const SizedBox(height: 12),
 
-                // Tags (arriba del editor)
-                TextField(
-                  controller: _tagsCtrl,
+                // Tags (con autocomplete)
+                TagAutocompleteInput(
+                  allTags: ref.watch(tagSettingsListProvider).valueOrNull ?? [],
+                  selectedTags: state.tags
+                      .split(',')
+                      .map((t) => t.trim())
+                      .where((t) => t.isNotEmpty)
+                      .toList(),
+                  initialText: state.tags,
                   onChanged: _controller.setTags,
-                  decoration: const InputDecoration(
-                    labelText: 'Tags',
-                    hintText: 'o usá -#tag en el contenido',
-                    border: OutlineInputBorder(),
-                  ),
                 ),
                 const SizedBox(height: 12),
 
