@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:taul/infrastructure/security/lockout_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
@@ -52,9 +53,6 @@ class _MasterPasswordRecoveryDialogState
     extends ConsumerState<MasterPasswordRecoveryDialog> {
   // ── Step 0: Code entry ──
   final _codeCtrl = TextEditingController();
-  int _failedAttempts = 0;
-  bool _lockoutActive = false;
-  Timer? _lockoutTimer;
 
   // ── Step 1: New MP form ──
   final _newPwCtrl = TextEditingController();
@@ -91,7 +89,6 @@ class _MasterPasswordRecoveryDialogState
     _newPwCtrl.dispose();
     _confirmCtrl.dispose();
     _hintCtrl.dispose();
-    _lockoutTimer?.cancel();
     super.dispose();
   }
 
@@ -122,6 +119,8 @@ class _MasterPasswordRecoveryDialogState
   }
 
   Widget _buildCodeEntry() {
+    final lockout = LockoutService.instance;
+    final isLockedOut = lockout.isLockedOut('backup_code');
     final remaining = _remainingCodes;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -153,12 +152,12 @@ class _MasterPasswordRecoveryDialogState
           const SizedBox(height: 8),
           Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
         ],
-        if (_lockoutActive) ...[
+        if (isLockedOut) ...[
           const SizedBox(height: 8),
-          const Text(
-            'Demasiados intentos fallidos. Esperá 60 segundos antes de '
-            'intentar de nuevo.',
-            style: TextStyle(color: Colors.orange, fontSize: 13),
+          Text(
+            'Demasiados intentos fallidos. Esperá ${lockout.lockoutRemaining('backup_code')?.inSeconds ?? 60}s '
+            'antes de intentar de nuevo.',
+            style: const TextStyle(color: Colors.orange, fontSize: 13),
           ),
         ],
       ],
@@ -218,6 +217,7 @@ class _MasterPasswordRecoveryDialogState
     if (_saving) return [];
 
     if (_step == 0) {
+      final isLockedOut = LockoutService.instance.isLockedOut('backup_code');
       return [
         TextButton(
           onPressed: () => Navigator.pop(
@@ -227,7 +227,7 @@ class _MasterPasswordRecoveryDialogState
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          onPressed: _lockoutActive ? null : _onVerifyCode,
+          onPressed: isLockedOut ? null : _onVerifyCode,
           child: const Text('Verificar'),
         ),
       ];
@@ -285,9 +285,17 @@ class _MasterPasswordRecoveryDialogState
   // ── Step 0 logic: verify backup code ──
 
   Future<void> _onVerifyCode() async {
+    final lockout = LockoutService.instance;
     final code = _codeCtrl.text.trim().toUpperCase();
     if (code.isEmpty) {
       setState(() => _error = 'Ingresá un código de respaldo');
+      return;
+    }
+
+    if (lockout.isLockedOut('backup_code')) {
+      final remaining = lockout.lockoutRemaining('backup_code');
+      setState(() => _error =
+          'Demasiados intentos. Esperá ${remaining?.inSeconds ?? 60}s');
       return;
     }
 
@@ -311,15 +319,11 @@ class _MasterPasswordRecoveryDialogState
     final matchIndex = await service.verifyBackupCode(code, hashes);
 
     if (matchIndex < 0) {
+      final locked = lockout.recordFailedAttempt('backup_code');
       setState(() {
-        _failedAttempts++;
-        if (_failedAttempts >= 3) {
-          _lockoutActive = true;
-          _lockoutTimer = Timer(const Duration(seconds: 60), () {
-            if (mounted) setState(() => _lockoutActive = false);
-          });
+        if (locked) {
           _error = 'Demasiados intentos fallidos. '
-              'Esperá 60 segundos antes de intentar de nuevo.';
+              'Esperá ${LockoutService.backupCodeLockoutSeconds}s antes de intentar de nuevo.';
         } else {
           final remainingTries = hashes.length;
           _error = 'Código inválido. '
@@ -328,6 +332,9 @@ class _MasterPasswordRecoveryDialogState
       });
       return;
     }
+
+    // Success — reset attempts
+    lockout.resetAttempts('backup_code');
 
     // Code matched → read backup_code_data entry BEFORE consuming.
     // We preserve the entry in memory so it can be used to unwrap the DEK

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:taul/infrastructure/security/lockout_service.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/widgets/master_password_recovery_dialog.dart';
 
@@ -124,9 +125,17 @@ class _LockScreenState extends ConsumerState<LockScreen> {
   }
 
   Future<void> _onUnlock() async {
+    final lockout = LockoutService.instance;
     final password = _passwordCtrl.text;
     if (password.isEmpty) {
       setState(() => _error = 'Ingresá tu contraseña maestra');
+      return;
+    }
+
+    if (lockout.isLockedOut('master_password')) {
+      final remaining = lockout.lockoutRemaining('master_password');
+      setState(() => _error =
+          'Demasiados intentos fallidos. Esperá ${remaining?.inSeconds ?? 30}s');
       return;
     }
 
@@ -154,12 +163,18 @@ class _LockScreenState extends ConsumerState<LockScreen> {
       );
 
       if (!isValid) {
+        final locked = lockout.recordFailedAttempt('master_password');
         setState(() {
-          _error = 'Contraseña incorrecta';
+          _error = locked
+              ? 'Demasiados intentos fallidos. Esperá ${LockoutService.masterPasswordLockoutSeconds}s'
+              : 'Contraseña incorrecta';
           _loading = false;
         });
         return;
       }
+
+      // Success — reset attempts
+      lockout.resetAttempts('master_password');
 
       // Derive KEK and unwrap DEK
       final kek = await authService.deriveMasterKey(
