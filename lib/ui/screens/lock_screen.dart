@@ -218,6 +218,8 @@ class _LockScreenState extends ConsumerState<LockScreen> {
       );
 
       Uint8List masterKey;
+      String? migrationMessage;
+      bool migrationFailed = false;
 
       if (dbEncrypted) {
         // DB is encrypted — unwrap DEK from bootstrap
@@ -241,7 +243,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
 
         if (config != null && !hasDek) {
           // Old user: has master password but no DEK → migrate
-          setState(() => _loading = true); // Keep loading state
+          setState(() => _loading = true);
           final dbFolder = await getApplicationDocumentsDirectory();
           final dbFile = File('${dbFolder.path}/${AppConstants.databaseName}');
           final migrationService = DbMigrationService();
@@ -267,12 +269,13 @@ class _LockScreenState extends ConsumerState<LockScreen> {
             );
             ref.invalidate(masterPasswordConfigProvider);
             masterKey = dek;
+            migrationMessage = 'Tu base de datos fue encriptada correctamente.';
           } else {
-            // Migration failed — fall back to old behavior (KEK as master key)
+            // Migration failed — fall back to old behavior
             masterKey = kek;
+            migrationFailed = true;
           }
         } else if (config != null && hasDek) {
-          // Has wrapped DEK but DB not encrypted — just encrypt DB
           final dek = await authService.unwrapStorageKey(
             payload: EncryptionPayload(
               ciphertextHex: config.encryptedStorageKeyHex!,
@@ -283,7 +286,6 @@ class _LockScreenState extends ConsumerState<LockScreen> {
           );
           masterKey = dek;
         } else {
-          // No config — fall back to KEK
           masterKey = kek;
         }
       }
@@ -291,6 +293,27 @@ class _LockScreenState extends ConsumerState<LockScreen> {
       ref.read(masterPasswordProvider.notifier).setMasterPassword(masterKey);
 
       if (!context.mounted) return;
+
+      // Show migration feedback before unlocking
+      if (migrationMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(migrationMessage),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      } else if (migrationFailed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No se pudo encriptar la base de datos. '
+              'Los datos siguen protegidos por tu contraseña maestra.',
+            ),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+
       ref.read(appLockProvider.notifier).unlock();
     } catch (e) {
       setState(() {
