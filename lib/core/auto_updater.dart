@@ -108,7 +108,7 @@ class UpdateService {
   Future<void> installUpdate(String installerPath) async {
     await Process.run(
       installerPath,
-      ['/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'],
+      ['/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS'],
       runInShell: true,
     );
   }
