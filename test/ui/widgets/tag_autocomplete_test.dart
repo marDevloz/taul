@@ -15,11 +15,12 @@ void main() {
     Widget buildTestWidget({
       String initialText = '',
       ValueChanged<String>? onChanged,
+      List<TagSetting>? tags,
     }) {
       return MaterialApp(
         home: Scaffold(
           body: TagAutocompleteInput(
-            allTags: allTags,
+            allTags: tags ?? allTags,
             selectedTags: const [],
             initialText: initialText,
             onChanged: onChanged ?? (_) {},
@@ -28,69 +29,61 @@ void main() {
       );
     }
 
-    testWidgets('should show suggestions when typing', (tester) async {
+    testWidgets('should show first matching suggestion as chip', (tester) async {
       await tester.pumpWidget(buildTestWidget());
 
-      // Type "traba" to trigger suggestions
       await tester.enterText(find.byType(TextField), 'traba');
       await tester.pumpAndSettle();
 
-      // Should show matching suggestion
+      // Should show one chip with the first match
       expect(find.text('trabajo'), findsOneWidget);
-      expect(find.text('personal'), findsNothing);
     });
 
-    testWidgets('should show all tags when field is focused and empty', (tester) async {
-      await tester.pumpWidget(buildTestWidget());
+    testWidgets('should update suggestion as user types more', (tester) async {
+      final moreTags = [
+        TagSetting(name: 'proyecto-alpha', isSecure: false, isSystem: false, createdAt: DateTime(2026)),
+        TagSetting(name: 'proyecto-beta', isSecure: false, isSystem: false, createdAt: DateTime(2026)),
+      ];
+      await tester.pumpWidget(buildTestWidget(tags: moreTags));
 
-      // Focus the field
-      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), 'alpha');
       await tester.pumpAndSettle();
 
-      // Should show all tags
-      expect(find.text('trabajo'), findsOneWidget);
-      expect(find.text('personal'), findsOneWidget);
-      expect(find.text('urgente'), findsOneWidget);
+      expect(find.text('proyecto-alpha'), findsOneWidget);
+      expect(find.text('proyecto-beta'), findsNothing);
     });
 
-    testWidgets('should add tag to input when suggestion tapped', (tester) async {
+    testWidgets('should add tag when chip tapped', (tester) async {
       String? changedValue;
       await tester.pumpWidget(buildTestWidget(onChanged: (v) => changedValue = v));
 
-      // Focus and type "pro"
-      await tester.tap(find.byType(TextField));
-      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'traba');
       await tester.pumpAndSettle();
 
-      // Tap the suggestion
       await tester.tap(find.text('trabajo'));
       await tester.pumpAndSettle();
 
-      // Input should now contain "trabajo,"
       expect(changedValue, 'trabajo,');
     });
 
-    testWidgets('should hide suggestions after selection', (tester) async {
+    testWidgets('should hide suggestion when input is empty', (tester) async {
       await tester.pumpWidget(buildTestWidget());
 
-      await tester.tap(find.byType(TextField));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'traba');
-      await tester.pumpAndSettle();
-
-      // Suggestions visible
-      expect(find.text('trabajo'), findsOneWidget);
-
-      // Select
-      await tester.tap(find.text('trabajo'));
-      await tester.pumpAndSettle();
-
-      // Suggestions should hide (no more suggestion chips)
-      // The text "trabajo" now appears in the TextField, not as a suggestion
+      // No text typed — no suggestion chip
+      expect(find.byType(GestureDetector), findsNothing);
     });
 
-    testWidgets('should not show already selected tags as suggestions', (tester) async {
+    testWidgets('should hide suggestion when no match', (tester) async {
+      await tester.pumpWidget(buildTestWidget());
+
+      await tester.enterText(find.byType(TextField), 'xyz');
+      await tester.pumpAndSettle();
+
+      // No suggestion chip should be visible
+      expect(find.byIcon(Icons.add), findsNothing);
+    });
+
+    testWidgets('should not show already selected tags', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -104,26 +97,11 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), 'traba');
       await tester.pumpAndSettle();
 
-      // "trabajo" should NOT appear as a suggestion (already selected)
-      // Only "personal" and "urgente" should appear
+      // "trabajo" is selected, should not appear as suggestion
       expect(find.text('trabajo'), findsNothing);
-      expect(find.text('personal'), findsOneWidget);
-      expect(find.text('urgente'), findsOneWidget);
-    });
-
-    testWidgets('should show "Crear tag" option when no exact match', (tester) async {
-      await tester.pumpWidget(buildTestWidget());
-
-      await tester.tap(find.byType(TextField));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'nuevotag');
-      await tester.pumpAndSettle();
-
-      // Should show "Crear tag: nuevotag" option
-      expect(find.textContaining('Crear tag'), findsOneWidget);
     });
   });
 }

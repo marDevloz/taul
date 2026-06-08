@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:taul/domain/entities/tag_setting.dart';
 import 'package:taul/ui/widgets/tag_suggestions.dart';
 
-/// A text input with autocomplete suggestions for tags.
+/// A text input with a single inline tag suggestion.
 ///
-/// Shows matching tags as a fixed-height dropdown below the input as the user types.
-/// Tapping a suggestion appends it to the comma-separated tag list.
-/// If the typed text doesn't match any existing tag, a "Crear tag" option is shown.
+/// As the user types, the first matching tag appears as a tappable chip
+/// below the input. Tapping it adds the tag.
 class TagAutocompleteInput extends StatefulWidget {
   const TagAutocompleteInput({
     super.key,
@@ -83,15 +82,9 @@ class _TagAutocompleteInputState extends State<TagAutocompleteInput> {
       selectedTags: widget.selectedTags,
     );
 
-    final hasExactMatch = suggestions.any(
-      (t) => t.name.toLowerCase() == _currentInput.toLowerCase(),
-    );
-
-    final showSuggestions = _focusNode.hasFocus &&
-        (suggestions.isNotEmpty || _currentInput.isNotEmpty);
-
-    final itemCount = suggestions.length +
-        (_currentInput.isNotEmpty && !hasExactMatch ? 1 : 0);
+    final firstSuggestion = _currentInput.isNotEmpty && suggestions.isNotEmpty
+        ? suggestions.first
+        : null;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -107,56 +100,30 @@ class _TagAutocompleteInputState extends State<TagAutocompleteInput> {
             border: OutlineInputBorder(),
           ),
         ),
-        if (showSuggestions && itemCount > 0)
-          SizedBox(
-            height: (itemCount * 48.0).clamp(0.0, 200.0),
-            child: Material(
-              elevation: 4,
-              borderRadius: BorderRadius.circular(8),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: itemCount,
-                  itemBuilder: (context, index) {
-                    if (index < suggestions.length) {
-                      final tag = suggestions[index];
-                      return ListTile(
-                        dense: true,
-                        visualDensity: VisualDensity.compact,
-                        leading: tag.color != null
-                            ? CircleAvatar(
-                                radius: 8,
-                                backgroundColor: Color(
-                                  int.parse(
-                                    'FF${tag.color!.replaceFirst('#', '')}',
-                                    radix: 16,
-                                  ),
-                                ),
-                              )
-                            : const Icon(Icons.tag, size: 16),
-                        title: Text(
-                          tag.name,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                        onTap: () => _selectTag(tag.name),
-                      );
-                    }
-                    return ListTile(
-                      dense: true,
-                      visualDensity: VisualDensity.compact,
-                      leading: const Icon(Icons.add_circle_outline, size: 16),
-                      title: Text(
-                        'Crear tag: $_currentInput',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Theme.of(context).colorScheme.primary,
-                          fontStyle: FontStyle.italic,
-                        ),
+        if (firstSuggestion != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: GestureDetector(
+              onTap: () => _selectTag(firstSuggestion.name),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add, size: 14, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      firstSuggestion.name,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
                       ),
-                      onTap: () => _selectTag(_currentInput),
-                    );
-                  },
+                    ),
+                  ],
                 ),
               ),
             ),
