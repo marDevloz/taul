@@ -40,9 +40,9 @@ class CredentialProtectionController {
     required EntryAuthService authService,
     required MasterPasswordStore passwordStore,
     MasterPasswordNotifier? masterPasswordNotifier,
-  })  : _authService = authService,
-        _passwordStore = passwordStore,
-        _masterPasswordNotifier = masterPasswordNotifier;
+  }) : _authService = authService,
+       _passwordStore = passwordStore,
+       _masterPasswordNotifier = masterPasswordNotifier;
 
   final EntryAuthService _authService;
   final MasterPasswordStore _passwordStore;
@@ -171,17 +171,23 @@ class CredentialProtectionController {
       if (!context.mounted) return null;
 
       final salt = _authService.hexToBytes(config.saltHex);
-      final password = await _askForPassword(context, verify: (pwd) async {
-        return _authService.verifyMasterPassword(
-          password: pwd,
-          salt: salt,
-          expectedHashHex: config.hashHex,
-        );
-      });
+      final password = await _askForPassword(
+        context,
+        verify: (pwd) async {
+          return _authService.verifyMasterPassword(
+            password: pwd,
+            salt: salt,
+            expectedHashHex: config.hashHex,
+          );
+        },
+      );
       if (password == null) return null;
 
       // Derive KEK and unwrap DEK
-      final kek = await _authService.deriveMasterKey(password: password, salt: salt);
+      final kek = await _authService.deriveMasterKey(
+        password: password,
+        salt: salt,
+      );
       final dek = await _authService.unwrapStorageKey(
         payload: EncryptionPayload(
           ciphertextHex: config.encryptedStorageKeyHex!,
@@ -199,15 +205,21 @@ class CredentialProtectionController {
       if (!context.mounted) return null;
 
       final salt = _authService.hexToBytes(config.saltHex);
-      final password = await _askForPassword(context, verify: (pwd) async {
-        return _authService.verifyMasterPassword(
-          password: pwd,
-          salt: salt,
-          expectedHashHex: config.hashHex,
-        );
-      });
+      final password = await _askForPassword(
+        context,
+        verify: (pwd) async {
+          return _authService.verifyMasterPassword(
+            password: pwd,
+            salt: salt,
+            expectedHashHex: config.hashHex,
+          );
+        },
+      );
       if (password == null) return null;
-      final key = await _authService.deriveMasterKey(password: password, salt: salt);
+      final key = await _authService.deriveMasterKey(
+        password: password,
+        salt: salt,
+      );
       _masterPasswordNotifier?.setMasterPassword(key);
       return key;
     }
@@ -232,7 +244,9 @@ class CredentialProtectionController {
     final wrapped = await _authService.wrapStorageKey(dek: dek, kek: kek);
 
     // Generate backup codes with DEK wraps
-    final codesWithWraps = await _authService.generateBackupCodesWithDekWraps(dek);
+    final codesWithWraps = await _authService.generateBackupCodesWithDekWraps(
+      dek,
+    );
     final backupCodeDataJson = jsonEncode(
       codesWithWraps.entries.map((e) => e.toJson()).toList(),
     );
@@ -257,21 +271,26 @@ class CredentialProtectionController {
       backupCodeDataJson: backupCodeDataJson,
     );
 
-    // Save bootstrap info so app can decrypt DB on next cold start.
-    await EncryptedDbBootstrap.save(
-      saltHex: _authService.bytesToHex(salt),
-      hashHex: hash,
-      wrappedDekHex: wrapped.ciphertextHex,
-      wrappedNonceHex: wrapped.nonceHex,
-      wrappedTagHex: wrapped.tagHex,
-      hint: setupHint,
-    );
-
     // Migrate the existing unencrypted database to encrypted.
     final dbFolder = await getApplicationDocumentsDirectory();
     final dbFile = File('${dbFolder.path}/${AppConstants.databaseName}');
     final migrationService = DbMigrationService();
-    await migrationService.migrateToEncrypted(dbFile: dbFile, dek: dek);
+    final migrated = await migrationService.migrateToEncrypted(
+      dbFile: dbFile,
+      dek: dek,
+    );
+
+    if (migrated) {
+      // Save bootstrap info only after the encrypted database is in place.
+      await EncryptedDbBootstrap.save(
+        saltHex: _authService.bytesToHex(salt),
+        hashHex: hash,
+        wrappedDekHex: wrapped.ciphertextHex,
+        wrappedNonceHex: wrapped.nonceHex,
+        wrappedTagHex: wrapped.tagHex,
+        hint: setupHint,
+      );
+    }
 
     _masterPasswordNotifier?.setMasterPassword(dek);
     return dek;
@@ -302,13 +321,16 @@ class CredentialProtectionController {
     }
 
     final salt = _authService.hexToBytes(config.saltHex);
-    final password = await _askForPassword(context, verify: (pwd) async {
-      return _authService.verifyMasterPassword(
-        password: pwd,
-        salt: salt,
-        expectedHashHex: config.hashHex,
-      );
-    });
+    final password = await _askForPassword(
+      context,
+      verify: (pwd) async {
+        return _authService.verifyMasterPassword(
+          password: pwd,
+          salt: salt,
+          expectedHashHex: config.hashHex,
+        );
+      },
+    );
     if (password == null) throw const UserCancelledException();
 
     final kek = await _authService.deriveMasterKey(
@@ -361,8 +383,10 @@ class CredentialProtectionController {
       }
       if (lockout.isLockedOut('master_password')) {
         final remaining = lockout.lockoutRemaining('master_password');
-        setLocalState(() =>
-            error = 'Demasiados intentos. Esperá ${remaining?.inSeconds ?? 30}s');
+        setLocalState(
+          () => error =
+              'Demasiados intentos. Esperá ${remaining?.inSeconds ?? 30}s',
+        );
         return;
       }
       setLocalState(() {
@@ -402,7 +426,9 @@ class CredentialProtectionController {
             obscureText: obscurePassword,
             autofocus: true,
             textInputAction: TextInputAction.done,
-            onSubmitted: loading ? null : (_) => onVerify(setLocalState, ctrl.text),
+            onSubmitted: loading
+                ? null
+                : (_) => onVerify(setLocalState, ctrl.text),
             decoration: InputDecoration(
               labelText: 'Ingresá tu master password',
               errorText: error,
@@ -423,7 +449,9 @@ class CredentialProtectionController {
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              onPressed: loading ? null : () => onVerify(setLocalState, ctrl.text),
+              onPressed: loading
+                  ? null
+                  : () => onVerify(setLocalState, ctrl.text),
               child: loading
                   ? const SizedBox(
                       width: 18,
@@ -467,7 +495,9 @@ class CredentialProtectionController {
               TextField(
                 controller: confirmCtrl,
                 obscureText: true,
-                decoration: const InputDecoration(labelText: 'Confirmar password'),
+                decoration: const InputDecoration(
+                  labelText: 'Confirmar password',
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -476,7 +506,8 @@ class CredentialProtectionController {
                 decoration: const InputDecoration(
                   labelText: 'Pista (opcional)',
                   hintText: 'Ej: nombre de mi primera mascota',
-                  helperText: 'Se guarda en texto plano — no uses tu contraseña ni variaciones',
+                  helperText:
+                      'Se guarda en texto plano — no uses tu contraseña ni variaciones',
                   helperMaxLines: 2,
                 ),
               ),
@@ -504,10 +535,10 @@ class CredentialProtectionController {
                   return;
                 }
                 final hint = hintCtrl.text.trim();
-                Navigator.pop(
-                  ctx,
-                  (password: pwd, hint: hint.isNotEmpty ? hint : null),
-                );
+                Navigator.pop(ctx, (
+                  password: pwd,
+                  hint: hint.isNotEmpty ? hint : null,
+                ));
               },
               child: const Text('Siguiente'),
             ),

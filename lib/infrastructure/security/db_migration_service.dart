@@ -5,8 +5,8 @@ import 'package:logger/logger.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:taul/core/constants.dart';
 
-/// Migrates an unencrypted SQLite database to an encrypted one using
-/// SQLite3MultipleCiphers (PRAGMA rekey pattern).
+/// Migrates an unencrypted SQLite database to an encrypted one using the
+/// SQLCipher-documented plaintext -> encrypted export flow.
 ///
 /// The migration is atomic: data is copied to a temp file, encrypted,
 /// then swapped into place. If anything fails, the original DB is preserved.
@@ -27,24 +27,28 @@ class DbMigrationService {
     if (!file.existsSync()) return false;
     try {
       final db = sqlite3.open(file.path, mode: OpenMode.readOnly);
-      // If we can read sqlite_master, it's unencrypted.
       final result = db.select('SELECT count(*) FROM sqlite_master;');
       db.dispose();
       return result.isEmpty;
     } catch (_) {
-      // Can't read without key → assume encrypted.
       return true;
     }
   }
 
+  String _toHex(Uint8List bytes) =>
+      bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+
+  String _sqlStringLiteral(String value) => "'${value.replaceAll("'", "''")}'";
+
   /// Migrates an unencrypted database to an encrypted one.
   ///
   /// 1. Opens the existing unencrypted DB.
-  /// 2. Copies it to a temp file via VACUUM INTO.
-  /// 3. Opens the temp file and applies PRAGMA rekey to encrypt it.
-  /// 4. Saves the user_version from the original DB.
-  /// 5. Swaps files: original → backup, encrypted → original.
-  /// 6. Deletes the backup.
+  /// 2. Attaches a new encrypted temp database.
+  /// 3. Copies schema/data with sqlcipher_export().
+  /// 4. Preserves user_version on the encrypted output.
+  /// 5. Verifies the encrypted temp DB can be opened with the key.
+  /// 6. Swaps files: original -> backup, encrypted -> original.
+  /// 7. Deletes the backup.
   ///
   /// Returns `true` if migration succeeded, `false` if no migration was
   /// needed (DB doesn't exist or is already encrypted).
@@ -62,70 +66,74 @@ class DbMigrationService {
       return false;
     }
 
-    _log.i('Starting DB migration: unencrypted → encrypted');
+    _log.i('Starting DB migration: unencrypted -> encrypted');
 
     final backupFile = File('${dbFile.path}.bak');
     final tmpFile = File('${dbFile.path}.enc.tmp');
+    final keyHex = _toHex(dek);
+    final keyLiteral = "x'$keyHex'";
 
-    // Clean up any leftover files from a previous failed migration.
     if (await tmpFile.exists()) await tmpFile.delete();
     if (await backupFile.exists()) await backupFile.delete();
 
     try {
-      // Step 1: Open unencrypted DB and capture user_version.
-      final plaintextDb = sqlite3.open(dbFile.path, mode: OpenMode.readOnly);
+      final plaintextDb = sqlite3.open(dbFile.path);
       final userVersion = plaintextDb.userVersion;
       _log.d('Captured user_version = $userVersion');
 
-      // Step 2: VACUUM INTO temp file (creates a clean copy).
-      final escapedTmpPath = tmpFile.path.replaceAll("'", "''");
-      plaintextDb.execute("VACUUM INTO '$escapedTmpPath';");
-      plaintextDb.dispose();
-      _log.d('VACUUM INTO completed');
+      try {
+        final escapedTmpPath = _sqlStringLiteral(tmpFile.path);
+        plaintextDb.execute(
+          'ATTACH DATABASE $escapedTmpPath AS encrypted KEY $keyLiteral;',
+        );
+        plaintextDb.execute("SELECT sqlcipher_export('encrypted');");
+        plaintextDb.execute('PRAGMA encrypted.user_version = $userVersion;');
+        plaintextDb.execute('DETACH DATABASE encrypted;');
+      } finally {
+        plaintextDb.dispose();
+      }
+      _log.d('Encrypted export completed with sqlcipher_export');
 
-      // Step 3: Open the temp copy and apply encryption key.
-      final keyHex =
-          dek.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-      final encryptedDb = sqlite3.open(tmpFile.path);
-      encryptedDb.execute("PRAGMA key = \"x'$keyHex'\";");
-      encryptedDb.userVersion = userVersion;
-      encryptedDb.dispose();
-      _log.d('Encryption applied with PRAGMA rekey');
-
-      // Step 4: Verify the encrypted DB can be opened with the key.
       final verifyDb = sqlite3.open(tmpFile.path);
-      verifyDb.execute("PRAGMA key = \"x'$keyHex'\";");
-      final count = verifyDb.select('SELECT count(*) FROM sqlite_master;');
-      verifyDb.dispose();
-      if (count.isEmpty) {
-        throw StateError('Encrypted DB verification failed: no tables found');
+      try {
+        verifyDb.execute('PRAGMA key = $keyLiteral;');
+        final count = verifyDb.select('SELECT count(*) FROM sqlite_master;');
+        final verifiedUserVersion = verifyDb.userVersion;
+        if (count.isEmpty || verifiedUserVersion != userVersion) {
+          throw StateError('Encrypted DB verification failed');
+        }
+      } finally {
+        verifyDb.dispose();
       }
       _log.d('Encrypted DB verified successfully');
 
-      // Step 5: Atomic swap: original → backup, encrypted → original.
       dbFile.renameSync(backupFile.path);
       tmpFile.renameSync(dbFile.path);
       _log.d('File swap completed');
 
-      // Step 6: Delete the unencrypted backup.
-      await backupFile.delete();
-      _log.i('Migration completed successfully');
+      try {
+        await backupFile.delete();
+      } catch (e, st) {
+        _log.w(
+          'Could not delete backup after migration',
+          error: e,
+          stackTrace: st,
+        );
+      }
 
+      _log.i('Migration completed successfully');
       return true;
     } catch (e, st) {
       _log.e('Migration failed', error: e, stackTrace: st);
 
-      // Attempt recovery: if tmp exists and final is missing, restore from tmp.
       if (await tmpFile.exists() && !await dbFile.exists()) {
         await tmpFile.rename(dbFile.path);
         _log.d('Recovered: renamed .enc.tmp back to original');
       }
-      // If backup exists and original is missing, restore from backup.
       if (await backupFile.exists() && !await dbFile.exists()) {
         await backupFile.rename(dbFile.path);
         _log.d('Recovered: restored from backup');
       }
-      // Clean up temp files.
       if (await tmpFile.exists()) await tmpFile.delete();
       if (await backupFile.exists()) await backupFile.delete();
 
