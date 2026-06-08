@@ -95,7 +95,11 @@ class MasterPasswordNotifier extends StateNotifier<Uint8List?> {
 
   Uint8List? get cachedKey => state;
   void setMasterPassword(Uint8List key) => state = key;
-  void clearMasterPassword() => state = null;
+  void clearMasterPassword() {
+    // Zero the buffer before releasing to prevent key lingering in RAM
+    state?.fillRange(0, state!.length, 0);
+    state = null;
+  }
   bool get isSet => state != null;
 }
 

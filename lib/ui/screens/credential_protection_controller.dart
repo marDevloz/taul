@@ -309,6 +309,8 @@ class CredentialProtectionController {
   /// Clears the cached DEK. The next call to [requireMasterKey] will prompt
   /// the user for their master password again.
   void clearCachedDek() {
+    // Zero the buffer before releasing to prevent DEK lingering in RAM
+    _cachedDek?.fillRange(0, _cachedDek!.length, 0);
     _cachedDek = null;
   }
 
