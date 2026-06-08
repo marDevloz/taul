@@ -130,6 +130,7 @@ class _TagAutocompleteInputState extends State<TagAutocompleteInput> {
                                 backgroundColor: Color(
                                   int.parse(
                                     'FF${tag.color!.replaceFirst('#', '')}',
+                                    radix: 16,
                                   ),
                                 ),
                               )
