@@ -71,7 +71,8 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
   @override
   void dispose() {
     if (!_didSaveSuccessfully) {
-      final hasContent = _titleCtrl.text.isNotEmpty ||
+      final hasContent =
+          _titleCtrl.text.isNotEmpty ||
           _pendingDisposeState!.content.isNotEmpty ||
           _tagsCtrl.text.isNotEmpty;
       if (hasContent) {
@@ -131,7 +132,8 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
 
   /// Unified suggestion: editor `-#` takes priority, then tags field partial.
   TagSetting? _unifiedSuggestion(List<TagSetting> allTags) {
-    final selectedTags = _pendingDisposeState?.tags
+    final selectedTags =
+        _pendingDisposeState?.tags
             .split(',')
             .map((t) => t.trim())
             .where((t) => t.isNotEmpty)
@@ -198,11 +200,14 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
     final state = ref.watch(createEntryControllerProvider);
     final allTags = ref.watch(tagSettingsListProvider).valueOrNull ?? [];
 
-    ref.listen(createEntryControllerProvider.select((s) => s.error), (_, error) {
+    ref.listen(createEntryControllerProvider.select((s) => s.error), (
+      _,
+      error,
+    ) {
       if (error != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
       }
     });
 
@@ -216,164 +221,186 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Form: takes available vertical space
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header
-                Row(
+          // Header
+          Row(
+            children: [
+              const Icon(Icons.add, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Nueva entrada',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: IconButton(
+                  tooltip: 'Comandos rápidos',
+                  icon: const Icon(Icons.help_outline, size: 20),
+                  onPressed: _showQuickCommands,
+                  style: IconButton.styleFrom(padding: EdgeInsets.zero),
+                ),
+              ),
+              const SizedBox(width: 4),
+              PopupMenuButton<EntryType?>(
+                onSelected: (value) {
+                  if (value == EntryType.credential) {
+                    Navigator.pop(context);
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => const CredentialFormSheet(),
+                    );
+                  } else {
+                    _controller.setManualType(value);
+                  }
+                },
+                tooltip: 'Cambiar tipo',
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 110),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: state.isManual
+                        ? theme.colorScheme.primaryContainer
+                        : theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_iconForType(state.effectiveType), size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        _labelForType(state.effectiveType),
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_drop_down,
+                        size: 16,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                ),
+                itemBuilder: (_) => [
+                  ...EntryType.values.map(
+                    (t) => PopupMenuItem(
+                      value: t,
+                      child: ListTile(
+                        dense: true,
+                        leading: Icon(_iconForType(t), size: 18),
+                        title: Text(
+                          _labelForType(t),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        trailing: state.effectiveType == t && state.isManual
+                            ? Icon(
+                                Icons.check,
+                                size: 16,
+                                color: theme.colorScheme.primary,
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  PopupMenuItem(
+                    value: null,
+                    child: ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.sync, size: 18),
+                      title: const Text('Auto', style: TextStyle(fontSize: 13)),
+                      subtitle: const Text(
+                        'detectar del contenido',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                      trailing: !state.isManual
+                          ? Icon(
+                              Icons.check,
+                              size: 16,
+                              color: theme.colorScheme.primary,
+                            )
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // 1. Título
+          TextField(
+            controller: _titleCtrl,
+            onChanged: _controller.setTitle,
+            decoration: const InputDecoration(
+              labelText: 'Título',
+              hintText: 'o escribí Titulo# en el contenido',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 2. Contenido (rich text editor)
+          const Text('Contenido', style: TextStyle(fontSize: 12)),
+          const SizedBox(height: 4),
+          RichTextEditor(
+            key: _editorKey,
+            initialContent: state.content,
+            onChanged: _onContentChanged,
+            maxHeight: 200,
+            hintText: state.detectedType != null
+                ? _typeHints[state.detectedType]
+                : null,
+          ),
+          const SizedBox(height: 4),
+
+          // 3. Unified autocomplete suggestion
+          if (suggestion != null)
+            GestureDetector(
+              onTap: () => _acceptSuggestion(suggestion),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.add, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text('Nueva entrada', style: theme.textTheme.titleMedium),
-                    ),
-                    SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: IconButton(
-                        tooltip: 'Comandos rápidos',
-                        icon: const Icon(Icons.help_outline, size: 20),
-                        onPressed: _showQuickCommands,
-                        style: IconButton.styleFrom(padding: EdgeInsets.zero),
-                      ),
-                    ),
+                    Icon(Icons.add, size: 14, color: theme.colorScheme.primary),
                     const SizedBox(width: 4),
-                    PopupMenuButton<EntryType?>(
-                      onSelected: (value) {
-                        if (value == EntryType.credential) {
-                          Navigator.pop(context);
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            builder: (_) => const CredentialFormSheet(),
-                          );
-                        } else {
-                          _controller.setManualType(value);
-                        }
-                      },
-                      tooltip: 'Cambiar tipo',
-                      child: Container(
-                        constraints: const BoxConstraints(minWidth: 110),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: state.isManual
-                              ? theme.colorScheme.primaryContainer
-                              : theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(_iconForType(state.effectiveType), size: 14),
-                            const SizedBox(width: 4),
-                            Text(_labelForType(state.effectiveType), style: const TextStyle(fontSize: 12)),
-                            const SizedBox(width: 4),
-                            Icon(Icons.arrow_drop_down, size: 16, color: theme.colorScheme.onSurfaceVariant),
-                          ],
-                        ),
+                    Text(
+                      suggestion.name,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onPrimaryContainer,
                       ),
-                      itemBuilder: (_) => [
-                        ...EntryType.values.map(
-                          (t) => PopupMenuItem(
-                            value: t,
-                            child: ListTile(
-                              dense: true,
-                              leading: Icon(_iconForType(t), size: 18),
-                              title: Text(_labelForType(t), style: const TextStyle(fontSize: 13)),
-                              trailing: state.effectiveType == t && state.isManual
-                                  ? Icon(Icons.check, size: 16, color: theme.colorScheme.primary)
-                                  : null,
-                            ),
-                          ),
-                        ),
-                        const PopupMenuDivider(),
-                        PopupMenuItem(
-                          value: null,
-                          child: ListTile(
-                            dense: true,
-                            leading: const Icon(Icons.sync, size: 18),
-                            title: const Text('Auto', style: TextStyle(fontSize: 13)),
-                            subtitle: const Text('detectar del contenido', style: TextStyle(fontSize: 11)),
-                            trailing: !state.isManual
-                                ? Icon(Icons.check, size: 16, color: theme.colorScheme.primary)
-                                : null,
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+              ),
+            ),
 
-                // 1. Título
-                TextField(
-                  controller: _titleCtrl,
-                  onChanged: _controller.setTitle,
-                  decoration: const InputDecoration(
-                    labelText: 'Título',
-                    hintText: 'o escribí Titulo# en el contenido',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 2. Contenido (rich text editor)
-                const Text('Contenido', style: TextStyle(fontSize: 12)),
-                const SizedBox(height: 4),
-                Expanded(
-                  child: RichTextEditor(
-                    key: _editorKey,
-                    initialContent: state.content,
-                    onChanged: _onContentChanged,
-                    hintText: state.detectedType != null
-                        ? _typeHints[state.detectedType]
-                        : null,
-                  ),
-                ),
-                const SizedBox(height: 4),
-
-                // 3. Unified autocomplete suggestion
-                if (suggestion != null)
-                  GestureDetector(
-                    onTap: () => _acceptSuggestion(suggestion),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.add, size: 14, color: theme.colorScheme.primary),
-                          const SizedBox(width: 4),
-                          Text(
-                            suggestion.name,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: theme.colorScheme.onPrimaryContainer,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                // 4. Tags
-                const SizedBox(height: 4),
-                TextField(
-                  controller: _tagsCtrl,
-                  onChanged: _onTagsChanged,
-                  decoration: const InputDecoration(
-                    labelText: 'Tags',
-                    hintText: 'separados por coma: dev, personal',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
+          // 4. Tags
+          const SizedBox(height: 4),
+          TextField(
+            controller: _tagsCtrl,
+            onChanged: _onTagsChanged,
+            decoration: const InputDecoration(
+              labelText: 'Tags',
+              hintText: 'separados por coma: dev, personal',
+              border: OutlineInputBorder(),
             ),
           ),
 
@@ -390,7 +417,11 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
               FilledButton(
                 onPressed: state.isSaving ? null : _save,
                 child: state.isSaving
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Text('Guardar'),
               ),
             ],
@@ -418,7 +449,10 @@ class _CreateEntrySheetState extends ConsumerState<CreateEntrySheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Comandos rápidos', style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                'Comandos rápidos',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 16),
               Expanded(
                 child: ListView(
@@ -551,10 +585,7 @@ class _CommandEntry extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
             ),
