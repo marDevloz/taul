@@ -25,6 +25,7 @@ import 'package:taul/infrastructure/export/export_service.dart';
 import 'package:taul/infrastructure/export/encrypted_export_service.dart';
 import 'package:taul/infrastructure/export/import_service.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
+import 'package:taul/infrastructure/security/encrypted_db_bootstrap.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/controllers/create_entry_controller.dart';
@@ -44,6 +45,17 @@ class AppLockNotifier extends StateNotifier<AppLockStatus> {
 
   Future<void> _checkInitialStatus() async {
     try {
+      final dbEncrypted = await EncryptedDbBootstrap.isEncrypted();
+
+      if (dbEncrypted) {
+        // DB is encrypted — we can't read from it yet. Check prefs for lock state.
+        final prefs = await SharedPreferences.getInstance();
+        final appLockEnabled = prefs.getBool('app_lock_enabled') ?? false;
+        state = appLockEnabled ? AppLockStatus.locked : AppLockStatus.unlocked;
+        return;
+      }
+
+      // DB is unencrypted — read from DB as before.
       final config = await _ref.read(masterPasswordStoreProvider).readFull();
       final isConfigured = config != null &&
           config.encryptedStorageKeyHex != null &&
