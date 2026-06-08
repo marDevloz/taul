@@ -248,7 +248,7 @@ void main() {
       await openEditSheet(tester);
 
       // Find the tags field by its label text
-      final tagsField = find.widgetWithText(TextField, 'Tags (opcional)');
+      final tagsField = find.widgetWithText(TextField, 'Tags');
       expect(tagsField, findsOneWidget);
 
       // Type matching text "ur"
@@ -283,7 +283,7 @@ void main() {
 
       await openEditSheet(tester);
 
-      final tagsField = find.widgetWithText(TextField, 'Tags (opcional)');
+      final tagsField = find.widgetWithText(TextField, 'Tags');
       expect(tagsField, findsOneWidget);
 
       // Type matching text
