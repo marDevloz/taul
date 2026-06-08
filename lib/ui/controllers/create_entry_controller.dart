@@ -118,33 +118,41 @@ class CreateEntryController extends StateNotifier<CreateEntryState> {
   /// Updates [content] and [detectedType] from Delta JSON content.
   /// Logic ported from CreateEntrySheet._detectTypeFromContent.
   void detectTypeFromContent(String jsonContent) {
-    state = state.copyWith(content: jsonContent, detectedType: null);
-    if (jsonContent.isEmpty) return;
+    if (jsonContent.isEmpty) {
+      state = state.copyWith(content: jsonContent, detectedType: null);
+      return;
+    }
     try {
       final plainText = RichTextHelper.documentToPlainText(
         RichTextHelper.getDocument(jsonContent),
       ).trim();
-      if (plainText.isEmpty) return;
+      if (plainText.isEmpty) {
+        state = state.copyWith(content: jsonContent, detectedType: null);
+        return;
+      }
 
+      EntryType? detected;
       // Detectar idea ANTES del split Title#
       if (plainText.startsWith('!') && plainText.length > 1 && plainText[1] != ' ') {
-        state = state.copyWith(detectedType: EntryType.idea);
+        detected = EntryType.idea;
       } else {
         // Ignorar Title# para el resto de detecciones
         final rest = splitTitle(plainText).rest;
 
         if (RichTextHelper.startsWithTaskMarker(rest)) {
-          state = state.copyWith(detectedType: EntryType.task);
+          detected = EntryType.task;
         } else if (RegExp(r'\w+\*\w+\*\w+').hasMatch(rest)) {
-          state = state.copyWith(detectedType: EntryType.credential);
+          detected = EntryType.credential;
         } else if (RegExp(r'\b\w{2,}:(?!//)\s*\S').hasMatch(rest)) {
-          state = state.copyWith(detectedType: EntryType.glossary);
+          detected = EntryType.glossary;
         } else {
-          state = state.copyWith(detectedType: EntryType.note);
+          detected = EntryType.note;
         }
       }
+      state = state.copyWith(content: jsonContent, detectedType: detected);
     } catch (_) {
-      // JSON malformado — silencioso, detectedType se queda null
+      // JSON malformado — detectedType se queda null
+      state = state.copyWith(content: jsonContent);
     }
   }
 

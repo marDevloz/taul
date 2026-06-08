@@ -421,23 +421,6 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
               filled: true,
               fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             ),
-            maxLines: 8,
-            minLines: 3,
-            style: const TextStyle(height: 1.5),
-          ),
-
-          // Parse preview
-          _buildParsePreview(),
-
-          const SizedBox(height: 12),
-
-          // Save button
-          FilledButton.icon(
-            onPressed: isSaving ? null : _save,
-            icon: isSaving
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.save),
-            label: Text(isSaving ? 'Guardando...' : 'Guardar'),
           ),
         ],
       ),

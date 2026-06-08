@@ -48,18 +48,20 @@ class _RichTextEditorState extends State<RichTextEditor> {
   void initState() {
     super.initState();
     _initController(widget.initialContent);
+    _controller.addListener(_onControllerChanged);
   }
 
   void _initController(String content) {
-    final doc = RichTextHelper.getDocument(content);
-    if (_controller.document != doc) {
+    final nextDoc = RichTextHelper.getDocument(content);
+    final currentJson = RichTextHelper.documentToJson(_controller.document);
+    final nextJson = RichTextHelper.documentToJson(nextDoc);
+    if (currentJson != nextJson) {
       _controller.removeListener(_onControllerChanged);
       _controller.dispose();
       _controller = QuillController(
-        document: doc,
+        document: nextDoc,
         selection: const TextSelection.collapsed(offset: 0),
       );
-      _controller.addListener(_onControllerChanged);
     }
   }
 
@@ -72,9 +74,7 @@ class _RichTextEditorState extends State<RichTextEditor> {
   }
 
   void _onControllerChanged() {
-    widget.onChanged?.call(
-      RichTextHelper.documentToJson(_controller.document),
-    );
+    widget.onChanged?.call(RichTextHelper.documentToJson(_controller.document));
   }
 
   void _requestFocus() {
