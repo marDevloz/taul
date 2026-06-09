@@ -52,9 +52,18 @@ class CertificateManager {
 
   Future<bool> _isCertValid(String certPath) async {
     try {
-      final content = await File(certPath).readAsString();
-      return content.contains('BEGIN CERTIFICATE') &&
-          content.contains('END CERTIFICATE');
+      final certFile = File(certPath);
+      final content = await certFile.readAsString();
+      if (!content.contains('BEGIN CERTIFICATE') ||
+          !content.contains('END CERTIFICATE')) {
+        return false;
+      }
+      // Regenerate if file is older than 365 days (cert validity window).
+      final lastModified = await certFile.lastModified();
+      if (DateTime.now().difference(lastModified).inDays > 365) {
+        return false;
+      }
+      return true;
     } catch (_) {
       return false;
     }

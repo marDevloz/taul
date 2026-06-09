@@ -73,6 +73,10 @@ class SyncClient {
   }
 
   http.Client _createClient() {
+    // TODO: TOCTOU gap — fingerprint is verified on a separate connection
+    // before the actual sync request. A MitM could swap certs between the
+    // two connections. Consider using a single persistent TLS connection or
+    // pinning via HTTP Public-Key-Pins / HPKP.
     return http.Client();
   }
 
@@ -139,10 +143,7 @@ class SyncClient {
     switch (response.statusCode) {
       case 200:
         return SyncResponse.fromJson(
-          Map<String, dynamic>.from(
-            // ignore: avoid_dynamic_calls
-            (response.body as dynamic) as Map,
-          ),
+          jsonDecode(response.body) as Map<String, dynamic>,
         );
       case 401:
         throw const PairingCodeRejectedException();
@@ -159,6 +160,10 @@ class SyncClient {
   }
 
   Future<List<int>> _getFingerprint(String host, int port) async {
+    // TODO: TOCTOU gap — this connection is separate from the sync HTTP
+    // request. An attacker who controls the network could present a valid
+    // cert here and a different one on the actual POST. Use a shared TLS
+    // session or HPKP to close the window.
     final socket = await SecureSocket.connect(
       host,
       port,

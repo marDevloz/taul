@@ -31,6 +31,46 @@ class EntryDao {
     return entry;
   }
 
+  /// Batch upsert for sync: pre-fetches all entries in a single query and
+  /// uses a Drift batch transaction for inserts/updates.
+  Future<void> batchUpsert(List<Entry> entries) async {
+    if (entries.isEmpty) return;
+
+    // 1. Pre-fetch existing entries in a single query.
+    final ids = entries.map((e) => e.id).toList();
+    final existingRows = await (_database.select(_database.entries)
+      ..where((tbl) => tbl.id.isIn(ids)))
+        .get();
+    final existingMap = {
+      for (final row in existingRows) row.id: _fromDbEntry(row),
+    };
+
+    // 2. Batch DB writes.
+    await _database.batch((b) {
+      for (final entry in entries) {
+        final existing = existingMap[entry.id];
+        if (existing == null) {
+          b.insert(_database.entries, _toCompanion(entry));
+        } else if (entry.updatedAt.isAfter(existing.updatedAt)) {
+          b.update(_database.entries, _toCompanion(entry));
+        }
+      }
+    });
+
+    // 3. Side effects (tags, FTS) after the batch.
+    for (final entry in entries) {
+      final existing = existingMap[entry.id];
+      if (existing == null || entry.updatedAt.isAfter(existing.updatedAt)) {
+        try {
+          await _syncTags(entry);
+        } catch (_) {}
+        try {
+          await _syncFts(entry);
+        } catch (_) {}
+      }
+    }
+  }
+
   /// Removes a tag from all entries that use it. Updates both the JSON tags
   /// column and the FTS index. Does NOT call _syncTags (avoids recreating
   /// a deleted TagSetting). Returns the list of affected entry IDs so callers

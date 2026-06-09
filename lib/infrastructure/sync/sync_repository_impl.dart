@@ -25,14 +25,7 @@ class SyncRepositoryImpl implements ISyncRepository {
 
   @override
   Future<void> upsertEntries(List<Entry> entries) async {
-    for (final entry in entries) {
-      final existing = await _entryDao.get(entry.id);
-      if (existing == null) {
-        await _entryDao.insert(entry);
-      } else if (entry.updatedAt.isAfter(existing.updatedAt)) {
-        await _entryDao.update(entry);
-      }
-    }
+    await _entryDao.batchUpsert(entries);
   }
 
   @override
@@ -46,9 +39,8 @@ class SyncRepositoryImpl implements ISyncRepository {
   @override
   Future<DateTime?> getLastSyncAt(String peerDeviceId) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('sync_last_$peerDeviceId') != null
-        ? DateTime.parse(prefs.getString('sync_last_$peerDeviceId')!)
-        : null;
+    final lastSync = prefs.getString('sync_last_$peerDeviceId');
+    return lastSync != null ? DateTime.parse(lastSync) : null;
   }
 
   @override

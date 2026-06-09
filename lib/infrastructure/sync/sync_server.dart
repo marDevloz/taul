@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:logger/logger.dart';
 import 'package:shelf/shelf.dart';
@@ -63,7 +64,7 @@ class SyncServer {
       try {
         _server = await shelf_io.serve(
           handler,
-          InternetAddress.loopbackIPv4,
+          InternetAddress.anyIPv4,
           _port!,
           securityContext: context,
         );
@@ -81,7 +82,7 @@ class SyncServer {
   /// Shuts down the server gracefully.
   Future<void> stop() async {
     _inactivityTimer?.cancel();
-    await _server?.close(force: true);
+    await _server?.close(force: false);
     _server = null;
     _port = null;
     _log.i('Sync server stopped');
@@ -148,8 +149,7 @@ class SyncServer {
   }
 
   int _randomPort() {
-    const range = _maxPort - _minPort;
-    return _minPort + (DateTime.now().microsecondsSinceEpoch % range);
+    return _minPort + Random.secure().nextInt(_maxPort - _minPort);
   }
 
   String _encodeError(int code, String message) {

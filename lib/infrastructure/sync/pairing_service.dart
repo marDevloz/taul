@@ -45,6 +45,6 @@ class PairingService {
         }
       }
     }
-    return '127.0.0.1';
+    throw Exception('No routable network interface found for sync');
   }
 }

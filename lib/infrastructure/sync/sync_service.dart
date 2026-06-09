@@ -113,12 +113,13 @@ class SyncService {
     _transition(SyncState.idle);
   }
 
-  void dispose() {
+  Future<void> dispose() async {
     for (final timer in _recoveryTimers) {
       timer.cancel();
     }
     _recoveryTimers.clear();
     _backgroundTimer?.cancel();
+    await _server.stop();
     _stateController.close();
   }
 }
