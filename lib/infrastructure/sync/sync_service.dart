@@ -17,6 +17,9 @@ class SyncService {
   final _recoveryTimers = <Timer>[];
   SyncState _state = SyncState.idle;
 
+  static const _backgroundAbortThreshold = Duration(seconds: 30);
+  Timer? _backgroundTimer;
+
   SyncService({
     required SyncServer server,
     required SyncClient client,
@@ -62,6 +65,12 @@ class SyncService {
         pairingCode: pairingCode,
         request: request,
       );
+
+      // Clock skew: server timestamp is authoritative
+      if (response.serverLastSyncAt != null) {
+        _log.d('Server timestamp: ${response.serverLastSyncAt}');
+      }
+
       _transition(SyncState.complete);
       return response;
     } catch (e, st) {
@@ -71,6 +80,23 @@ class SyncService {
       rethrow;
     }
   }
+
+  void onAppBackgrounded() {
+    _backgroundTimer?.cancel();
+    _backgroundTimer = Timer(_backgroundAbortThreshold, () {
+      if (isActive) {
+        _log.i('App backgrounded > ${_backgroundAbortThreshold.inSeconds}s — aborting sync');
+        stop();
+      }
+    });
+  }
+
+  void onAppForegrounded() {
+    _backgroundTimer?.cancel();
+    _backgroundTimer = null;
+  }
+
+  bool get isActive => _state.isActive;
 
   void _scheduleRecover() {
     _recoveryTimers.add(
@@ -82,6 +108,7 @@ class SyncService {
   }
 
   Future<void> stop() async {
+    _backgroundTimer?.cancel();
     await _server.stop();
     _transition(SyncState.idle);
   }
@@ -91,6 +118,7 @@ class SyncService {
       timer.cancel();
     }
     _recoveryTimers.clear();
+    _backgroundTimer?.cancel();
     _stateController.close();
   }
 }

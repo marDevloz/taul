@@ -54,6 +54,8 @@ dependencies:
   http: ^1.6.0
   pointycastle: ^4.0.0
   asn1lib: ^1.6.5
+  qr_flutter: ^4.1.0
+  flutter_zxing: ^2.3.0
 
 dev_dependencies:
   flutter_test:

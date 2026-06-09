@@ -13,14 +13,12 @@ class SyncClient {
   static const _connectTimeout = Duration(seconds: 10);
   static const _readTimeout = Duration(seconds: 30);
   static const _chunkSize = 100;
+  static const _maxRetries = 3;
+  static const _retryDelay = Duration(seconds: 2);
 
   SyncClient();
 
   /// Sends a sync request to the remote server.
-  ///
-  /// [host] and [port] identify the remote server.
-  /// [expectedFingerprint] is the SHA-256 of the server cert for pinning.
-  /// [pairingCode] is the 6-digit code for authentication.
   Future<SyncResponse> sync({
     required String host,
     required int port,
@@ -32,31 +30,46 @@ class SyncClient {
     final client = _createClient();
 
     try {
-      // Validate TLS fingerprint
       final actualFingerprint = await _getFingerprint(host, port);
       if (!_matchFingerprint(expectedFingerprint, actualFingerprint)) {
         throw const TlsFingerprintMismatchException();
       }
 
-      // Chunked send for 100+ entries
       if (request.entries.length > _chunkSize) {
         return await _sendChunked(
-          client: client,
-          uri: uri,
-          pairingCode: pairingCode,
-          request: request,
+          client: client, uri: uri, pairingCode: pairingCode, request: request,
         );
       }
 
-      return await _sendSingle(
-        client: client,
-        uri: uri,
-        pairingCode: pairingCode,
-        request: request,
+      return await _sendWithRetry(
+        client: client, uri: uri, pairingCode: pairingCode, request: request,
       );
+    } on SocketException {
+      throw const SyncInterruptedException();
+    } on TimeoutException {
+      throw const SyncInterruptedException();
     } finally {
       client.close();
     }
+  }
+
+  Future<SyncResponse> _sendWithRetry({
+    required http.Client client,
+    required Uri uri,
+    required String pairingCode,
+    required SyncRequest request,
+  }) async {
+    for (var attempt = 0; attempt < _maxRetries; attempt++) {
+      try {
+        return await _sendSingle(
+          client: client, uri: uri, pairingCode: pairingCode, request: request,
+        );
+      } on RateLimitException {
+        if (attempt == _maxRetries - 1) rethrow;
+        await Future<void>.delayed(_retryDelay * (attempt + 1));
+      }
+    }
+    throw const SyncInterruptedException();
   }
 
   http.Client _createClient() {
@@ -204,4 +217,10 @@ class UnexpectedResponseException implements Exception {
   const UnexpectedResponseException(this.statusCode);
   @override
   String toString() => 'Unexpected response ($statusCode)';
+}
+
+class SyncInterruptedException implements Exception {
+  const SyncInterruptedException();
+  @override
+  String toString() => 'Sync interrupted — server unreachable';
 }

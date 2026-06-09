@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:taul/domain/entities/sync_state.dart';
 import 'package:taul/ui/providers/device_id_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
@@ -108,26 +109,32 @@ class _SyncBody extends ConsumerWidget {
           child: Container(
             height: 200,
             alignment: Alignment.center,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.qr_code_2,
-                  size: 80,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Código QR',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Disponible durante pairing',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
+            child: syncState == SyncState.pairing
+                ? QrImageView(
+                    data: 'https://sync.taul.local',
+                    version: QrVersions.auto,
+                    size: 160,
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.qr_code_2,
+                        size: 80,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Código QR',
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Disponible durante pairing',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
           ),
         ),
         const SizedBox(height: 16),

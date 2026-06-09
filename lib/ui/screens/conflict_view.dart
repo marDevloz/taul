@@ -43,6 +43,9 @@ class _ConflictCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localDeleted = conflict.localVersion.isDeleted;
+    final remoteDeleted = conflict.remoteVersion.isDeleted;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: ListTile(
@@ -55,7 +58,22 @@ class _ConflictCard extends StatelessWidget {
           'Dispositivo: ${conflict.peerDeviceId.substring(0, 8)}...',
           style: Theme.of(context).textTheme.bodySmall,
         ),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (localDeleted)
+              const Badge(
+                label: Text('Eliminado local'),
+                child: Icon(Icons.delete_outline, size: 18),
+              ),
+            if (remoteDeleted)
+              const Badge(
+                label: Text('Eliminado remoto'),
+                child: Icon(Icons.cloud_off, size: 18),
+              ),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
@@ -76,12 +94,36 @@ class _ConflictDetail extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final local = conflict.localVersion;
     final remote = conflict.remoteVersion;
+    final localDeleted = local.isDeleted;
+    final remoteDeleted = remote.isDeleted;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Detalle de conflicto')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (localDeleted || remoteDeleted) ...[
+            Card(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        localDeleted
+                            ? 'Esta entrada fue eliminada localmente'
+                            : 'Esta entrada fue eliminada en el dispositivo remoto',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           _DiffSection(
             title: 'Título',
             local: local.title,
@@ -110,26 +152,30 @@ class _ConflictDetail extends ConsumerWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {
-                    ref.read(resolveConflictProvider)(
-                      conflict.id,
-                      ConflictResolution.keepLocal,
-                    );
-                    Navigator.pop(context);
-                  },
+                  onPressed: remoteDeleted
+                      ? null
+                      : () {
+                          ref.read(resolveConflictProvider)(
+                            conflict.id,
+                            ConflictResolution.keepLocal,
+                          );
+                          Navigator.pop(context);
+                        },
                   child: const Text('Mantener local'),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {
-                    ref.read(resolveConflictProvider)(
-                      conflict.id,
-                      ConflictResolution.keepRemote,
-                    );
-                    Navigator.pop(context);
-                  },
+                  onPressed: localDeleted
+                      ? null
+                      : () {
+                          ref.read(resolveConflictProvider)(
+                            conflict.id,
+                            ConflictResolution.keepRemote,
+                          );
+                          Navigator.pop(context);
+                        },
                   child: const Text('Mantener remoto'),
                 ),
               ),
@@ -139,13 +185,15 @@ class _ConflictDetail extends ConsumerWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.tonal(
-              onPressed: () {
-                ref.read(resolveConflictProvider)(
-                  conflict.id,
-                  ConflictResolution.keepBoth,
-                );
-                Navigator.pop(context);
-              },
+              onPressed: localDeleted || remoteDeleted
+                  ? null
+                  : () {
+                      ref.read(resolveConflictProvider)(
+                        conflict.id,
+                        ConflictResolution.keepBoth,
+                      );
+                      Navigator.pop(context);
+                    },
               child: const Text('Mantener ambos'),
             ),
           ),

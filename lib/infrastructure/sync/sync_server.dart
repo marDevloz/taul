@@ -17,6 +17,7 @@ class SyncServer {
   final CertificateManager _certManager;
   final String pairingCode;
   final Future<SyncResponse> Function(SyncRequest) onRequest;
+  final void Function()? onCrash;
   final Logger _log;
 
   HttpServer? _server;
@@ -32,6 +33,7 @@ class SyncServer {
     required CertificateManager certManager,
     required this.pairingCode,
     required this.onRequest,
+    this.onCrash,
     Logger? logger,
   })  : _certManager = certManager,
         _log = logger ?? Logger();
@@ -39,26 +41,41 @@ class SyncServer {
   int? get port => _port;
   bool get isRunning => _server != null;
 
-  /// Starts the HTTPS server on a random available port.
+  static const _maxPortRetries = 5;
+
+  /// Starts the HTTPS server, retrying on port conflict.
   Future<int> start() async {
-    final context = await _certManager.getContext();
+    SecurityContext context;
+    try {
+      context = await _certManager.getContext();
+    } catch (e, st) {
+      _log.e('Certificate generation failed', error: e, stackTrace: st);
+      rethrow;
+    }
+
     final handler = const Pipeline()
         .addMiddleware(_logMiddleware())
         .addHandler(_handleRequest);
 
-    // Pick random port in ephemeral range
-    _port = _randomPort();
-
-    _server = await shelf_io.serve(
-      handler,
-      InternetAddress.loopbackIPv4,
-      _port!,
-      securityContext: context,
-    );
-
-    _resetInactivityTimer();
-    _log.i('Sync server started on port $_port');
-    return _port!;
+    SocketException? lastError;
+    for (var attempt = 0; attempt < _maxPortRetries; attempt++) {
+      _port = _randomPort();
+      try {
+        _server = await shelf_io.serve(
+          handler,
+          InternetAddress.loopbackIPv4,
+          _port!,
+          securityContext: context,
+        );
+        _resetInactivityTimer();
+        _log.i('Sync server started on port $_port');
+        return _port!;
+      } on SocketException catch (e) {
+        lastError = e;
+        _log.w('Port $_port in use, retrying (${attempt + 1}/$_maxPortRetries)');
+      }
+    }
+    throw lastError ?? Exception('Failed to bind after $_maxPortRetries attempts');
   }
 
   /// Shuts down the server gracefully.
