@@ -137,7 +137,7 @@ void main() {
 
       // Verify user_version was bumped to 10
       final version = rawDb.userVersion;
-      expect(version, 10, reason: 'user_version should be 10 after v10 migration');
+      expect(version, 11, reason: 'user_version should be 11 after v11 migration');
 
       // Verify column is gone
       final columnsAfter = rawDb.select("PRAGMA table_info('entries')");

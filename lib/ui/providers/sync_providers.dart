@@ -5,13 +5,15 @@ import 'package:taul/domain/entities/sync_state.dart';
 import 'package:taul/infrastructure/database/app_database.dart' hide Conflict;
 import 'package:taul/infrastructure/database/conflict_dao.dart';
 import 'package:taul/infrastructure/sync/sync_service.dart';
+import 'package:taul/ui/providers/entry_providers.dart';
 
 final syncServiceProvider = Provider<SyncService?>((ref) => null);
 
 final syncStateProvider = StateProvider<SyncState>((ref) => SyncState.idle);
 
 final conflictCountProvider = StreamProvider<int>((ref) async* {
-  final dao = ConflictDao(AppDatabase());
+  final db = ref.watch(databaseProvider);
+  final dao = ConflictDao(db);
   while (true) {
     yield await dao.getPendingCount();
     await Future<void>.delayed(const Duration(seconds: 5));
@@ -19,7 +21,8 @@ final conflictCountProvider = StreamProvider<int>((ref) async* {
 });
 
 final pendingConflictsProvider = FutureProvider<List<Conflict>>((ref) async {
-  final dao = ConflictDao(AppDatabase());
+  final db = ref.watch(databaseProvider);
+  final dao = ConflictDao(db);
   return dao.getByResolution(ConflictResolution.pending);
 });
 
@@ -47,7 +50,8 @@ final stopSyncProvider = Provider<Future<void> Function()>((ref) {
 final resolveConflictProvider =
     Provider<Future<void> Function(int, ConflictResolution)>((ref) {
   return (int id, ConflictResolution resolution) async {
-    final dao = ConflictDao(AppDatabase());
+    final db = ref.read(databaseProvider);
+    final dao = ConflictDao(db);
     await dao.updateResolution(id, resolution);
     ref.invalidate(pendingConflictsProvider);
     ref.invalidate(conflictCountProvider);

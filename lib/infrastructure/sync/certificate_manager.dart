@@ -85,7 +85,7 @@ class CertificateManager {
   }
 
   Uint8List _tbs(RSAPublicKey pub, DateTime from, DateTime to) {
-    final v = _seq([_int(BigInt.from(2))]); // version 3
+    final v = _int(BigInt.from(2)); // version 3
     final serial = _int(BigInt.from(DateTime.now().microsecondsSinceEpoch));
     final alg = _sha256RsaAlg();
     final name = _name('Taul Sync');
@@ -95,17 +95,17 @@ class CertificateManager {
   }
 
   Uint8List _sha256RsaAlg() =>
-      _seq([_oid('1.2.840.113549.1.1.11')]);
+      _seq([_oid('1.2.840.113549.1.1.11'), _null()]);
 
   Uint8List _name(String cn) {
     final attr = _seq([_oid('2.5.4.3'), _utf8(cn)]);
-    final rdn = _seq([_set([attr])]);
-    return _seq([rdn]);
+    return _seq([_set([attr])]);
   }
 
   Uint8List _spki(RSAPublicKey pub) {
     final rsaKey = _seq([_int(pub.n!), _int(pub.publicExponent!)]);
-    return _seq([_sha256RsaAlg(), _bitStr(rsaKey)]);
+    final rsaAlg = _seq([_oid('1.2.840.113549.1.1.1'), _null()]);
+    return _seq([rsaAlg, _bitStr(rsaKey)]);
   }
 
   Uint8List _encodePrivKey(RSAPrivateKey k) {
@@ -133,7 +133,7 @@ class CertificateManager {
   }
 
   Uint8List _sign(Uint8List data, RSAPrivateKey key) {
-    final signer = RSASigner(SHA256Digest(), 'SHA-256');
+    final signer = RSASigner(SHA256Digest(), '0609608648016503040201');
     signer.init(true, PrivateKeyParameter<RSAPrivateKey>(key));
     return signer.generateSignature(data).bytes;
   }
@@ -151,13 +151,15 @@ class CertificateManager {
 
   Uint8List _utf8(String s) => _tagBytes(0x0c, Uint8List.fromList(utf8.encode(s)));
 
+  Uint8List _null() => _tagBytes(0x05, Uint8List(0));
+
   Uint8List _utc(DateTime dt) {
-    final s = '${dt.year.toRadixString(16).padLeft(2, '0')}'
-        '${dt.month.toRadixString(16).padLeft(2, '0')}'
-        '${dt.day.toRadixString(16).padLeft(2, '0')}'
-        '${dt.hour.toRadixString(16).padLeft(2, '0')}'
-        '${dt.minute.toRadixString(16).padLeft(2, '0')}'
-        '${dt.second.toRadixString(16).padLeft(2, '0')}Z';
+    final s = '${(dt.year % 100).toString().padLeft(2, '0')}'
+        '${dt.month.toString().padLeft(2, '0')}'
+        '${dt.day.toString().padLeft(2, '0')}'
+        '${dt.hour.toString().padLeft(2, '0')}'
+        '${dt.minute.toString().padLeft(2, '0')}'
+        '${dt.second.toString().padLeft(2, '0')}Z';
     return _tagBytes(0x17, Uint8List.fromList(utf8.encode(s)));
   }
 

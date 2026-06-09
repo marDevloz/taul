@@ -118,8 +118,7 @@ class SyncServer {
       final body = await request.readAsString();
       final syncRequest = SyncRequest.fromJson(
         Map<String, dynamic>.from(
-          // ignore: avoid_dynamic_calls
-          (body as dynamic) as Map,
+          jsonDecode(body) as Map,
         ),
       );
 

@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  file_selector_linux
   screen_retriever_linux
   sqlite3_flutter_libs
   system_tray
@@ -11,6 +12,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
+  flutter_zxing
   jni
 )
 

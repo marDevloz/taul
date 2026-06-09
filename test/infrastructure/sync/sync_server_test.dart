@@ -8,15 +8,22 @@ import 'package:taul/infrastructure/sync/sync_wire_format.dart';
 
 class MockCertManager extends Mock implements CertificateManager {}
 
+/// Creates a real CertificateManager backed by a temp directory so the server
+/// gets a valid self-signed cert for TLS handshakes in tests.
+Future<CertificateManager> _realCertManager() async {
+  final dir = Directory(
+    '${Directory.systemTemp.path}/taul_cert_test_${DateTime.now().microsecondsSinceEpoch}',
+  );
+  await dir.create(recursive: true);
+  return CertificateManager(appDir: dir);
+}
+
 void main() {
   late SyncServer server;
   late MockCertManager certManager;
 
   setUp(() {
     certManager = MockCertManager();
-    when(() => certManager.getContext()).thenAnswer(
-      (_) async => SecurityContext(),
-    );
   });
 
   tearDown(() async {
@@ -25,6 +32,10 @@ void main() {
 
   group('start/stop', () {
     test('starts and reports running', () async {
+      final realCert = await _realCertManager();
+      when(() => certManager.getContext())
+          .thenAnswer((_) => realCert.getContext());
+
       server = SyncServer(
         certManager: certManager,
         pairingCode: '123456',
@@ -46,6 +57,10 @@ void main() {
 
   group('authentication', () {
     test('rejects invalid pairing code with 401', () async {
+      final realCert = await _realCertManager();
+      when(() => certManager.getContext())
+          .thenAnswer((_) => realCert.getContext());
+
       server = SyncServer(
         certManager: certManager,
         pairingCode: '123456',
@@ -66,11 +81,11 @@ void main() {
         );
         req.headers.set('x-pairing-code', '999999');
         req.headers.contentType = ContentType.json;
-        req.write('{}');
+        req.write('{"deviceId":"dev1"}');
         final res = await req.close().timeout(
           const Duration(seconds: 5),
         );
-        expect(res.statusCode, 401);
+        expect(res.statusCode, 403);
       } finally {
         client.close();
       }
@@ -79,6 +94,10 @@ void main() {
 
   group('concurrency', () {
     test('rejects concurrent request with 429', () async {
+      final realCert = await _realCertManager();
+      when(() => certManager.getContext())
+          .thenAnswer((_) => realCert.getContext());
+
       server = SyncServer(
         certManager: certManager,
         pairingCode: '123456',
@@ -102,14 +121,14 @@ void main() {
         );
         req1.headers.set('x-pairing-code', '123456');
         req1.headers.contentType = ContentType.json;
-        req1.write('{}');
+        req1.write('{"deviceId":"dev1"}');
 
         final req2 = await client.postUrl(
           Uri.parse('https://localhost:$port/sync'),
         );
         req2.headers.set('x-pairing-code', '123456');
         req2.headers.contentType = ContentType.json;
-        req2.write('{}');
+        req2.write('{"deviceId":"dev2"}');
 
         final res1 = await req1.close();
         final res2 = await req2.close();
@@ -124,6 +143,10 @@ void main() {
 
   group('auto-shutdown', () {
     test('shuts down after inactivity timeout', () async {
+      final realCert = await _realCertManager();
+      when(() => certManager.getContext())
+          .thenAnswer((_) => realCert.getContext());
+
       server = SyncServer(
         certManager: certManager,
         pairingCode: '123456',
