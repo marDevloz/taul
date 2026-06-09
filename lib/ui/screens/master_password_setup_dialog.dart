@@ -62,6 +62,12 @@ class _MasterPasswordSetupDialogState
     return PopScope(
       canPop: !_saving,
       child: AlertDialog(
+        insetPadding: EdgeInsets.symmetric(
+          horizontal: 40,
+          vertical: MediaQuery.of(context).viewInsets.bottom > 0
+              ? MediaQuery.of(context).viewInsets.bottom * 0.1
+              : 24,
+        ),
         title: Text(widget.isChange ? 'Cambiar Contraseña Maestra' : 'Configurar Contraseña Maestra'),
         content: _buildContent(),
         actions: _buildActions(),
@@ -96,50 +102,52 @@ class _MasterPasswordSetupDialogState
   }
 
   Widget _buildPasswordForm() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: _newPwCtrl,
-          obscureText: _obscurePasswords,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: 'Contraseña maestra',
-            helperText: 'Mínimo 8 caracteres',
-            suffixIcon: IconButton(
-              icon: Icon(_obscurePasswords ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscurePasswords = !_obscurePasswords),
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _newPwCtrl,
+            obscureText: _obscurePasswords,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Contraseña maestra',
+              helperText: 'Mínimo 8 caracteres',
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePasswords ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscurePasswords = !_obscurePasswords),
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _confirmCtrl,
-          obscureText: _obscurePasswords,
-          decoration: InputDecoration(
-            labelText: 'Confirmar contraseña',
-            suffixIcon: IconButton(
-              icon: Icon(_obscurePasswords ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscurePasswords = !_obscurePasswords),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _hintCtrl,
-          maxLength: 200,
-          decoration: const InputDecoration(
-            labelText: 'Pista (opcional)',
-            helperText: 'Se guarda como texto plano — no uses tu contraseña ni variaciones',
-            helperMaxLines: 2,
-          ),
-        ),
-        if (_error != null) ...[
           const SizedBox(height: 8),
-          Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+          TextField(
+            controller: _confirmCtrl,
+            obscureText: _obscurePasswords,
+            decoration: InputDecoration(
+              labelText: 'Confirmar contraseña',
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePasswords ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscurePasswords = !_obscurePasswords),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _hintCtrl,
+            maxLength: 200,
+            decoration: const InputDecoration(
+              labelText: 'Pista (opcional)',
+              helperText: 'Se guarda como texto plano — no uses tu contraseña ni variaciones',
+              helperMaxLines: 2,
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -224,75 +232,79 @@ class _MasterPasswordSetupDialogState
   }
 
   Widget _buildCurrentPasswordForm() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: _currentPwCtrl,
-          obscureText: _obscurePasswords,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: 'Contraseña maestra actual',
-            suffixIcon: IconButton(
-              icon: Icon(_obscurePasswords ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscurePasswords = !_obscurePasswords),
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _currentPwCtrl,
+            obscureText: _obscurePasswords,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Contraseña maestra actual',
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePasswords ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscurePasswords = !_obscurePasswords),
+              ),
             ),
           ),
-        ),
-        if (_error != null) ...[
-          const SizedBox(height: 8),
-          Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+          ],
         ],
-      ],
+      ),
     );
   }
 
   Widget _buildNewPasswordForm() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: _newPwCtrl,
-          obscureText: _obscurePasswords,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: 'Nueva contraseña maestra',
-            helperText: 'Mínimo 8 caracteres',
-            suffixIcon: IconButton(
-              icon: Icon(_obscurePasswords ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscurePasswords = !_obscurePasswords),
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _newPwCtrl,
+            obscureText: _obscurePasswords,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Nueva contraseña maestra',
+              helperText: 'Mínimo 8 caracteres',
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePasswords ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscurePasswords = !_obscurePasswords),
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _confirmCtrl,
-          obscureText: _obscurePasswords,
-          decoration: InputDecoration(
-            labelText: 'Confirmar nueva contraseña',
-            suffixIcon: IconButton(
-              icon: Icon(_obscurePasswords ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscurePasswords = !_obscurePasswords),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _hintCtrl,
-          maxLength: 200,
-          decoration: const InputDecoration(
-            labelText: 'Pista (opcional)',
-            helperText: 'Se guarda como texto plano — no uses tu contraseña ni variaciones',
-            helperMaxLines: 2,
-          ),
-        ),
-        if (_error != null) ...[
           const SizedBox(height: 8),
-          Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+          TextField(
+            controller: _confirmCtrl,
+            obscureText: _obscurePasswords,
+            decoration: InputDecoration(
+              labelText: 'Confirmar nueva contraseña',
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePasswords ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscurePasswords = !_obscurePasswords),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _hintCtrl,
+            maxLength: 200,
+            decoration: const InputDecoration(
+              labelText: 'Pista (opcional)',
+              helperText: 'Se guarda como texto plano — no uses tu contraseña ni variaciones',
+              helperMaxLines: 2,
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+          ],
         ],
-      ],
+      ),
     );
   }
 

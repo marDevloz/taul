@@ -312,83 +312,85 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
         top: 24,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildHeader(theme, Icons.add, 'Nueva entrada'),
-          const SizedBox(height: 16),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildHeader(theme, Icons.add, 'Nueva entrada'),
+            const SizedBox(height: 16),
 
-          // 1. Title
-          TextField(
-            controller: _titleCtrl,
-            onChanged: _controller.setTitle,
-            decoration: const InputDecoration(
-              labelText: 'Título',
-              hintText: 'o escribí Titulo# en el contenido',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // 2. Content (rich text editor)
-          const Text('Contenido', style: TextStyle(fontSize: 12)),
-          const SizedBox(height: 4),
-          RichTextEditor(
-            key: _editorKey,
-            initialContent: state.content,
-            onChanged: _onContentChanged,
-            maxHeight: 200,
-            hintText: state.detectedType != null
-                ? _typeHints[state.detectedType]
-                : null,
-          ),
-          const SizedBox(height: 4),
-
-          // 3. Unified autocomplete suggestion
-          if (suggestion != null)
-            GestureDetector(
-              onTap: () => _acceptSuggestion(suggestion),
-              child: _buildSuggestionChip(theme, suggestion),
-            ),
-
-          // 4. Tags
-          const SizedBox(height: 4),
-          TextField(
-            controller: _tagsCtrl,
-            onChanged: _onTagsChanged,
-            decoration: const InputDecoration(
-              labelText: 'Tags',
-              hintText: 'separados por coma: dev, personal',
-              border: OutlineInputBorder(),
-            ),
-          ),
-
-          // Buttons
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: state.isSaving
-                    ? null
-                    : () => Navigator.pop(context),
-                child: const Text('Cancelar'),
+            // 1. Title
+            TextField(
+              controller: _titleCtrl,
+              onChanged: _controller.setTitle,
+              decoration: const InputDecoration(
+                labelText: 'Título',
+                hintText: 'o escribí Titulo# en el contenido',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: state.isSaving ? null : _saveCreate,
-                child: state.isSaving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Guardar'),
+            ),
+            const SizedBox(height: 12),
+
+            // 2. Content (rich text editor)
+            const Text('Contenido', style: TextStyle(fontSize: 12)),
+            const SizedBox(height: 4),
+            RichTextEditor(
+              key: _editorKey,
+              initialContent: state.content,
+              onChanged: _onContentChanged,
+              maxHeight: 200,
+              hintText: state.detectedType != null
+                  ? _typeHints[state.detectedType]
+                  : null,
+            ),
+            const SizedBox(height: 4),
+
+            // 3. Unified autocomplete suggestion
+            if (suggestion != null)
+              GestureDetector(
+                onTap: () => _acceptSuggestion(suggestion),
+                child: _buildSuggestionChip(theme, suggestion),
               ),
-            ],
-          ),
-        ],
+
+            // 4. Tags
+            const SizedBox(height: 4),
+            TextField(
+              controller: _tagsCtrl,
+              onChanged: _onTagsChanged,
+              decoration: const InputDecoration(
+                labelText: 'Tags',
+                hintText: 'separados por coma: dev, personal',
+                border: OutlineInputBorder(),
+              ),
+            ),
+
+            // Buttons
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: state.isSaving
+                      ? null
+                      : () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: state.isSaving ? null : _saveCreate,
+                  child: state.isSaving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Guardar'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -404,80 +406,82 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
         top: 24,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildHeader(theme, Icons.edit_note, 'Editar entrada'),
-          const SizedBox(height: 16),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildHeader(theme, Icons.edit_note, 'Editar entrada'),
+            const SizedBox(height: 16),
 
-          // 1. Title
-          TextField(
-            controller: _titleCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Título',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // 2. Type selector
-          _buildTypeSelector(theme),
-          const SizedBox(height: 12),
-
-          // 3. Content (rich text editor)
-          const Text('Contenido', style: TextStyle(fontSize: 12)),
-          const SizedBox(height: 4),
-          RichTextEditor(
-            key: _editorKey,
-            initialContent: _richContent,
-            onChanged: _onContentChanged,
-            maxHeight: 200,
-          ),
-          const SizedBox(height: 4),
-
-          // 4. Unified autocomplete suggestion
-          if (suggestion != null)
-            GestureDetector(
-              onTap: () => _acceptSuggestion(suggestion),
-              child: _buildSuggestionChip(theme, suggestion),
-            ),
-
-          // 5. Tags
-          const SizedBox(height: 4),
-          TextField(
-            controller: _tagsCtrl,
-            onChanged: _onTagsChanged,
-            decoration: const InputDecoration(
-              labelText: 'Tags',
-              hintText: 'separados por coma',
-              border: OutlineInputBorder(),
-            ),
-          ),
-
-          // Buttons
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: _isSaving ? null : () => Navigator.pop(context),
-                child: const Text('Cancelar'),
+            // 1. Title
+            TextField(
+              controller: _titleCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Título',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: _isSaving ? null : _saveEdit,
-                child: _isSaving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Guardar'),
+            ),
+            const SizedBox(height: 12),
+
+            // 2. Type selector
+            _buildTypeSelector(theme),
+            const SizedBox(height: 12),
+
+            // 3. Content (rich text editor)
+            const Text('Contenido', style: TextStyle(fontSize: 12)),
+            const SizedBox(height: 4),
+            RichTextEditor(
+              key: _editorKey,
+              initialContent: _richContent,
+              onChanged: _onContentChanged,
+              maxHeight: 200,
+            ),
+            const SizedBox(height: 4),
+
+            // 4. Unified autocomplete suggestion
+            if (suggestion != null)
+              GestureDetector(
+                onTap: () => _acceptSuggestion(suggestion),
+                child: _buildSuggestionChip(theme, suggestion),
               ),
-            ],
-          ),
-        ],
+
+            // 5. Tags
+            const SizedBox(height: 4),
+            TextField(
+              controller: _tagsCtrl,
+              onChanged: _onTagsChanged,
+              decoration: const InputDecoration(
+                labelText: 'Tags',
+                hintText: 'separados por coma',
+                border: OutlineInputBorder(),
+              ),
+            ),
+
+            // Buttons
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _isSaving ? null : () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: _isSaving ? null : _saveEdit,
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Guardar'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
