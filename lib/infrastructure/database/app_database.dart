@@ -3,8 +3,10 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:drift_sqflite/drift_sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
+import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:taul/core/constants.dart';
 import 'package:taul/shared/tag_palette.dart';
 
@@ -195,15 +197,29 @@ class AppDatabase extends _$AppDatabase {
       );
 
   Future<void> _createFtsTable() async {
-    await customInsert(
-      'CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5('
-      'id UNINDEXED, title, content, tags, '
-      "tokenize='unicode61')",
-    );
+    try {
+      await customInsert(
+        'CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5('
+        'id UNINDEXED, title, content, tags, '
+        "tokenize='unicode61')",
+      );
+    } catch (e) {
+      // FTS5 may not be available (e.g., on Android system SQLite).
+      // The app continues to work — full-text search is simply unavailable.
+    }
   }
 }
 
-LazyDatabase _openConnection({Uint8List? dek}) {
+QueryExecutor _openConnection({Uint8List? dek}) {
+  // Android: use sqflite (system SQLite, no SQLCipher yet)
+  if (Platform.isAndroid) {
+    return SqfliteQueryExecutor.inDatabaseFolder(
+      path: AppConstants.databaseName,
+      logStatements: false,
+    );
+  }
+
+  // Desktop: use NativeDatabase with sqlite3mc (SQLCipher via PRAGMA key)
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File('${dbFolder.path}/${AppConstants.databaseName}');
