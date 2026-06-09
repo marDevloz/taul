@@ -6,17 +6,18 @@ import 'package:drift/native.dart';
 import 'package:drift_sqflite/drift_sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
-import 'package:sqflite/sqflite.dart' as sqflite;
+
 import 'package:taul/core/constants.dart';
 import 'package:taul/shared/tag_palette.dart';
 
+import 'conflicts_table.dart';
 import 'entries_table.dart';
 import 'master_password_config_table.dart';
 import 'tag_settings_table.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Entries, MasterPasswordConfig, TagSettings])
+@DriftDatabase(tables: [Entries, MasterPasswordConfig, TagSettings, Conflicts])
 class AppDatabase extends _$AppDatabase {
   AppDatabase({Uint8List? dek}) : super(_openConnection(dek: dek));
 
@@ -27,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.custom(super.executor);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -187,6 +188,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 10) {
             await m.dropColumn(entries, 'tags_color');
+          }
+          if (from < 11) {
+            await m.createTable(conflicts);
           }
         },
         beforeOpen: (_) async {
