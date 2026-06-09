@@ -509,11 +509,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
         ),
         IconButton(
           icon: const Icon(Icons.sync),
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Sync coming in Phase 3')),
-            );
-          },
+          onPressed: () => context.push('/sync'),
         ),
         IconButton(
           icon: const Icon(Icons.delete_outline),

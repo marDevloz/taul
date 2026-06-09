@@ -13,6 +13,8 @@ import 'package:taul/ui/screens/settings_screen.dart';
 import 'package:taul/ui/screens/tag_management_screen.dart';
 import 'package:taul/ui/screens/user_manual_screen.dart';
 import 'package:taul/ui/screens/about_screen.dart';
+import 'package:taul/ui/screens/sync_view.dart';
+import 'package:taul/ui/screens/conflict_view.dart';
 import 'package:taul/ui/screens/trash_screen.dart';
 import 'package:taul/ui/widgets/inactivity_detector.dart';
 import 'package:taul/ui/widgets/keyboard_shortcuts.dart';
@@ -66,6 +68,18 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/trash',
             name: 'trash',
             builder: (_, __) => const TrashScreen(),
+          ),
+          GoRoute(
+            path: '/sync',
+            name: 'sync',
+            builder: (_, __) => const SyncView(),
+            routes: [
+              GoRoute(
+                path: 'conflicts',
+                name: 'sync-conflicts',
+                builder: (_, __) => const ConflictView(),
+              ),
+            ],
           ),
         ],
       ),
