@@ -118,6 +118,7 @@ class _EntryFormCreateSheetState extends ConsumerState<EntryFormCreateSheet> {
       final saved = await _controller!.save();
       if (saved) {
         _didSaveSuccessfully = true;
+        try { _draftNotifier?.clear(); } catch (_) { /* best-effort */ }
         if (mounted) Navigator.pop(context);
       }
     } catch (e) {
