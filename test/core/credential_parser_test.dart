@@ -99,5 +99,23 @@ void main() {
       expect(result.username, 'user');
       expect(result.password, 'pass');
     });
+
+    test('parses with accented tags', () {
+      final result = CredentialParser.parse('Gmail*user*pass -#trabajo -#desarrollo');
+      expect(result, isNotNull);
+      expect(result!.tags, ['trabajo', 'desarrollo']);
+    });
+
+    test('parses credential with ñ in tag', () {
+      final result = CredentialParser.parse('Gmail*user*pass -#español');
+      expect(result, isNotNull);
+      expect(result!.tags, ['español']);
+    });
+
+    test('legacy ;# tags with accents', () {
+      final result = CredentialParser.parse('Gmail,*user,*pass,;#compú');
+      expect(result, isNotNull);
+      expect(result!.tags, ['compú']);
+    });
   });
 }

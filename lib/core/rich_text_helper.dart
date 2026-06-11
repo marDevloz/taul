@@ -54,7 +54,7 @@ class RichTextHelper {
   /// El formato exacto es `-#tag` — el `-` antes de `#` es el marker.
   /// Los tags pueden contener guiones: `-#gol-caracol`.
   static ({String clean, List<String> tags}) extractTags(String raw) {
-    final re = RegExp(r'-#([\w-]+)');
+    final re = RegExp(r'-#([\w\u00C0-\u024F\u0400-\u04FF-]+)');
     final matches = re.allMatches(raw);
     final tags = matches.map((m) => m.group(1)!).toList();
     final clean = raw.replaceAll(re, '').replaceAll(RegExp(r'\s+'), ' ').trim();

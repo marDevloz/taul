@@ -114,6 +114,17 @@ void main() {
       expect(result.tags, isEmpty);
       expect(result.clean, 'hello world');
     });
+
+    test('handles accented tags correctly', () {
+      final result = CreateEntryController.extractTags('texto -#computación -#nú');
+      expect(result.tags, ['computación', 'nú']);
+      expect(result.clean, 'texto');
+    });
+
+    test('handles ñ and mixed accented tags', () {
+      final result = CreateEntryController.extractTags('-#desarrollo -#programación -#ñ');
+      expect(result.tags, ['desarrollo', 'programación', 'ñ']);
+    });
   });
 
   group('stripTitleAndTags', () {

@@ -23,13 +23,13 @@ class CredentialParser {
   /// Returns null if no password found.
   static ParsedCredential? parse(String text) {
     // Extract -#tags first
-    final tagRe = RegExp(r'-#([\w-]+)');
+    final tagRe = RegExp(r'-#([\w\u00C0-\u024F\u0400-\u04FF-]+)');
     final tagMatches = tagRe.allMatches(text);
     final tags = tagMatches.map((m) => m.group(1)!).toList();
     final withoutTags = text.replaceAll(tagRe, ' ').trim();
 
     // Extract legacy ;#tags
-    final legacyTagRe = RegExp(r';#([\w-]+)');
+    final legacyTagRe = RegExp(r';#([\w\u00C0-\u024F\u0400-\u04FF-]+)');
     final legacyTagMatches = legacyTagRe.allMatches(withoutTags);
     for (final m in legacyTagMatches) {
       tags.add(m.group(1)!);
