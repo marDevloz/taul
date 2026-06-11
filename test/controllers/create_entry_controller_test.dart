@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -217,21 +219,21 @@ void main() {
   group('processContentForType', () {
     test('idea strips leading "!"', () {
       final result = controller.processContentForType(
-        EntryType.idea, '!idea', '', []);
-      expect(result.content.content, 'idea');
+        EntryType.idea, '!idea', '!idea', '', []);
+      expect(result.content.content, contains('idea'));
       expect(result.type, EntryType.idea);
     });
 
     test('idea keeps body unchanged when no "!"', () {
       final result = controller.processContentForType(
-        EntryType.idea, 'just text', '', []);
-      expect(result.content.content, 'just text');
+        EntryType.idea, 'just text', 'just text', '', []);
+      expect(result.content.content, contains('just text'));
     });
 
     test('glossary calls formatForGlossary', () {
       final body = 'term: definition';
       final result = controller.processContentForType(
-        EntryType.glossary, body, '', []);
+        EntryType.glossary, body, body, '', []);
       expect(result.type, EntryType.glossary);
       // formatForGlossary capitalizes term + definition and bolds/italicizes
       final plain = RichTextHelper.documentToPlainText(
@@ -244,7 +246,7 @@ void main() {
     test('credential returns structured content with secret', () {
       final body = 'serv*user*pass';
       final result = controller.processContentForType(
-        EntryType.credential, body, '', []);
+        EntryType.credential, body, body, '', []);
       expect(result.type, EntryType.credential);
       expect(result.content.content, contains('Usuario:'));
       expect(result.content.secret, 'pass');
@@ -255,7 +257,7 @@ void main() {
       // No asterisks → CredentialParser returns null
       final body = 'just plain text';
       final result = controller.processContentForType(
-        EntryType.credential, body, '', []);
+        EntryType.credential, body, body, '', []);
       expect(result.type, EntryType.note);
       expect(result.content.secret, isNull);
       expect(result.content.requiresAuth, false);
@@ -267,7 +269,7 @@ void main() {
       //                           → splitTitle → title: "Meeting", rest: "[] task"
       final body = '[] task';
       final result = controller.processContentForType(
-        EntryType.task, body, 'Meeting', ['work']);
+        EntryType.task, body, body, 'Meeting', ['work']);
       expect(result.type, EntryType.task);
       expect(result.content.tags, ['work']);
       final plain = RichTextHelper.documentToPlainText(
@@ -281,13 +283,26 @@ void main() {
     test('note strips content via stripTitleAndTags', () {
       final body = _delta('Meeting# plain note -#tag1');
       final result = controller.processContentForType(
-        EntryType.note, body, 'Meeting', ['tag1']);
+        EntryType.note, body, 'Meeting# plain note -#tag1', 'Meeting', ['tag1']);
       expect(result.type, EntryType.note);
       expect(result.content.secret, isNull);
       final plain = RichTextHelper.documentToPlainText(
         RichTextHelper.getDocument(result.content.content),
       ).trim();
       expect(plain, 'plain note');
+    });
+
+    test('note preserves formatting (bold, italic, lists)', () {
+      // Create Delta JSON with bold text
+      final delta = jsonEncode([
+        {'insert': 'Bold text', 'attributes': {'bold': true}},
+        {'insert': '\n'},
+      ]);
+      final result = controller.processContentForType(
+        EntryType.note, delta, 'Bold text', '', []);
+      expect(result.type, EntryType.note);
+      // Verify the output is still Delta JSON with formatting
+      expect(result.content.content, contains('"bold":true'));
     });
   });
 

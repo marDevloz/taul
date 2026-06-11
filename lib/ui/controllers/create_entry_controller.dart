@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/credential_parser.dart';
@@ -161,20 +163,27 @@ class CreateEntryController extends StateNotifier<CreateEntryState> {
   // ---------------------------------------------------------------------------
 
   /// Formats body content according to EntryType rules.
+  /// [deltaJson] is the original rich text content (preserves formatting).
+  /// [plainText] is the stripped plain text (for tag/title extraction).
   /// Returns both the [ProcessedContent] and the [EntryType] (may change
   /// from the input type, e.g. credential → note when parsing fails).
   /// Pure function — does NOT mutate state.
   ({ProcessedContent content, EntryType type}) processContentForType(
     EntryType type,
-    String body,
+    String deltaJson,
+    String plainText,
     String title,
     List<String> tags,
   ) {
     switch (type) {
       case EntryType.idea:
+        // Strip "!" prefix from Delta JSON to preserve formatting
+        final stripped = plainText.startsWith('!')
+            ? _stripLeadingChar(deltaJson, '!')
+            : deltaJson;
         return (
           content: ProcessedContent(
-            content: body.startsWith('!') ? body.substring(1).trim() : body,
+            content: stripped,
             tags: tags,
           ),
           type: type,
@@ -182,13 +191,13 @@ class CreateEntryController extends StateNotifier<CreateEntryState> {
       case EntryType.glossary:
         return (
           content: ProcessedContent(
-            content: RichTextHelper.formatForGlossary(body),
+            content: RichTextHelper.formatForGlossary(plainText),
             tags: tags,
           ),
           type: type,
         );
       case EntryType.credential:
-        final parsedCred = CredentialParser.parse(body);
+        final parsedCred = CredentialParser.parse(plainText);
         if (parsedCred != null) {
           final metadata = <String, String>{
             if (parsedCred.username.isNotEmpty) 'username': parsedCred.username,
@@ -214,17 +223,17 @@ class CreateEntryController extends StateNotifier<CreateEntryState> {
         // No se pudo parsear como credencial — fallback a nota
         return (
           content: ProcessedContent(
-            content: stripTitleAndTags(body, tags, title),
+            content: stripTitleAndTags(deltaJson, tags, title),
             tags: tags,
           ),
           type: EntryType.note,
         );
       case EntryType.task:
-        var content = stripTitleAndTags(body, tags, title);
-        if (RichTextHelper.startsWithTaskMarker(body)) {
-          final plainPrefix = body.substring(
+        var content = stripTitleAndTags(deltaJson, tags, title);
+        if (RichTextHelper.startsWithTaskMarker(plainText)) {
+          final plainPrefix = plainText.substring(
             0,
-            body.length - RichTextHelper.stripTaskMarker(body).length,
+            plainText.length - RichTextHelper.stripTaskMarker(plainText).length,
           );
           content = RichTextHelper.stripPrefix(content, plainPrefix);
         }
@@ -235,12 +244,34 @@ class CreateEntryController extends StateNotifier<CreateEntryState> {
       case EntryType.note:
         return (
           content: ProcessedContent(
-            content: stripTitleAndTags(body, tags, title),
+            content: stripTitleAndTags(deltaJson, tags, title),
             tags: tags,
           ),
           type: type,
         );
     }
+  }
+
+  /// Strips the first occurrence of [char] from Delta JSON content.
+  static String _stripLeadingChar(String deltaJson, String char) {
+    final doc = RichTextHelper.getDocument(deltaJson);
+    final ops = doc.toDelta().toJson();
+    final result = <Map<String, dynamic>>[];
+    var stripped = false;
+    for (final op in ops) {
+      if (op['insert'] is String && !stripped) {
+        var text = op['insert'] as String;
+        final idx = text.indexOf(char);
+        if (idx != -1) {
+          text = text.substring(idx + 1);
+          stripped = true;
+        }
+        if (text.isNotEmpty) result.add({...op, 'insert': text});
+      } else {
+        result.add(op);
+      }
+    }
+    return jsonEncode(result);
   }
 
   // ---------------------------------------------------------------------------
@@ -256,12 +287,12 @@ class CreateEntryController extends StateNotifier<CreateEntryState> {
     final currentTitle = state.title;
     if (currentContent.isEmpty && currentTitle.isEmpty) return false;
 
-    // Convert Delta JSON → plain text
+    // Convert Delta JSON → plain text ONLY for tag/title extraction
     final rawPlainText = RichTextHelper.documentToPlainText(
       RichTextHelper.getDocument(currentContent),
     ).trim();
 
-    // Extract tags and split title
+    // Extract tags and split title from plain text
     final extracted = extractTags(rawPlainText);
     final text = extracted.clean;
     final contentTags = extracted.tags;
@@ -281,9 +312,10 @@ class CreateEntryController extends StateNotifier<CreateEntryState> {
     // Title: manual overrides parsed
     final finalTitle = currentTitle.isNotEmpty ? currentTitle : parsedTitle;
 
-    // Format content per type (type may change, e.g. credential → note)
+    // Format content per type — pass Delta JSON to preserve formatting
     final result = processContentForType(
       state.effectiveType,
+      currentContent,
       body,
       finalTitle,
       finalTags,
