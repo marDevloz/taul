@@ -84,6 +84,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Detalle de conflicto'), findsOneWidget);
+
+      // Buttons are at the bottom of a ListView — scroll to reveal them
+      await tester.scrollUntilVisible(
+        find.text('Mantener local'),
+        100,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+
       expect(find.text('Mantener local'), findsOneWidget);
       expect(find.text('Mantener remoto'), findsOneWidget);
       expect(find.text('Mantener ambos'), findsOneWidget);
