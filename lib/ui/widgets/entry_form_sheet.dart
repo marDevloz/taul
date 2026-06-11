@@ -37,18 +37,18 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
   final _tagsCtrl = TextEditingController();
   final _editorKey = GlobalKey<RichTextEditorState>();
 
-  // Create mode
+  // Create mode — nullable, only initialized when !_isEditing
   bool _didSaveSuccessfully = false;
-  late final EntryDraftNotifier _draftNotifier;
-  late final CreateEntryController _controller;
+  EntryDraftNotifier? _draftNotifier;
+  CreateEntryController? _controller;
   CreateEntryState? _pendingDisposeState;
 
   // Tag autocomplete
   String? _editorHashTagPartial;
   String _tagsFieldPartial = '';
 
-  // Edit mode
-  late EntryType _selectedType;
+  // Edit mode — nullable, only initialized when _isEditing
+  EntryType? _selectedType;
   bool _isSaving = false;
   String _richContent = '';
 
@@ -87,9 +87,9 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
     if (draft != null) {
       _titleCtrl.text = draft.title;
       _tagsCtrl.text = draft.tags;
-      _controller.loadDraft(draft);
+      _controller!.loadDraft(draft);
       if (draft.content.isNotEmpty) {
-        _controller.detectTypeFromContent(draft.content);
+        _controller!.detectTypeFromContent(draft.content);
       }
     }
   }
@@ -99,25 +99,29 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
     if (!_isEditing && !_didSaveSuccessfully) {
       final hasContent =
           _titleCtrl.text.isNotEmpty ||
-          _pendingDisposeState!.content.isNotEmpty ||
+          (_pendingDisposeState?.content ?? '').isNotEmpty ||
           _tagsCtrl.text.isNotEmpty;
       if (hasContent) {
         final draft = EntryDraft(
           title: _titleCtrl.text,
-          content: _pendingDisposeState!.content,
+          content: _pendingDisposeState?.content ?? '',
           tags: _tagsCtrl.text,
-          manualType: _pendingDisposeState!.manualType,
+          manualType: _pendingDisposeState?.manualType,
         );
         Future.microtask(() {
           try {
-            _draftNotifier.save(draft);
-          } catch (_) {}
+            _draftNotifier?.save(draft);
+          } catch (e) {
+            // Draft save is best-effort — don't crash dispose
+          }
         });
       } else {
         Future.microtask(() {
           try {
-            _draftNotifier.clear();
-          } catch (_) {}
+            _draftNotifier?.clear();
+          } catch (e) {
+            // Draft clear is best-effort — don't crash dispose
+          }
         });
       }
     }
@@ -134,7 +138,7 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
     if (_isEditing) {
       setState(() => _richContent = content);
     } else {
-      _controller.detectTypeFromContent(content);
+      _controller?.detectTypeFromContent(content);
     }
     _updateEditorHashTag();
   }
@@ -150,7 +154,7 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
 
   void _onTagsChanged(String text) {
     if (!_isEditing) {
-      _controller.setTags(text);
+      _controller?.setTags(text);
     }
     final parts = text.split(',');
     final partial = parts.last.trim();
@@ -220,12 +224,12 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
 
   Future<void> _saveCreate() async {
     try {
-      final saved = await _controller.save();
+      final saved = await _controller!.save();
       if (saved) {
         _didSaveSuccessfully = true;
         if (mounted) Navigator.pop(context);
       }
-    } catch (_) {
+    } catch (e) {
       // Error is handled by the ref.listen in build
     }
   }
@@ -257,7 +261,7 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
         title: _titleCtrl.text,
         content: content,
         tags: tags,
-        type: _selectedType,
+        type: _selectedType ?? entry.type,
       );
       ref.invalidate(entryDetailProvider(widget.entryId!));
       ref.invalidate(entryListProvider);
@@ -323,7 +327,7 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
             // 1. Title
             TextField(
               controller: _titleCtrl,
-              onChanged: _controller.setTitle,
+              onChanged: _controller?.setTitle,
               decoration: const InputDecoration(
                 labelText: 'Título',
                 hintText: 'o escribí Titulo# en el contenido',
@@ -374,7 +378,7 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
                   onPressed: state.isSaving
                       ? null
                       : () {
-                          _draftNotifier.clear();
+                          _draftNotifier?.clear();
                           Navigator.pop(context);
                         },
                   child: const Text('Cancelar'),
@@ -523,7 +527,7 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
     final bool isManual;
 
     if (_isEditing) {
-      effectiveType = _selectedType;
+      effectiveType = _selectedType ?? widget.entry!.type;
       isManual = true;
     } else {
       final state = ref.watch(createEntryControllerProvider);
@@ -570,7 +574,7 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
     final bool isManual;
 
     if (_isEditing) {
-      effectiveType = _selectedType;
+      effectiveType = _selectedType ?? widget.entry!.type;
       isManual = true;
     } else {
       final state = ref.watch(createEntryControllerProvider);
@@ -643,13 +647,14 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
     }
 
     if (_isEditing) {
-      setState(() => _selectedType = value!);
+      setState(() => _selectedType = value);
     } else {
-      _controller.setManualType(value);
+      _controller?.setManualType(value);
     }
   }
 
   Widget _buildTypeSelector(ThemeData theme) {
+    final currentType = _selectedType ?? widget.entry!.type;
     return Row(
       children: [
         Text('Tipo:', style: theme.textTheme.bodySmall),
@@ -677,10 +682,10 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(_iconForType(_selectedType), size: 14),
+                Icon(_iconForType(currentType), size: 14),
                 const SizedBox(width: 4),
                 Text(
-                  _labelForType(_selectedType),
+                  _labelForType(currentType),
                   style: const TextStyle(fontSize: 12),
                 ),
                 const SizedBox(width: 4),
@@ -703,7 +708,7 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
                       _labelForType(t),
                       style: const TextStyle(fontSize: 13),
                     ),
-                    trailing: _selectedType == t
+                    trailing: currentType == t
                         ? Icon(
                             Icons.check,
                             size: 16,
