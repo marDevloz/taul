@@ -20,7 +20,7 @@ class EntryFormCreateSheet extends ConsumerStatefulWidget {
   final String tagsFieldPartial;
   final ValueChanged<String> onContentChanged;
   final ValueChanged<String> onTagsChanged;
-  final VoidCallback onAcceptSuggestion;
+  final ValueChanged<String> onAcceptSuggestion;
   final Future<void> Function()? onCredentialRequested;
 
   const EntryFormCreateSheet({

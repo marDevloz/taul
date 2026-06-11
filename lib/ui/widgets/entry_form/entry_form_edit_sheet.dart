@@ -21,7 +21,7 @@ class EntryFormEditSheet extends ConsumerStatefulWidget {
   final String tagsFieldPartial;
   final ValueChanged<String> onContentChanged;
   final ValueChanged<String> onTagsChanged;
-  final VoidCallback onAcceptSuggestion;
+  final ValueChanged<String> onAcceptSuggestion;
   final Entry entry;
   final String entryId;
 

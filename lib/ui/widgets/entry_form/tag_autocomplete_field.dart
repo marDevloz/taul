@@ -60,7 +60,8 @@ class TagAutocompleteField extends ConsumerStatefulWidget {
   final String tagsText;
 
   /// Called when the user taps the suggestion chip.
-  final VoidCallback onAcceptSuggestion;
+  /// Receives the accepted tag name.
+  final ValueChanged<String> onAcceptSuggestion;
 
   const TagAutocompleteField({
     super.key,
@@ -89,7 +90,7 @@ class _TagAutocompleteFieldState extends ConsumerState<TagAutocompleteField> {
     if (suggestion == null) return const SizedBox.shrink();
 
     return GestureDetector(
-      onTap: widget.onAcceptSuggestion,
+      onTap: () => widget.onAcceptSuggestion(suggestion.name),
       child: _buildSuggestionChip(context, suggestion),
     );
   }

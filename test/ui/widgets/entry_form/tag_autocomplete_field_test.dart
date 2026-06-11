@@ -51,7 +51,7 @@ Widget _buildApp({
   required String? editorHashTagPartial,
   required String tagsFieldPartial,
   required String tagsText,
-  required VoidCallback onAcceptSuggestion,
+  required ValueChanged<String> onAcceptSuggestion,
   List<TagSetting>? allTags,
 }) {
   final tagSettingsRepo = _FakeTagSettingsRepository(allTags ?? _allTags);
@@ -89,7 +89,7 @@ void main() {
         editorHashTagPartial: 'tra',
         tagsFieldPartial: '',
         tagsText: '',
-        onAcceptSuggestion: () {},
+        onAcceptSuggestion: (_) {},
         allTags: allTags,
       ));
       await tester.pump();
@@ -103,7 +103,7 @@ void main() {
         editorHashTagPartial: null,
         tagsFieldPartial: 'pers',
         tagsText: '',
-        onAcceptSuggestion: () {},
+        onAcceptSuggestion: (_) {},
         allTags: allTags,
       ));
       await tester.pump();
@@ -117,7 +117,7 @@ void main() {
         editorHashTagPartial: 'tra',
         tagsFieldPartial: 'pers',
         tagsText: '',
-        onAcceptSuggestion: () {},
+        onAcceptSuggestion: (_) {},
         allTags: allTags,
       ));
       await tester.pump();
@@ -132,7 +132,7 @@ void main() {
         editorHashTagPartial: null,
         tagsFieldPartial: '',
         tagsText: '',
-        onAcceptSuggestion: () {},
+        onAcceptSuggestion: (_) {},
         allTags: allTags,
       ));
       await tester.pump();
@@ -143,12 +143,12 @@ void main() {
 
     testWidgets('should invoke onAcceptSuggestion when chip is tapped',
         (tester) async {
-      bool accepted = false;
+      String? acceptedTag;
       await tester.pumpWidget(_buildApp(
         editorHashTagPartial: 'tra',
         tagsFieldPartial: '',
         tagsText: '',
-        onAcceptSuggestion: () => accepted = true,
+        onAcceptSuggestion: (tag) => acceptedTag = tag,
         allTags: allTags,
       ));
       await tester.pump();
@@ -156,7 +156,7 @@ void main() {
       await tester.tap(find.text('trabajo'));
       await tester.pump();
 
-      expect(accepted, isTrue);
+      expect(acceptedTag, 'trabajo');
     });
   });
 }
