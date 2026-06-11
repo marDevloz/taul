@@ -53,7 +53,6 @@ class _SnakeFabState extends State<SnakeFab> {
   final ScrollController _scrollController = ScrollController();
   final Set<int> _revealedIndices = {};
   Timer? _revealTimer;
-  bool _isHovered = false;
 
   @override
   void initState() {
@@ -164,38 +163,28 @@ class _SnakeFabState extends State<SnakeFab> {
     final hasFilter =
         widget.selectedValue != null && widget.selectedValue!.isNotEmpty;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      cursor: SystemMouseCursors.click,
-      child: AnimatedScale(
-        scale: _isHovered ? 1.0 : 0.7,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: FloatingActionButton.small(
-            heroTag: null,
-            onPressed: widget.onTap,
-            backgroundColor: hasFilter
-                ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.85)
-                : theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.8),
-            foregroundColor: hasFilter
-                ? theme.colorScheme.onSecondaryContainer
-                : theme.colorScheme.onSurfaceVariant,
-            elevation: 0,
-            child: widget.collapsedIcon,
-          ),
-        ),
+        ],
+      ),
+      child: FloatingActionButton.small(
+        heroTag: null,
+        onPressed: widget.onTap,
+        backgroundColor: hasFilter
+            ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.85)
+            : theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.8),
+        foregroundColor: hasFilter
+            ? theme.colorScheme.onSecondaryContainer
+            : theme.colorScheme.onSurfaceVariant,
+        elevation: 0,
+        child: widget.collapsedIcon,
       ),
     );
   }

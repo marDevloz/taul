@@ -18,7 +18,6 @@ import 'package:taul/ui/widgets/empty_states.dart';
 import 'package:taul/ui/widgets/entry_card.dart';
 import 'package:taul/ui/widgets/master_password_gate.dart';
 import 'package:taul/ui/widgets/snake_fab.dart';
-import 'package:taul/ui/widgets/hoverable_fab.dart';
 import 'package:taul/ui/widgets/search_bar_widget.dart';
 
 class HomeView extends ConsumerStatefulWidget {
@@ -275,15 +274,13 @@ class _HomeViewState extends ConsumerState<HomeView> {
           const SizedBox(height: 8),
           _buildTagFilterFab(),
           const SizedBox(height: 8),
-          HoverableFab(
-            child: FloatingActionButton.small(
-              heroTag: null,
-              onPressed: () => _showQuickAdd(context),
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.primaryContainer.withValues(alpha: 0.7),
-              child: const Icon(Icons.add, size: 20),
-            ),
+          FloatingActionButton(
+            heroTag: null,
+            onPressed: () => _showQuickAdd(context),
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.primaryContainer.withValues(alpha: 0.7),
+            child: const Icon(Icons.add),
           ),
         ],
       ),
