@@ -21,6 +21,7 @@ void main() {
   setUp(() {
     server = MockSyncServer();
     client = MockSyncClient();
+    when(() => server.stop()).thenAnswer((_) async {});
     service = SyncService(
       server: server,
       client: client,
