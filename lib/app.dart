@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -22,6 +21,9 @@ import 'package:taul/ui/widgets/update_dialog.dart';
 
 /// Tracks whether the startup update check has been dispatched.
 final _updateCheckDoneProvider = StateProvider<bool>((ref) => false);
+
+/// Prevents duplicate addPostFrameCallback registration in builder.
+bool _updateCheckScheduled = false;
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -94,15 +96,6 @@ class TaulApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final lockStatus = ref.watch(appLockProvider);
     final router = ref.watch(routerProvider);
-    final updateCheckDone = ref.watch(_updateCheckDoneProvider);
-
-    // Dispatch one-time update check after first frame when unlocked
-    if (!updateCheckDone && lockStatus == AppLockStatus.unlocked) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(_updateCheckDoneProvider.notifier).state = true;
-        _handleAutoUpdate(context, ref);
-      });
-    }
 
     return MaterialApp.router(
       title: 'Taúl',
@@ -121,7 +114,7 @@ class TaulApp extends ConsumerWidget {
       routerConfig: router,
       debugShowCheckedModeBanner: false,
       localizationsDelegates: FlutterQuillLocalizations.localizationsDelegates,
-      builder: (context, child) {
+      builder: (appContext, child) {
         if (lockStatus == AppLockStatus.checking) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -129,6 +122,16 @@ class TaulApp extends ConsumerWidget {
         }
         if (lockStatus == AppLockStatus.locked) {
           return const _LockScreenWrapper();
+        }
+        // Dispatch one-time update check using MaterialApp's context
+        // (which has Navigator and ScaffoldMessenger as ancestors)
+        final updateCheckDone = ref.watch(_updateCheckDoneProvider);
+        if (!updateCheckDone && !_updateCheckScheduled) {
+          _updateCheckScheduled = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref.read(_updateCheckDoneProvider.notifier).state = true;
+            _handleAutoUpdate(appContext, ref);
+          });
         }
         return InactivityDetector(child: child!);
       },
@@ -157,30 +160,36 @@ class _LockScreenWrapper extends StatelessWidget {
 
 /// Chequea si hay actualización disponible y maneja la respuesta del usuario.
 Future<void> _handleAutoUpdate(BuildContext context, WidgetRef ref) async {
-  final service = ref.read(updateServiceProvider);
-  final manifest = await service.checkForUpdate();
-  if (manifest == null || !context.mounted) return;
+  try {
+    final service = ref.read(updateServiceProvider);
+    final manifest = await service.checkForUpdate();
+    if (manifest == null || !context.mounted) return;
 
-  final action = await showUpdateDialog(context, manifest);
-  if (!context.mounted || action == null) return;
+    final action = await showUpdateDialog(context, manifest);
+    if (!context.mounted || action == null) return;
 
-  switch (action) {
-    case UpdateDialogAction.download:
-      await _downloadAndInstall(context, service, manifest);
-    case UpdateDialogAction.skip:
-      await service.skipVersion(manifest.version);
-    case UpdateDialogAction.later:
-      break;
+    switch (action) {
+      case UpdateDialogAction.download:
+        await _downloadAndInstall(context, service, manifest);
+      case UpdateDialogAction.skip:
+        await service.skipVersion(manifest.version);
+      case UpdateDialogAction.later:
+        break;
+    }
+  } catch (_) {
+    // Fail silencioso — el update check no debe crashear la app
   }
 }
 
-/// Descarga el installer, muestra feedback y lo ejecuta.
+/// Descarga el installer, lo ejecuta y cierra la app.
+/// Solo se llama en Windows (el dialog no ofrece download en mobile).
 Future<void> _downloadAndInstall(
   BuildContext context,
   UpdateService service,
   UpdateManifest manifest,
 ) async {
   if (!context.mounted) return;
+  ScaffoldMessenger.of(context).clearSnackBars();
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(
       content: Row(
@@ -194,28 +203,23 @@ Future<void> _downloadAndInstall(
           Text('Descargando actualización...'),
         ],
       ),
-      duration: Duration(seconds: 30),
+      duration: Duration(minutes: 2),
     ),
   );
 
   try {
     final path = await service.downloadInstaller(manifest.url);
     if (!context.mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    // installUpdate lanza el installer y cierra la app después de 1.5s
     await service.installUpdate(path);
-    // Installer lanzado — cerrar la app para que pueda sobreescribir archivos
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Instalando actualización... Reiniciá la app.')),
-      );
-    }
-    await Future.delayed(const Duration(seconds: 2));
-    SystemNavigator.pop();
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al descargar: $e')),
+        const SnackBar(
+          content: Text('No se pudo completar la actualización. Intentá de nuevo más tarde.'),
+        ),
       );
     }
   }

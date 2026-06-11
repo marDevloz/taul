@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/core/auto_updater.dart';
 import 'package:taul/ui/widgets/update_dialog.dart';
@@ -24,6 +23,7 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
       if (!mounted) return;
 
       if (manifest == null) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ya tenés la versión más reciente.')),
         );
@@ -39,6 +39,7 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
         case UpdateDialogAction.skip:
           await service.skipVersion(manifest.version);
           if (mounted) {
+            ScaffoldMessenger.of(context).clearSnackBars();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Versión ${manifest.version} saltada.'),
@@ -47,6 +48,15 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
           }
         case UpdateDialogAction.later:
           break;
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo verificar actualizaciones.'),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isChecking = false);
@@ -58,6 +68,7 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
     UpdateManifest manifest,
   ) async {
     if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Row(
@@ -71,31 +82,23 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
             Text('Descargando actualización...'),
           ],
         ),
-        duration: Duration(seconds: 30),
+        duration: Duration(minutes: 2),
       ),
     );
 
     try {
       final path = await service.downloadInstaller(manifest.url);
       if (!mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      // installUpdate lanza el installer y cierra la app después de 1.5s
       await service.installUpdate(path);
-      // Installer lanzado — cerrar la app para que pueda sobreescribir archivos
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Instalando actualización... Reiniciá la app.')),
-        );
-      }
-      // Dar tiempo al snackbar y cerrar
-      await Future.delayed(const Duration(seconds: 2));
-      if (mounted) {
-        SystemNavigator.pop();
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al descargar: $e')),
+          const SnackBar(
+            content: Text('No se pudo completar la actualización. Intentá de nuevo más tarde.'),
+          ),
         );
       }
     }

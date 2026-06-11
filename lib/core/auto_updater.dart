@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,10 +10,13 @@ const _manifestUrl =
     'https://github.com/marDevloz/taul/releases/latest/download/manifest.json';
 
 /// Versión actual del app (sincronizada con pubspec.yaml).
-const String appVersion = '1.2.2';
+const String appVersion = '1.2.3';
 
 /// Clave de SharedPreferences para la versión saltada.
 const _skipPrefKey = 'update_skip_version';
+
+/// Solo Windows soporta instalación automática (Inno Setup).
+bool get _supportsAutoInstall => Platform.isWindows;
 
 /// Modelo del manifest.json que se sube como release asset.
 class UpdateManifest {
@@ -35,15 +39,24 @@ class UpdateManifest {
 /// Service que maneja el chequeo de actualizaciones, descarga e instalación.
 class UpdateService {
   /// Compara dos versiones semánticas (X.Y.Z).
+  /// Ignora sufijos pre-release (e.g. "1.3.0-beta.1" → [1,3,0]).
   /// Retorna true si [remote] es más nueva que [current].
   bool _isNewer(String remote, String current) {
-    final rParts = remote.split('.').map(int.tryParse).toList();
-    final cParts = current.split('.').map(int.tryParse).toList();
+    int parseSegment(String s) {
+      // Strip pre-release, build metadata, and v prefix
+      // "v1" → "1", "0-beta" → "0", "3+build" → "3"
+      var cleaned = s.split(RegExp(r'[-+]')).first;
+      cleaned = cleaned.replaceFirst(RegExp(r'^v'), '');
+      return int.tryParse(cleaned) ?? 0;
+    }
+
+    final rParts = remote.split('.').map(parseSegment).toList();
+    final cParts = current.split('.').map(parseSegment).toList();
 
     final len = rParts.length < cParts.length ? rParts.length : cParts.length;
     for (int i = 0; i < len; i++) {
-      final r = rParts[i] ?? 0;
-      final c = cParts[i] ?? 0;
+      final r = rParts[i];
+      final c = cParts[i];
       if (r > c) return true;
       if (r < c) return false;
     }
@@ -52,9 +65,9 @@ class UpdateService {
 
   /// Fetch remoto del manifest.json.
   Future<UpdateManifest?> _fetchManifest() async {
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 8);
     try {
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 8);
       final request = await client.getUrl(Uri.parse(_manifestUrl));
       final response = await request.close();
       if (response.statusCode != 200) return null;
@@ -63,6 +76,8 @@ class UpdateService {
       return UpdateManifest.fromJson(jsonDecode(body) as Map<String, dynamic>);
     } catch (_) {
       return null; // fail silencioso
+    } finally {
+      client.close(force: true);
     }
   }
 
@@ -88,30 +103,69 @@ class UpdateService {
   }
 
   /// Descarga el installer a un archivo temporal y retorna la ruta.
+  /// Solo funciona en Windows — en otras plataformas lanza [UnsupportedError].
   Future<String> downloadInstaller(String url) async {
+    if (!_supportsAutoInstall) {
+      throw UnsupportedError(
+        'La instalación automática solo está disponible en Windows.',
+      );
+    }
+
     final tempDir = Directory.systemTemp.path;
-    final fileName = url.split('/').last;
-    final destPath = '$tempDir\\$fileName';
+    final fileName = url.split('?').first.split('/').last;
+    if (fileName.isEmpty) {
+      throw Exception('URL de descarga inválida');
+    }
+    final destPath = '$tempDir${Platform.pathSeparator}$fileName';
 
-    final client = HttpClient();
-    final request = await client.getUrl(Uri.parse(url));
-    final response = await request.close();
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 30);
+    try {
+      final request = await client.getUrl(Uri.parse(url));
+      final response = await request.close();
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
 
-    final file = File(destPath);
-    await file.create(recursive: true);
-    await response.pipe(file.openWrite());
+      final file = File(destPath);
+      try {
+        await response.pipe(file.openWrite());
+      } catch (_) {
+        // Limpiar archivo parcial en caso de fallo mid-stream
+        if (await file.exists()) {
+          await file.delete();
+        }
+        rethrow;
+      }
 
-    return destPath;
+      return destPath;
+    } finally {
+      client.close(force: true);
+    }
   }
 
-  /// Lanza el installer en modo silencioso y retorna inmediatamente.
-  /// El caller debe cerrar la app para que el installer pueda sobreescribir archivos.
+  /// Lanza el installer en modo silencioso y cierra la app.
+  ///
+  /// En Windows usa `/SILENT` para mostrar progreso sin interacción.
+  /// Espera 1.5s antes de cerrar para que el installer adquiera locks de archivos.
   Future<void> installUpdate(String installerPath) async {
+    if (!_supportsAutoInstall) {
+      throw UnsupportedError(
+        'La instalación automática solo está disponible en Windows.',
+      );
+    }
+
+    // Lanzar installer con /SILENT (muestra barra de progreso)
     await Process.start(
       installerPath,
-      ['/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS'],
-      runInShell: true,
+      ['/SILENT', '/NORESTART'],
     );
+
+    // Dar tiempo al installer para que adquiera locks antes de cerrar la app
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    // Cerrar la app — el installer continúa ejecutándose independientemente
+    await SystemNavigator.pop();
   }
 }
 
