@@ -4,7 +4,6 @@ import 'package:taul/domain/entities/entry.dart';
 part 'sync_wire_format.freezed.dart';
 part 'sync_wire_format.g.dart';
 
-@JsonSerializable(explicitToJson: true)
 @freezed
 class SyncRequest with _$SyncRequest {
   const factory SyncRequest({
