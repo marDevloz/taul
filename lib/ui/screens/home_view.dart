@@ -35,6 +35,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
   final Map<String, DateTime> _unlockTimestamps = {};
   String? _expandedFabId;
   Timer? _autoLockTimer;
+  bool _isFabHovered = false;
 
   @override
   void initState() {
@@ -264,29 +265,37 @@ class _HomeViewState extends ConsumerState<HomeView> {
           ),
         ],
       ),
-      floatingActionButton: AnimatedOpacity(
-        opacity: _expandedEntryId != null ? 0.3 : 1.0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            _buildTypeFilterFab(),
-            const SizedBox(height: 8),
-            _buildTaskStatusFilterFab(),
-            const SizedBox(height: 8),
-            _buildTagFilterFab(),
-            const SizedBox(height: 8),
-            FloatingActionButton(
-              heroTag: null,
-              onPressed: () => _showQuickAdd(context),
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.primaryContainer.withValues(alpha: 0.7),
-              child: const Icon(Icons.add),
-            ),
-          ],
+      floatingActionButton: MouseRegion(
+        onEnter: (_) => setState(() => _isFabHovered = true),
+        onExit: (_) => setState(() => _isFabHovered = false),
+        child: AnimatedOpacity(
+          opacity: _isFabHovered
+              ? 1.0
+              : _expandedEntryId != null
+                  ? 0.3
+                  : 1.0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildTypeFilterFab(),
+              const SizedBox(height: 8),
+              _buildTaskStatusFilterFab(),
+              const SizedBox(height: 8),
+              _buildTagFilterFab(),
+              const SizedBox(height: 8),
+              FloatingActionButton(
+                heroTag: null,
+                onPressed: () => _showQuickAdd(context),
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.primaryContainer.withValues(alpha: 0.7),
+                child: const Icon(Icons.add),
+              ),
+            ],
+          ),
         ),
       ),
     );
