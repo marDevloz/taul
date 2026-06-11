@@ -2,7 +2,7 @@
 ; Build: iscc installer\setup.iss
 
 #define MyAppName "Taúl"
-#define MyAppVersion "1.2.4"
+#define MyAppVersion "1.2.5"
 #define MyAppPublisher "Gentleman Programming"
 #define MyAppURL "https://github.com/marDevloz/taul"
 #define MyAppExeName "taul.exe"

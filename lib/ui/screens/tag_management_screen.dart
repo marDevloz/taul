@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logger/logger.dart';
 import 'package:taul/domain/entities/tag_setting.dart';
 import 'package:taul/shared/tag_palette.dart';
 import 'package:taul/ui/providers/color_providers.dart';
@@ -8,77 +9,141 @@ import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:taul/ui/screens/credential_protection_controller.dart';
 import 'package:taul/ui/widgets/palette_picker.dart';
 
-class TagManagementScreen extends ConsumerWidget {
+class TagManagementScreen extends ConsumerStatefulWidget {
   const TagManagementScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TagManagementScreen> createState() =>
+      _TagManagementScreenState();
+}
+
+class _TagManagementScreenState extends ConsumerState<TagManagementScreen> {
+  final Set<String> _selectedTags = {};
+
+  bool get _isSelectionMode => _selectedTags.isNotEmpty;
+
+  void _toggleSelection(String tagName) {
+    setState(() {
+      if (_selectedTags.contains(tagName)) {
+        _selectedTags.remove(tagName);
+      } else {
+        _selectedTags.add(tagName);
+      }
+    });
+  }
+
+  void _clearSelection() {
+    setState(() => _selectedTags.clear());
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final tagsAsync = ref.watch(tagSettingsListProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gestionar etiquetas'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'Agregar etiqueta',
-            onPressed: () => _showAddTagDialog(context, ref),
-          ),
-        ],
+        title: Text(
+          _isSelectionMode
+              ? '${_selectedTags.length} seleccionado${_selectedTags.length == 1 ? '' : 's'}'
+              : 'Gestionar etiquetas',
+        ),
+        leading: _isSelectionMode
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _clearSelection,
+              )
+            : null,
+        actions: _isSelectionMode
+            ? []
+            : [
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  tooltip: 'Agregar etiqueta',
+                  onPressed: () => _showAddTagDialog(context),
+                ),
+              ],
       ),
-      body: tagsAsync.when(
-        data: (tags) {
-          if (tags.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+      body: Stack(
+        children: [
+          tagsAsync.when(
+            data: (tags) {
+              if (tags.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.label_outline,
+                        size: 64,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No hay etiquetas',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Agregá una etiqueta con el botón +',
+                        style:
+                            Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color:
+                                  Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              final systemTags = tags.where((t) => t.isSystem).toList();
+              final userTags = tags.where((t) => !t.isSystem).toList();
+
+              return ListView(
                 children: [
-                  Icon(
-                    Icons.label_outline,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No hay etiquetas',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Agregá una etiqueta con el botón +',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+                  // System tags section
+                  if (systemTags.isNotEmpty) ...[
+                    _buildSectionHeader(context, 'Tags del sistema'),
+                    for (final tag in systemTags)
+                      _TagSettingTile(
+                        setting: tag,
+                        ref: ref,
+                        isSystem: true,
+                      ),
+                  ],
+                  // User tags section
+                  if (userTags.isNotEmpty) ...[
+                    _buildSectionHeader(context, 'Tags personalizados'),
+                    for (final tag in userTags)
+                      _TagSettingTile(
+                        setting: tag,
+                        ref: ref,
+                        isSystem: false,
+                        isSelected: _selectedTags.contains(tag.name),
+                        isSelectionMode: _isSelectionMode,
+                        onToggle: () => _toggleSelection(tag.name),
+                      ),
+                  ],
                 ],
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, _) => Center(child: Text('Error: $err')),
+          ),
+          if (_isSelectionMode)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _DeleteActionBar(
+                selectedCount: _selectedTags.length,
+                onDelete: _showBatchDeleteConfirmation,
+                onCancel: _clearSelection,
               ),
-            );
-          }
-
-          final systemTags = tags.where((t) => t.isSystem).toList();
-          final userTags = tags.where((t) => !t.isSystem).toList();
-
-          return ListView(
-            children: [
-              // System tags section
-              if (systemTags.isNotEmpty) ...[
-                _buildSectionHeader(context, 'Tags del sistema'),
-                for (final tag in systemTags)
-                  _TagSettingTile(setting: tag, ref: ref, isSystem: true),
-              ],
-              // User tags section
-              if (userTags.isNotEmpty) ...[
-                _buildSectionHeader(context, 'Tags personalizados'),
-                for (final tag in userTags)
-                  _TagSettingTile(setting: tag, ref: ref, isSystem: false),
-              ],
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+            ),
+        ],
       ),
     );
   }
@@ -96,7 +161,7 @@ class TagManagementScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _showAddTagDialog(BuildContext context, WidgetRef ref) async {
+  Future<void> _showAddTagDialog(BuildContext context) async {
     final nameCtrl = TextEditingController();
     String? selectedColor;
     String? error;
@@ -160,17 +225,114 @@ class TagManagementScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Future<void> _showBatchDeleteConfirmation() async {
+    final counts = ref.read(tagUsageCountProvider);
+    int totalAffectedEntries = 0;
+    for (final name in _selectedTags) {
+      totalAffectedEntries += counts[name.toLowerCase()] ?? 0;
+    }
+
+    final count = _selectedTags.length;
+    final entryLabel = totalAffectedEntries == 1 ? 'entrada' : 'entradas';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(count == 1 ? '¿Eliminar tag?' : '¿Eliminar tags?'),
+        content: Text(
+          count == 1
+              ? 'Se eliminará 1 tag y se desvinculará de '
+                  '$totalAffectedEntries $entryLabel.'
+              : 'Se eliminarán $count tags y se desvincularán de '
+                  '$totalAffectedEntries $entryLabel.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await _executeBatchDelete();
+    }
+    // If cancelled, stay in selection mode
+  }
+
+  Future<void> _executeBatchDelete() async {
+    final deleteUseCase = ref.read(deleteTagSettingProvider);
+    final removeTag = ref.read(removeTagFromEntriesProvider);
+    final affectedEntryIds = <String>{};
+    int successCount = 0;
+    final totalCount = _selectedTags.length;
+
+    for (final tagName in _selectedTags.toList()) {
+      try {
+        await deleteUseCase.call(tagName);
+        final ids = await removeTag(tagName);
+        affectedEntryIds.addAll(ids);
+        successCount++;
+      } catch (e) {
+        Logger().e('Failed to delete tag $tagName', error: e);
+      }
+    }
+
+    // Provider invalidation cascade
+    ref.invalidate(tagSettingsListProvider);
+    ref.invalidate(entryListProvider);
+    for (final id in affectedEntryIds) {
+      ref.invalidate(entryDetailProvider(id));
+    }
+
+    // Exit selection
+    _clearSelection();
+
+    // SnackBar
+    if (!mounted) return;
+    if (successCount == totalCount) {
+      final label = totalCount == 1 ? 'tag' : 'tags';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$totalCount $label eliminados')),
+      );
+    } else if (successCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Se eliminaron $successCount de $totalCount tags'),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudieron eliminar tags')),
+      );
+    }
+  }
 }
 
 class _TagSettingTile extends ConsumerWidget {
   final TagSetting setting;
   final WidgetRef ref;
   final bool isSystem;
+  final bool isSelected;
+  final bool isSelectionMode;
+  final VoidCallback? onToggle;
 
   const _TagSettingTile({
     required this.setting,
     required this.ref,
     this.isSystem = false,
+    this.isSelected = false,
+    this.isSelectionMode = false,
+    this.onToggle,
   });
 
   @override
@@ -194,14 +356,32 @@ class _TagSettingTile extends ConsumerWidget {
       );
     }
 
-    // User tag: full CRUD as before
+    // User tag: selection mode or normal mode
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: color,
-        radius: 16,
-        child: setting.isSecure
-            ? const Icon(Icons.lock, size: 16, color: Colors.white)
-            : null,
+      leading: Stack(
+        children: [
+          CircleAvatar(
+            backgroundColor: color,
+            radius: 16,
+            child: setting.isSecure
+                ? const Icon(Icons.lock, size: 16, color: Colors.white)
+                : null,
+          ),
+          if (isSelected)
+            Positioned(
+              right: -2,
+              top: -2,
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                padding: const EdgeInsets.all(1),
+                child: Icon(Icons.check_circle,
+                    size: 14, color: Theme.of(context).colorScheme.primary),
+              ),
+            ),
+        ],
       ),
       title: Text(setting.name),
       subtitle: setting.isSecure ? const Text('Requiere autenticación') : null,
@@ -209,8 +389,10 @@ class _TagSettingTile extends ConsumerWidget {
         value: setting.isSecure,
         onChanged: (value) => _toggleSecure(context, value),
       ),
-      onTap: () => _showRenameDialog(context),
-      onLongPress: () => _showDeleteConfirmation(context),
+      onTap: isSelectionMode
+          ? onToggle
+          : () => _showRenameDialog(context),
+      onLongPress: onToggle,
     );
   }
 
@@ -301,71 +483,6 @@ class _TagSettingTile extends ConsumerWidget {
     ref.invalidate(tagSettingsListProvider);
   }
 
-  Future<void> _showDeleteConfirmation(BuildContext context) async {
-    final counts = ref.read(tagUsageCountProvider);
-    final usageCount = counts[setting.name.toLowerCase()] ?? 0;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar etiqueta'),
-        content: usageCount > 0
-            ? RichText(
-                text: TextSpan(
-                  style: Theme.of(ctx).textTheme.bodyMedium,
-                  children: [
-                    TextSpan(
-                      text: 'La etiqueta "${setting.name}" está siendo usada por ',
-                    ),
-                    TextSpan(
-                      text: '$usageCount entrada${usageCount == 1 ? '' : 's'}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(ctx).colorScheme.error,
-                      ),
-                    ),
-                    const TextSpan(
-                      text: '.\n\nSi la eliminás, se quitará de todas esas '
-                          'entradas y no se podrá recuperar.',
-                    ),
-                  ],
-                ),
-              )
-            : Text('¿Eliminar la etiqueta "${setting.name}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && context.mounted) {
-      final deleteUseCase = ref.read(deleteTagSettingProvider);
-      await deleteUseCase.call(setting.name);
-      final removeTag = ref.read(removeTagFromEntriesProvider);
-      final affectedIds = await removeTag(setting.name);
-      for (final id in affectedIds) {
-        ref.invalidate(entryDetailProvider(id));
-      }
-      ref.invalidate(tagSettingsListProvider);
-      ref.invalidate(entryListProvider);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Etiqueta "${setting.name}" eliminada')),
-        );
-      }
-    }
-  }
-
   Future<void> _toggleSecure(BuildContext context, bool newValue) async {
     // If enabling secure, require master password
     if (newValue) {
@@ -396,5 +513,65 @@ class _TagSettingTile extends ConsumerWidget {
       isSystem: setting.isSystem,
     );
     ref.invalidate(tagSettingsListProvider);
+  }
+}
+
+class _DeleteActionBar extends StatelessWidget {
+  final int selectedCount;
+  final VoidCallback onDelete;
+  final VoidCallback onCancel;
+
+  const _DeleteActionBar({
+    required this.selectedCount,
+    required this.onDelete,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 12,
+        bottom: MediaQuery.of(context).padding.bottom + 12,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHigh,
+        border: Border(
+          top: BorderSide(color: theme.dividerColor),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Selection count
+          Expanded(
+            child: Text(
+              selectedCount == 1
+                  ? '1 tag seleccionado'
+                  : '$selectedCount tags seleccionados',
+              style: theme.textTheme.titleSmall,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Cancel button
+          IconButton(
+            key: const Key('cancel_selection'),
+            icon: const Icon(Icons.close),
+            onPressed: onCancel,
+            tooltip: 'Cancelar selección',
+          ),
+          // Delete button
+          IconButton(
+            key: const Key('delete_selected'),
+            icon: const Icon(Icons.delete),
+            color: theme.colorScheme.error,
+            onPressed: onDelete,
+            tooltip: 'Eliminar seleccionados',
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -1,7 +1,7 @@
 name: taul
 description: "Personal knowledge vault — minimal, fast, secure, sovereign."
 publish_to: "none"
-version: 1.2.4+1
+version: 1.2.5+1
 
 environment:
   sdk: ^3.11.0
