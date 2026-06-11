@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,7 +9,7 @@ const _manifestUrl =
     'https://github.com/marDevloz/taul/releases/latest/download/manifest.json';
 
 /// Versión actual del app (sincronizada con pubspec.yaml).
-const String appVersion = '1.2.3';
+const String appVersion = '1.2.4';
 
 /// Clave de SharedPreferences para la versión saltada.
 const _skipPrefKey = 'update_skip_version';
@@ -147,7 +146,7 @@ class UpdateService {
   /// Lanza el installer en modo silencioso y cierra la app.
   ///
   /// En Windows usa `/SILENT` para mostrar progreso sin interacción.
-  /// Espera 1.5s antes de cerrar para que el installer adquiera locks de archivos.
+  /// Espera 2s antes de cerrar para que el installer adquiera locks de archivos.
   Future<void> installUpdate(String installerPath) async {
     if (!_supportsAutoInstall) {
       throw UnsupportedError(
@@ -162,10 +161,12 @@ class UpdateService {
     );
 
     // Dar tiempo al installer para que adquiera locks antes de cerrar la app
-    await Future.delayed(const Duration(milliseconds: 1500));
+    await Future.delayed(const Duration(seconds: 2));
 
     // Cerrar la app — el installer continúa ejecutándose independientemente
-    await SystemNavigator.pop();
+    // exit(0) es más confiable que SystemNavigator.pop() cuando el installer
+    // tiene el focus de la ventana
+    exit(0);
   }
 }
 

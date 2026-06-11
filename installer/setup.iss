@@ -2,7 +2,7 @@
 ; Build: iscc installer\setup.iss
 
 #define MyAppName "Taúl"
-#define MyAppVersion "1.2.3"
+#define MyAppVersion "1.2.4"
 #define MyAppPublisher "Gentleman Programming"
 #define MyAppURL "https://github.com/marDevloz/taul"
 #define MyAppExeName "taul.exe"
@@ -13,7 +13,7 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
-DefaultDirName={autopf}\{#MyAppName}
+DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=..\dist
@@ -22,7 +22,8 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\{#MyAppExeName}
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
+PrivilegesRequiredOverridingAllowed=lowest
 
 [Languages]
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
