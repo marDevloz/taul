@@ -110,6 +110,10 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
 
   @override
   Widget build(BuildContext context) {
+    assert(
+      _isEditing ? widget.entryId != null : true,
+      'Editing requires entryId',
+    );
     if (_isEditing) {
       return EntryFormEditSheet(
         editorKey: _editorKey,

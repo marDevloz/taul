@@ -93,8 +93,8 @@ class _EntryFormEditSheetState extends ConsumerState<EntryFormEditSheet> {
       ref.invalidate(tagSettingsMapProvider);
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      setState(() => _isSaving = false);
       if (mounted) {
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al guardar: $e')),
         );
@@ -144,17 +144,16 @@ class _EntryFormEditSheetState extends ConsumerState<EntryFormEditSheet> {
             ),
             const SizedBox(height: 12),
 
-            // 2. Type selector
-            _buildInlineTypeSelector(theme),
-            const SizedBox(height: 12),
-
             // 3. Content (rich text editor)
             const Text('Contenido', style: TextStyle(fontSize: 12)),
             const SizedBox(height: 4),
             RichTextEditor(
               key: widget.editorKey,
               initialContent: _richContent,
-              onChanged: widget.onContentChanged,
+              onChanged: (json) {
+                widget.onContentChanged(json);
+                setState(() => _richContent = json);
+              },
               maxHeight: 200,
             ),
             const SizedBox(height: 4),
@@ -221,77 +220,6 @@ class _EntryFormEditSheetState extends ConsumerState<EntryFormEditSheet> {
           currentType: currentType,
           isManual: _selectedType != null,
           onSelected: _onTypeSelected,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInlineTypeSelector(ThemeData theme) {
-    final currentType = _selectedType ?? widget.entry.type;
-    return Row(
-      children: [
-        Text('Tipo:', style: theme.textTheme.bodySmall),
-        const SizedBox(width: 8),
-        PopupMenuButton<EntryType>(
-          onSelected: (t) {
-            if (t == EntryType.credential) {
-              Navigator.pop(context);
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                builder: (_) => CredentialFormSheet(entry: widget.entry),
-              );
-            } else {
-              setState(() => _selectedType = t);
-            }
-          },
-          child: Container(
-            constraints: const BoxConstraints(minWidth: 110),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(iconForType(currentType), size: 14),
-                const SizedBox(width: 4),
-                Text(
-                  labelForType(currentType),
-                  style: const TextStyle(fontSize: 12),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.arrow_drop_down,
-                  size: 16,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
-          itemBuilder: (_) => EntryType.values
-              .map(
-                (t) => PopupMenuItem(
-                  value: t,
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(iconForType(t), size: 18),
-                    title: Text(
-                      labelForType(t),
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    trailing: currentType == t
-                        ? Icon(
-                            Icons.check,
-                            size: 16,
-                            color: theme.colorScheme.primary,
-                          )
-                        : null,
-                  ),
-                ),
-              )
-              .toList(),
         ),
       ],
     );

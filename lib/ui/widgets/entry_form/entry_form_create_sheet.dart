@@ -43,9 +43,10 @@ class EntryFormCreateSheet extends ConsumerStatefulWidget {
 
 class _EntryFormCreateSheetState extends ConsumerState<EntryFormCreateSheet> {
   bool _didSaveSuccessfully = false;
+  bool _didCancel = false;
   EntryDraftNotifier? _draftNotifier;
   CreateEntryController? _controller;
-  CreateEntryState? _pendingDisposeState;
+  CreateEntryState? _lastKnownState;
 
   static const _typeHints = {
     EntryType.note: 'Escribí algo...  -#tag  Título# contenido',
@@ -60,7 +61,7 @@ class _EntryFormCreateSheetState extends ConsumerState<EntryFormCreateSheet> {
     super.initState();
     _draftNotifier = ref.read(entryDraftProvider.notifier);
     _controller = ref.read(createEntryControllerProvider.notifier);
-    _pendingDisposeState = ref.read(createEntryControllerProvider);
+    _lastKnownState = ref.read(createEntryControllerProvider);
     Future.microtask(() {
       if (!mounted) return;
       _restoreDraft();
@@ -81,16 +82,16 @@ class _EntryFormCreateSheetState extends ConsumerState<EntryFormCreateSheet> {
 
   @override
   void dispose() {
-    if (!_didSaveSuccessfully) {
+    if (!_didSaveSuccessfully && !_didCancel) {
       final hasContent = widget.titleCtrl.text.isNotEmpty ||
-          (_pendingDisposeState?.content ?? '').isNotEmpty ||
+          (_lastKnownState?.content ?? '').isNotEmpty ||
           widget.tagsCtrl.text.isNotEmpty;
       if (hasContent) {
         final draft = EntryDraft(
           title: widget.titleCtrl.text,
-          content: _pendingDisposeState?.content ?? '',
+          content: _lastKnownState?.content ?? '',
           tags: widget.tagsCtrl.text,
-          manualType: _pendingDisposeState?.manualType,
+          manualType: _lastKnownState?.manualType,
         );
         Future.microtask(() {
           try {
@@ -137,6 +138,7 @@ class _EntryFormCreateSheetState extends ConsumerState<EntryFormCreateSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final state = ref.watch(createEntryControllerProvider);
+    _lastKnownState = state;
 
     ref.listen(createEntryControllerProvider.select((s) => s.error), (
       _,
@@ -219,7 +221,8 @@ class _EntryFormCreateSheetState extends ConsumerState<EntryFormCreateSheet> {
                   onPressed: state.isSaving
                       ? null
                       : () {
-                          _draftNotifier?.clear();
+                          _didCancel = true;
+                          try { _draftNotifier?.clear(); } catch (_) { /* best-effort */ }
                           Navigator.pop(context);
                         },
                   child: const Text('Cancelar'),
