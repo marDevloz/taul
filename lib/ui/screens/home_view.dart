@@ -264,25 +264,30 @@ class _HomeViewState extends ConsumerState<HomeView> {
           ),
         ],
       ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          _buildTypeFilterFab(),
-          const SizedBox(height: 8),
-          _buildTaskStatusFilterFab(),
-          const SizedBox(height: 8),
-          _buildTagFilterFab(),
-          const SizedBox(height: 8),
-          FloatingActionButton(
-            heroTag: null,
-            onPressed: () => _showQuickAdd(context),
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.primaryContainer.withValues(alpha: 0.7),
-            child: const Icon(Icons.add),
-          ),
-        ],
+      floatingActionButton: AnimatedOpacity(
+        opacity: _expandedEntryId != null ? 0.3 : 1.0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _buildTypeFilterFab(),
+            const SizedBox(height: 8),
+            _buildTaskStatusFilterFab(),
+            const SizedBox(height: 8),
+            _buildTagFilterFab(),
+            const SizedBox(height: 8),
+            FloatingActionButton(
+              heroTag: null,
+              onPressed: () => _showQuickAdd(context),
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.primaryContainer.withValues(alpha: 0.7),
+              child: const Icon(Icons.add),
+            ),
+          ],
+        ),
       ),
     );
   }
