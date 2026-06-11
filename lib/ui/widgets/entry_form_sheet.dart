@@ -373,7 +373,10 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
                 TextButton(
                   onPressed: state.isSaving
                       ? null
-                      : () => Navigator.pop(context),
+                      : () {
+                          _draftNotifier.clear();
+                          Navigator.pop(context);
+                        },
                   child: const Text('Cancelar'),
                 ),
                 const SizedBox(width: 8),
