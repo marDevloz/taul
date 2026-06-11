@@ -55,7 +55,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Local Title'), findsOneWidget);
-      expect(find.textContaining('peer-device'), findsOneWidget);
+      expect(find.textContaining('peer-dev'), findsOneWidget);
     });
 
     testWidgets('navigates to detail on tap', (tester) async {
