@@ -2,7 +2,7 @@
 ; Build: iscc installer\setup.iss
 
 #define MyAppName "Taúl"
-#define MyAppVersion "1.2.5"
+#define MyAppVersion "1.2.6"
 #define MyAppPublisher "Gentleman Programming"
 #define MyAppURL "https://github.com/marDevloz/taul"
 #define MyAppExeName "taul.exe"
@@ -32,7 +32,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
 
 [Files]
-Source: "..\build\windows\x64\runner\Release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\build\windows\x64\runner\Release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion; BeforeInstall: TaskKill('{#MyAppExeName}')
 Source: "..\build\windows\x64\runner\Release\flutter_windows.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\build\windows\x64\runner\Release\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\build\windows\x64\runner\Release\data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -47,3 +47,11 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}
 
 [UninstallRun]
 Filename: "{cmd}"; Parameters: "/C taskkill /f /im taul.exe 2>nul"; Flags: runhidden
+
+[Code]
+procedure TaskKill(FileName: String);
+var
+  ResultCode: Integer;
+begin
+  Exec('taskkill.exe', '/f /im "' + FileName + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;

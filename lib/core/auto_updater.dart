@@ -9,7 +9,7 @@ const _manifestUrl =
     'https://github.com/marDevloz/taul/releases/latest/download/manifest.json';
 
 /// Versión actual del app (sincronizada con pubspec.yaml).
-const String appVersion = '1.2.5';
+const String appVersion = '1.2.6';
 
 /// Clave de SharedPreferences para la versión saltada.
 const _skipPrefKey = 'update_skip_version';
@@ -143,10 +143,10 @@ class UpdateService {
     }
   }
 
-  /// Lanza el installer en modo silencioso y cierra la app.
+  /// Lanza el installer en modo silencioso.
   ///
-  /// En Windows usa `/SILENT` para mostrar progreso sin interacción.
-  /// Espera 2s antes de cerrar para que el installer adquiera locks de archivos.
+  /// El installer ejecuta `taskkill /f /im taul.exe` via BeforeInstall
+  /// ANTES de reemplazar archivos. No necesitamos cerrar la app desde Dart.
   Future<void> installUpdate(String installerPath) async {
     if (!_supportsAutoInstall) {
       throw UnsupportedError(
@@ -155,18 +155,14 @@ class UpdateService {
     }
 
     // Lanzar installer con /SILENT (muestra barra de progreso)
+    // El installer matará el proceso via BeforeInstall → taskkill
     await Process.start(
       installerPath,
       ['/SILENT', '/NORESTART'],
     );
 
-    // Dar tiempo al installer para que adquiera locks antes de cerrar la app
-    await Future.delayed(const Duration(seconds: 2));
-
-    // Cerrar la app — el installer continúa ejecutándose independientemente
-    // exit(0) es más confiable que SystemNavigator.pop() cuando el installer
-    // tiene el focus de la ventana
-    exit(0);
+    // No cerramos la app desde aquí — el installer se encarga.
+    // Si el installer falla, el usuario puede cerrar manualmente.
   }
 }
 
