@@ -87,10 +87,10 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
     );
 
     try {
-      final path = await service.downloadInstaller(manifest.url);
+      final path = await service.downloadUpdate(manifest.downloadUrl);
       if (!mounted) return;
       ScaffoldMessenger.of(context).clearSnackBars();
-      // installUpdate lanza el installer y cierra la app después de 1.5s
+      // installUpdate: Windows lanza installer, Android abre APK
       await service.installUpdate(path);
     } catch (e) {
       if (mounted) {

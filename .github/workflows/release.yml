@@ -1,4 +1,4 @@
-name: Release Windows
+name: Release
 
 on:
   push:
@@ -50,35 +50,93 @@ jobs:
           Write-Host "Found ISCC.exe at: $iscc"
           & $iscc installer/setup.iss
 
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: |
+            dist/Taul-v*.exe
+          retention-days: 1
+
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build Android APK
+        run: flutter build apk --release
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 1
+
+  create-release:
+    needs: [build-windows, build-android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: dist
+
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-build
+          path: dist
+
       - name: Generate manifest.json
         run: |
-          $version = "${{ github.ref_name }}" -replace '^v'
-          $exeName = "Taul-v$version-setup.exe"
-          $manifest = @{
-            version = $version
-            url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$exeName"
-            notes = "Consultá las release notes en GitHub para conocer las novedades."
-          } | ConvertTo-Json
-          Set-Content -Path "dist/manifest.json" -Value $manifest
+          version="${GITHUB_REF_NAME#v}"
+          exeName="Taul-v${version}-setup.exe"
+          apkName="app-release.apk"
+          cat > dist/manifest.json << EOF
+          {
+            "version": "$version",
+            "url": "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$exeName",
+            "android_url": "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$apkName",
+            "notes": "Consultá las release notes en GitHub para conocer las novedades."
+          }
+          EOF
+
+      - name: Rename APK
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mv dist/app-release.apk "dist/Taul-v${version}.apk"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/Taul-v*.exe
+            dist/Taul-v*-setup.exe
+            dist/Taul-v*.apk
             dist/manifest.json
           generate_release_notes: true
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload artifact (fallback)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: taul-installer
-          path: |
-            dist/Taul-v*.exe
-            dist/manifest.json
-          retention-days: 7

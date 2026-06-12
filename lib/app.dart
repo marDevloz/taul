@@ -181,8 +181,8 @@ Future<void> _handleAutoUpdate(BuildContext context, WidgetRef ref) async {
   }
 }
 
-/// Descarga el installer, lo ejecuta y cierra la app.
-/// Solo se llama en Windows (el dialog no ofrece download en mobile).
+/// Descarga la actualización y la instala.
+/// Funciona en Windows (installer) y Android (APK).
 Future<void> _downloadAndInstall(
   BuildContext context,
   UpdateService service,
@@ -208,10 +208,10 @@ Future<void> _downloadAndInstall(
   );
 
   try {
-    final path = await service.downloadInstaller(manifest.url);
+    final path = await service.downloadUpdate(manifest.downloadUrl);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).clearSnackBars();
-    // installUpdate lanza el installer y cierra la app después de 1.5s
+    // installUpdate: Windows lanza installer, Android abre APK
     await service.installUpdate(path);
   } catch (e) {
     if (context.mounted) {
