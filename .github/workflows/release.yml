@@ -109,11 +109,16 @@ jobs:
           name: android-build
           path: dist
 
+      - name: Rename APK
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mv dist/app-release.apk "dist/Taul-v${version}.apk"
+
       - name: Generate manifest.json
         run: |
           version="${GITHUB_REF_NAME#v}"
           exeName="Taul-v${version}-setup.exe"
-          apkName="app-release.apk"
+          apkName="Taul-v${version}.apk"
           cat > dist/manifest.json << EOF
           {
             "version": "$version",
@@ -122,11 +127,6 @@ jobs:
             "notes": "Consultá las release notes en GitHub para conocer las novedades."
           }
           EOF
-
-      - name: Rename APK
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          mv dist/app-release.apk "dist/Taul-v${version}.apk"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
