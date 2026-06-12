@@ -9,7 +9,7 @@ const _manifestUrl =
     'https://github.com/marDevloz/taul/releases/latest/download/manifest.json';
 
 /// Versión actual del app (sincronizada con pubspec.yaml).
-const String appVersion = '1.2.8';
+const String appVersion = '1.2.9';
 
 /// Clave de SharedPreferences para la versión saltada.
 const _skipPrefKey = 'update_skip_version';
