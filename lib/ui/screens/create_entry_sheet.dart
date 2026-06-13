@@ -3,12 +3,10 @@ import 'package:taul/ui/widgets/entry_form_sheet.dart';
 
 /// Thin wrapper that shows the unified [EntryFormSheet] in create mode.
 class CreateEntrySheet extends StatelessWidget {
-  final Future<void> Function()? onCredentialRequested;
-
-  const CreateEntrySheet({super.key, this.onCredentialRequested});
+  const CreateEntrySheet({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return EntryFormSheet(onCredentialRequested: onCredentialRequested);
+    return const EntryFormSheet();
   }
 }

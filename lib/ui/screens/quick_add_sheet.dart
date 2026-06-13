@@ -9,9 +9,7 @@ import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:taul/ui/screens/credential_form_sheet.dart';
 
 class QuickAddSheet extends ConsumerStatefulWidget {
-  final Future<void> Function()? onCredentialRequested;
-
-  const QuickAddSheet({super.key, this.onCredentialRequested});
+  const QuickAddSheet({super.key});
 
   @override
   ConsumerState<QuickAddSheet> createState() => _QuickAddSheetState();
@@ -243,7 +241,10 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     // --- Single entry via controller ---
     try {
       final saved = await _controller.save();
-      if (saved && mounted) Navigator.pop(context);
+      if (saved) {
+        _controller.reset();
+        if (mounted) Navigator.pop(context);
+      }
     } catch (_) {
       // Error is shown via the ref.listen in build
     }
@@ -401,9 +402,13 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                   avatar: const Icon(Icons.lock, size: 12),
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
-                  onPressed: () async {
-                    await widget.onCredentialRequested?.call();
-                    if (mounted && context.mounted) Navigator.pop(context);
+                  onPressed: () {
+                    Navigator.pop(context);
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => const CredentialFormSheet(),
+                    );
                   },
                 ),
               ],

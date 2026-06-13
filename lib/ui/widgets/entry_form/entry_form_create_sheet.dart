@@ -4,6 +4,7 @@ import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/ui/controllers/create_entry_controller.dart';
 import 'package:taul/ui/providers/entry_draft_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/screens/credential_form_sheet.dart';
 import 'package:taul/ui/widgets/entry_form/entry_type_selector.dart';
 import 'package:taul/ui/widgets/entry_form/quick_commands_sheet.dart';
 import 'package:taul/ui/widgets/entry_form/tag_autocomplete_field.dart';
@@ -21,7 +22,6 @@ class EntryFormCreateSheet extends ConsumerStatefulWidget {
   final ValueChanged<String> onContentChanged;
   final ValueChanged<String> onTagsChanged;
   final ValueChanged<String> onAcceptSuggestion;
-  final Future<void> Function()? onCredentialRequested;
 
   const EntryFormCreateSheet({
     super.key,
@@ -33,7 +33,6 @@ class EntryFormCreateSheet extends ConsumerStatefulWidget {
     required this.onContentChanged,
     required this.onTagsChanged,
     required this.onAcceptSuggestion,
-    this.onCredentialRequested,
   });
 
   @override
@@ -118,6 +117,7 @@ class _EntryFormCreateSheetState extends ConsumerState<EntryFormCreateSheet> {
       final saved = await _controller!.save();
       if (saved) {
         _didSaveSuccessfully = true;
+        _controller!.reset();
         try { _draftNotifier?.clear(); } catch (_) { /* best-effort */ }
         if (mounted) Navigator.pop(context);
       }
@@ -129,7 +129,11 @@ class _EntryFormCreateSheetState extends ConsumerState<EntryFormCreateSheet> {
   void _onTypeSelected(EntryType? value) {
     if (value == EntryType.credential) {
       Navigator.pop(context);
-      widget.onCredentialRequested?.call();
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => const CredentialFormSheet(),
+      );
       return;
     }
     _controller?.setManualType(value);
@@ -223,6 +227,7 @@ class _EntryFormCreateSheetState extends ConsumerState<EntryFormCreateSheet> {
                       ? null
                       : () {
                           _didCancel = true;
+                          _controller!.reset();
                           try { _draftNotifier?.clear(); } catch (_) { /* best-effort */ }
                           Navigator.pop(context);
                         },
