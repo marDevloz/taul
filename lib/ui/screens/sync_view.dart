@@ -240,6 +240,11 @@ class _StatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final (icon, label, color) = switch (syncState) {
       SyncState.idle => (Icons.check_circle_outline, 'Inactivo', Colors.grey),
+      SyncState.connecting => (
+          Icons.sync,
+          'Conectando...',
+          Colors.blue,
+        ),
       SyncState.pairing => (
           Icons.handshake,
           'Esperando conexión...',

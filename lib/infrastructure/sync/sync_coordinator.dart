@@ -100,4 +100,65 @@ class SyncCoordinator {
       entries: localDelta,
     );
   }
+
+  /// Processes a sync response received from a remote device (client side).
+  ///
+  /// 1. Gets local entries modified since the remote's lastSyncAt
+  /// 2. Detects conflicts where both sides modified the same entry
+  /// 3. Stores conflicts in the DB
+  /// 4. Upserts non-conflicting remote entries
+  /// 5. Records lastSyncAt for this peer
+  /// 6. Returns ProcessSyncResult with counts
+  Future<ProcessSyncResult> processSyncResponse(SyncResponse response) async {
+    _log.i(
+      'Processing sync response from ${response.deviceId}: '
+      '${response.entries.length} entries, '
+      'serverLastSyncAt: ${response.serverLastSyncAt}',
+    );
+
+    // 1. Load local entries modified since remote's lastSyncAt
+    final localDelta = await _repo.getModifiedEntries(response.serverLastSyncAt);
+    _log.d('Local delta: ${localDelta.length} entries');
+
+    // 2. Detect conflicts: entries modified on BOTH sides since lastSyncAt
+    final conflicts = ConflictResolver.detectConflicts(
+      localEntries: localDelta,
+      remoteEntries: response.entries,
+      lastSyncAt: response.serverLastSyncAt,
+      peerDeviceId: response.deviceId,
+    );
+    _log.d('Conflicts detected: ${conflicts.length}');
+
+    // 3. Store conflicts in the DB
+    for (final conflict in conflicts) {
+      await _conflictDao.insert(conflict);
+    }
+
+    // 4. Upsert non-conflicting remote entries
+    final conflictIds = conflicts.map((c) => c.entryId).toSet();
+    final entriesToUpsert = response.entries
+        .where((e) => !conflictIds.contains(e.id))
+        .toList();
+
+    if (entriesToUpsert.isNotEmpty) {
+      _log.d('Upserting ${entriesToUpsert.length} non-conflicting entries');
+      await _repo.upsertEntries(entriesToUpsert);
+    }
+
+    // 5. Record sync timestamp for this peer
+    if (response.serverLastSyncAt != null) {
+      await _repo.setLastSyncAt(response.deviceId, response.serverLastSyncAt!);
+    }
+
+    _log.i(
+      'Response processing complete: '
+      'upserted ${entriesToUpsert.length}, '
+      'conflicts: ${conflicts.length}',
+    );
+
+    return ProcessSyncResult(
+      entriesUpserted: entriesToUpsert.length,
+      conflictsCount: conflicts.length,
+    );
+  }
 }
