@@ -554,6 +554,11 @@ class _HomeViewState extends ConsumerState<HomeView> {
       actions: [
         if (count >= 1) ...[
           IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Mover a la papelera',
+            onPressed: _batchDeleteSelected,
+          ),
+          IconButton(
             icon: const Icon(Icons.star_outline_rounded),
             tooltip: 'Favorito',
             onPressed: () => _batchToggleFavorito(),
@@ -569,7 +574,6 @@ class _HomeViewState extends ConsumerState<HomeView> {
             onPressed: _navigateToMerge,
             child: const Text('Combinar'),
           ),
-        TextButton(onPressed: _exitSelectMode, child: const Text('Cancelar')),
       ],
     );
   }
@@ -632,6 +636,46 @@ class _HomeViewState extends ConsumerState<HomeView> {
     final ref = this.ref;
     for (final entry in entries) {
       await ref.read(toggleEntryTagProvider).call(entry, 'archivado');
+    }
+    ref.invalidate(entryListProvider);
+    ref.invalidate(filteredEntriesProvider);
+    _exitSelectMode();
+  }
+
+  Future<void> _batchDeleteSelected() async {
+    final count = _selectedEntryIds.length;
+    final label = count == 1 ? 'entrada' : 'entradas';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mover a la papelera'),
+        content: Text(
+          count == 1
+              ? '¿Mover 1 entrada a la papelera? Podés restaurarla después.'
+              : '¿Mover $count $label a la papelera? Podés restaurarlas después.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final ref = this.ref;
+    for (final id in _selectedEntryIds) {
+      await ref.read(deleteEntryProvider).call(id);
     }
     ref.invalidate(entryListProvider);
     ref.invalidate(filteredEntriesProvider);
