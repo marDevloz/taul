@@ -82,6 +82,7 @@ final startSyncProvider = Provider<Future<void> Function()>((ref) {
       return;
     }
 
+    _startCancelled = false;
     ref.read(syncStateProvider.notifier).state = SyncState.pairing;
 
     try {
@@ -89,11 +90,22 @@ final startSyncProvider = Provider<Future<void> Function()>((ref) {
       final pairingService = ref.read(pairingServiceProvider);
       final pairingCode = pairingService.generateCode();
 
-      // 2. Create and start the sync server
+      // 2. Create the sync server (certificate + setup)
       final server = await ref.read(syncServerProvider(pairingCode).future);
-      final port = await server.start();
+      if (_startCancelled) {
+        _resetSyncSession(ref);
+        return;
+      }
 
-      // 3. Create sync service
+      // 3. Start the HTTPS server (socket bind)
+      final port = await server.start();
+      if (_startCancelled) {
+        await server.stop();
+        _resetSyncSession(ref);
+        return;
+      }
+
+      // 4. Get device ID and create sync service
       final deviceId = await ref.read(deviceIdProvider.future);
       final client = SyncClient();
       final coordinator = ref.read(syncCoordinatorProvider);
@@ -105,17 +117,22 @@ final startSyncProvider = Provider<Future<void> Function()>((ref) {
         log: Logger(),
       );
 
-      // 4. Store service and listen to state changes
+      // 5. Store service and listen to state changes
       ref.read(syncServiceProvider.notifier).state = service;
       service.stateStream.listen((state) {
         ref.read(syncStateProvider.notifier).state = state;
       });
 
-      // 5. Store port + pairing code for UI consumption
+      // 6. Store port + pairing code for UI consumption
       _currentPort = port;
       _currentPairingCode = pairingCode;
       _currentPairingService = pairingService;
     } catch (e, st) {
+      if (_startCancelled) {
+        // Stop was pressed during a failing start — just go idle
+        _resetSyncSession(ref);
+        return;
+      }
       Logger().e('Failed to start sync', error: e, stackTrace: st);
       ref.read(syncStateProvider.notifier).state = SyncState.error;
       // Auto-recover after 5 seconds
@@ -130,6 +147,7 @@ final startSyncProvider = Provider<Future<void> Function()>((ref) {
 int? _currentPort;
 String? _currentPairingCode;
 PairingService? _currentPairingService;
+bool _startCancelled = false;
 
 /// Current sync server port (for QR code generation).
 final syncPortProvider = Provider<int?>((ref) => _currentPort);
@@ -144,16 +162,30 @@ final syncPairingServiceProvider = Provider<PairingService?>(
 
 final stopSyncProvider = Provider<Future<void> Function()>((ref) {
   return () async {
+    // Signal any in-flight start to abort
+    _startCancelled = true;
+
     final service = ref.read(syncServiceProvider);
-    if (service == null) return;
-    await service.stop();
-    ref.read(syncServiceProvider.notifier).state = null;
-    ref.read(syncStateProvider.notifier).state = SyncState.idle;
-    _currentPort = null;
-    _currentPairingCode = null;
-    _currentPairingService = null;
+    if (service != null) {
+      try {
+        await service.stop();
+      } catch (e, st) {
+        Logger().e('Error stopping sync service', error: e, stackTrace: st);
+      }
+    }
+
+    _resetSyncSession(ref);
   };
 });
+
+/// Resets all sync session state back to idle.
+void _resetSyncSession(Ref ref) {
+  ref.read(syncServiceProvider.notifier).state = null;
+  ref.read(syncStateProvider.notifier).state = SyncState.idle;
+  _currentPort = null;
+  _currentPairingCode = null;
+  _currentPairingService = null;
+}
 
 final resolveConflictProvider =
     Provider<Future<void> Function(int, ConflictResolution)>((ref) {
