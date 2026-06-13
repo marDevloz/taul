@@ -674,12 +674,48 @@ class _HomeViewState extends ConsumerState<HomeView> {
     if (confirmed != true || !context.mounted) return;
 
     final ref = this.ref;
-    for (final id in _selectedEntryIds) {
-      await ref.read(deleteEntryProvider).call(id);
+    int successCount = 0;
+    final totalCount = _selectedEntryIds.length;
+
+    for (final id in _selectedEntryIds.toList()) {
+      try {
+        await ref.read(deleteEntryProvider).call(id);
+        successCount++;
+      } catch (_) {
+        // Partial failure: continue with remaining entries
+      }
     }
+
+    // Provider invalidation cascade
     ref.invalidate(entryListProvider);
     ref.invalidate(filteredEntriesProvider);
+    for (final id in _selectedEntryIds) {
+      ref.invalidate(entryDetailProvider(id));
+    }
+
+    // Exit selection mode
     _exitSelectMode();
+
+    // SnackBar feedback
+    if (!mounted) return;
+    if (successCount == totalCount) {
+      final label = totalCount == 1 ? 'entrada' : 'entradas';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$totalCount $label movidas a la papelera')),
+      );
+    } else if (successCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Se movieron $successCount de $totalCount entradas a la papelera',
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudieron mover entradas a la papelera')),
+      );
+    }
   }
 
   List<Entry> _resolveSelectedEntries() {

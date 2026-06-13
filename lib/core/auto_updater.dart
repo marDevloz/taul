@@ -189,12 +189,10 @@ class UpdateService {
   static const _channel = MethodChannel('com.example.taul/installer');
 
   /// Abre un APK en Android usando MethodChannel + FileProvider.
+  /// Errors propagate to installUpdate() → _downloadAndInstall() which
+  /// shows a SnackBar to the user.
   Future<void> _openApk(String filePath) async {
-    try {
-      await _channel.invokeMethod('installApk', {'filePath': filePath});
-    } catch (_) {
-      // fail silencioso — el instalador nativo manejará cualquier error
-    }
+    await _channel.invokeMethod('installApk', {'filePath': filePath});
   }
 }
 
