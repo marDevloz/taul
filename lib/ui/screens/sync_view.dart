@@ -105,38 +105,7 @@ class _SyncBody extends ConsumerWidget {
         const SizedBox(height: 16),
         _StatusCard(syncState: syncState),
         const SizedBox(height: 16),
-        Card(
-          child: Container(
-            height: 200,
-            alignment: Alignment.center,
-            child: syncState == SyncState.pairing
-                ? QrImageView(
-                    data: 'https://sync.taul.local',
-                    version: QrVersions.auto,
-                    size: 160,
-                  )
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.qr_code_2,
-                        size: 80,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Código QR',
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Disponible durante pairing',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-          ),
-        ),
+        _QrSection(syncState: syncState),
         const SizedBox(height: 16),
         conflictCount.when(
           data: (count) => count > 0
@@ -158,6 +127,106 @@ class _SyncBody extends ConsumerWidget {
         const SizedBox(height: 24),
         _SyncActionButton(syncState: syncState),
       ],
+    );
+  }
+}
+
+class _QrSection extends ConsumerStatefulWidget {
+  const _QrSection({required this.syncState});
+
+  final SyncState syncState;
+
+  @override
+  ConsumerState<_QrSection> createState() => _QrSectionState();
+}
+
+class _QrSectionState extends ConsumerState<_QrSection> {
+  String? _qrData;
+
+  @override
+  void didUpdateWidget(_QrSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.syncState == SyncState.pairing && _qrData == null) {
+      _loadQrData();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.syncState == SyncState.pairing) {
+      _loadQrData();
+    }
+  }
+
+  Future<void> _loadQrData() async {
+    try {
+      final port = ref.read(syncPortProvider);
+      final pairingService = ref.read(syncPairingServiceProvider);
+      if (port == null || pairingService == null) return;
+      final ip = await pairingService.getLocalIpAddress();
+      final qrData = 'https://$ip:$port';
+      if (mounted) setState(() => _qrData = qrData);
+    } catch (_) {
+      // IP detection failed — leave QR data null
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pairingCode = ref.watch(syncPairingCodeProvider);
+
+    return Card(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        alignment: Alignment.center,
+        child: widget.syncState == SyncState.pairing && _qrData != null
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  QrImageView(
+                    data: _qrData!,
+                    version: QrVersions.auto,
+                    size: 160,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Código: $pairingCode',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Escaneá este código desde el otro dispositivo',
+                    style: Theme.of(context).textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.qr_code_2,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Código QR',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Disponible durante pairing',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }

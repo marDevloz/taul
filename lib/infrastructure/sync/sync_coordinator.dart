@@ -13,6 +13,21 @@ import 'package:taul/infrastructure/sync/sync_wire_format.dart';
 /// 4. Upserts non-conflicting remote entries
 /// 5. Records lastSyncAt for this peer
 /// 6. Returns SyncResponse with local delta + conflict count
+///
+/// ## Crypto Policy (protected entries)
+///
+/// Protected entries carry [Entry.encryptedSecret], [Entry.cipherNonce], and
+/// [Entry.cipherTag] as opaque blobs on the [Entry] model. These fields are
+/// serialized/deserialized by the freezed + json_serializable layer and
+/// travel through sync **as-is** — no additional encryption is applied at
+/// the transport level.
+///
+/// **DEK Isolation**: Data Encryption Keys (DEKs) are NEVER transmitted.
+/// Each device derives its own DEK locally from the master key + entry ID.
+/// The encryptedSecret blob can only be decrypted by a device that holds
+/// the same master key. This means two devices must be initialized with
+/// the same master key (via vault unlock) for protected entries to be
+/// readable after sync.
 class SyncCoordinator {
   final ISyncRepository _repo;
   final ConflictDao _conflictDao;
