@@ -12,8 +12,11 @@ import 'package:taul/infrastructure/sync/sync_coordinator.dart';
 import 'package:taul/infrastructure/sync/sync_repository_impl.dart';
 import 'package:taul/infrastructure/sync/sync_server.dart';
 import 'package:taul/infrastructure/sync/sync_service.dart';
+import 'package:taul/infrastructure/sync/sync_wire_format.dart';
 import 'package:taul/ui/providers/device_id_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+export 'package:taul/ui/providers/sync_client_providers.dart'
+    show connectAndSyncProvider;
 
 /// Manages certificate lifecycle for HTTPS sync.
 final certificateManagerProvider = FutureProvider<CertificateManager>((ref) {
@@ -58,6 +61,11 @@ final syncServerProvider = FutureProvider.family<SyncServer, String>(
 final syncServiceProvider = StateProvider<SyncService?>((ref) => null);
 
 final syncStateProvider = StateProvider<SyncState>((ref) => SyncState.idle);
+
+/// Stores the result of the last completed client sync.
+final lastSyncResultProvider = StateProvider<ProcessSyncResult?>(
+  (ref) => null,
+);
 
 final conflictCountProvider = StreamProvider<int>((ref) async* {
   final db = ref.watch(databaseProvider);

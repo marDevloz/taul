@@ -41,11 +41,11 @@ Chain strategy: feature-branch-chain
 
 ## PR #2: Provider Layer — Orchestration (~130 lines)
 
-- [ ] 2.1 RED: Write failing tests for `ConnectParams` + `connectAndSyncProvider` with mocked `SyncService` + `SyncCoordinator` — verify delta computed, request built, `performSync` called, response processed, result returned, error states (401, unreachable, TLS mismatch, timeout)
-- [ ] 2.2 GREEN: Create `ConnectParams` class (host, port, fingerprint, pairingCode) + TLS trust-on-first-use helpers (`SharedPreferences` key `tls_trust_{host:port}`, hex-encode fingerprint) in `lib/ui/providers/sync_client_providers.dart`
-- [ ] 2.3 GREEN: Create `connectAndSyncProvider` (`FutureProvider.family<ProcessSyncResult, ConnectParams>`) — parse URL, check/establish TLS trust, get local delta, build `SyncRequest`, set state to `connecting`, call `SyncService.performSync()`, call `coordinator.processSyncResponse()`, set state to `complete` or `error`
-- [ ] 2.4 GREEN: Expose `connectAndSyncProvider` in `lib/ui/providers/sync_providers.dart`
-- [ ] 2.5 REFACTOR: Run `dart analyze` + `flutter test`, fix any issues
+- [x] 2.1 RED: Write failing tests for `ConnectParams` + `connectAndSyncProvider` with mocked `SyncService` + `SyncCoordinator` — verify delta computed, request built, `performSync` called, response processed, result returned, error states (401, unreachable, TLS mismatch, timeout)
+- [x] 2.2 GREEN: Create `ConnectParams` class (host, port, fingerprint, pairingCode) + TLS trust-on-first-use helpers (`SharedPreferences` key `tls_trust_{host:port}`, hex-encode fingerprint) in `lib/ui/providers/sync_client_providers.dart`
+- [x] 2.3 GREEN: Create `connectAndSyncProvider` (`FutureProvider.family<ProcessSyncResult, ConnectParams>`) — parse URL, check/establish TLS trust, get local delta, build `SyncRequest`, set state to `connecting`, call `SyncService.performSync()`, call `coordinator.processSyncResponse()`, set state to `complete` or `error`
+- [x] 2.4 GREEN: Expose `connectAndSyncProvider` in `lib/ui/providers/sync_providers.dart`
+- [x] 2.5 REFACTOR: Run `dart analyze` + `flutter test`, fix any issues
 
 **Files created:** `sync_client_providers.dart`
 **Files modified:** `sync_providers.dart`
@@ -55,10 +55,10 @@ Chain strategy: feature-branch-chain
 
 ## PR #3: UI Layer — Widgets + Integration (~100 lines)
 
-- [ ] 3.1 RED: Write widget tests in `test/ui/screens/sync_view_test.dart` — `SyncConnectSheet` renders URL + code fields, validates empty/invalid before submit, disabled button without 6-digit code; `SyncView` shows connect card in idle/complete, results card with entries+conflicts count, error messages per scenario (wrong code, unreachable, TLS mismatch, timeout)
-- [ ] 3.2 GREEN: Create `lib/ui/screens/sync_connect_sheet.dart` — `ConsumerStatefulWidget` with `showModalBottomSheet`, URL `TextFormField` (prefilled `https://`), 6-digit pairing code field, `FilledButton`("Conectar"), calls `connectAndSyncProvider`, closes sheet on submit
-- [ ] 3.3 GREEN: Modify `lib/ui/screens/sync_view.dart` — add `_ConnectCard`(`ListTile` with link icon) visible when `syncState.canStart`; add `_SyncResultCard` showing "N entradas sincronizadas, M conflictos" + "Resolver conflictos" button when conflicts exist
-- [ ] 3.4 REFACTOR: Run `dart analyze` + `flutter test`, verify all spec scenarios from `specs/sync-client-connect/spec.md` pass
+- [x] 3.1 RED: Write widget tests in `test/ui/screens/sync_view_test.dart` — `SyncConnectSheet` renders URL + code fields, validates empty/invalid before submit, disabled button without 6-digit code; `SyncView` shows connect card in idle/complete, results card with entries+conflicts count, error messages per scenario (wrong code, unreachable, TLS mismatch, timeout)
+- [x] 3.2 GREEN: Create `lib/ui/screens/sync_connect_sheet.dart` — `ConsumerStatefulWidget` with `showModalBottomSheet`, URL `TextFormField` (prefilled `https://`), 6-digit pairing code field, `FilledButton`("Conectar"), calls `connectAndSyncProvider`, closes sheet on submit
+- [x] 3.3 GREEN: Modify `lib/ui/screens/sync_view.dart` — add `_ConnectCard`(`ListTile` with link icon) visible when `syncState.canStart`; add `_SyncResultCard` showing "N entradas sincronizadas, M conflictos" + "Resolver conflictos" button when conflicts exist
+- [x] 3.4 REFACTOR: Run `dart analyze` + `flutter test`, verify all spec scenarios from `specs/sync-client-connect/spec.md` pass
 
 **Files created:** `sync_connect_sheet.dart`
 **Files modified:** `sync_view.dart`
