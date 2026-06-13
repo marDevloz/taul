@@ -23,6 +23,7 @@ class SyncResponse with _$SyncResponse {
     required int entriesReceived,
     required int conflictsCount,
     DateTime? serverLastSyncAt,
+    @Default([]) List<Entry> entries,
   }) = _SyncResponse;
 
   factory SyncResponse.fromJson(Map<String, dynamic> json) =>
