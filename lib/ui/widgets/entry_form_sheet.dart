@@ -16,13 +16,11 @@ import 'package:taul/ui/widgets/rich_text_editor.dart';
 class EntryFormSheet extends ConsumerStatefulWidget {
   final Entry? entry;
   final String? entryId;
-  final Future<void> Function()? onCredentialRequested;
 
   const EntryFormSheet({
     super.key,
     this.entry,
     this.entryId,
-    this.onCredentialRequested,
   });
 
   @override
@@ -138,7 +136,6 @@ class _EntryFormSheetState extends ConsumerState<EntryFormSheet> {
       onContentChanged: _onContentChanged,
       onTagsChanged: _onTagsChanged,
       onAcceptSuggestion: _acceptSuggestion,
-      onCredentialRequested: widget.onCredentialRequested,
     );
   }
 }

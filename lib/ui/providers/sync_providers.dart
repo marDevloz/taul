@@ -1,13 +1,61 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logger/logger.dart';
 import 'package:taul/domain/entities/conflict.dart';
 import 'package:taul/domain/entities/conflict_resolution.dart';
 import 'package:taul/domain/entities/sync_state.dart';
-import 'package:taul/infrastructure/database/app_database.dart' hide Conflict;
 import 'package:taul/infrastructure/database/conflict_dao.dart';
+import 'package:taul/infrastructure/database/entry_dao.dart';
+import 'package:taul/infrastructure/sync/certificate_manager.dart';
+import 'package:taul/infrastructure/sync/pairing_service.dart';
+import 'package:taul/infrastructure/sync/sync_client.dart';
+import 'package:taul/infrastructure/sync/sync_coordinator.dart';
+import 'package:taul/infrastructure/sync/sync_repository_impl.dart';
+import 'package:taul/infrastructure/sync/sync_server.dart';
 import 'package:taul/infrastructure/sync/sync_service.dart';
+import 'package:taul/ui/providers/device_id_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 
-final syncServiceProvider = Provider<SyncService?>((ref) => null);
+/// Manages certificate lifecycle for HTTPS sync.
+final certificateManagerProvider = FutureProvider<CertificateManager>((ref) {
+  return CertificateManager.create();
+});
+
+/// Coordinates the sync exchange on the server side.
+final syncCoordinatorProvider = Provider<SyncCoordinator>((ref) {
+  final db = ref.watch(databaseProvider);
+  final entryDao = EntryDao(db);
+  final conflictDao = ConflictDao(db);
+  final repo = SyncRepositoryImpl(entryDao: entryDao, conflictDao: conflictDao);
+  final deviceId = ref.watch(deviceIdProvider).valueOrNull ?? 'unknown';
+  return SyncCoordinator(
+    repo: repo,
+    conflictDao: conflictDao,
+    localDeviceId: deviceId,
+  );
+});
+
+/// Manages pairing codes and IP detection.
+final pairingServiceProvider = Provider<PairingService>((ref) {
+  return PairingService();
+});
+
+/// The sync server instance. Only created when sync is started.
+final syncServerProvider = FutureProvider.family<SyncServer, String>(
+  (ref, pairingCode) async {
+    final certManager = ref.watch(certificateManagerProvider).valueOrNull;
+    if (certManager == null) throw Exception('Certificate manager not ready');
+    final coordinator = ref.watch(syncCoordinatorProvider);
+    return SyncServer(
+      certManager: certManager,
+      pairingCode: pairingCode,
+      onRequest: coordinator.handleSyncRequest,
+      logger: Logger(),
+    );
+  },
+);
+
+/// The main sync service. Returns null until startSync is called.
+final syncServiceProvider = StateProvider<SyncService?>((ref) => null);
 
 final syncStateProvider = StateProvider<SyncState>((ref) => SyncState.idle);
 
@@ -28,22 +76,82 @@ final pendingConflictsProvider = FutureProvider<List<Conflict>>((ref) async {
 
 final startSyncProvider = Provider<Future<void> Function()>((ref) {
   return () async {
-    final service = ref.read(syncServiceProvider);
-    if (service == null) return;
+    final existing = ref.read(syncServiceProvider);
+    if (existing != null) {
+      // Already running — no-op (idempotent)
+      return;
+    }
+
     ref.read(syncStateProvider.notifier).state = SyncState.pairing;
-    service.stateStream.listen((state) {
-      ref.read(syncStateProvider.notifier).state = state;
-    });
-    await service.startServer();
+
+    try {
+      // 1. Generate pairing code
+      final pairingService = ref.read(pairingServiceProvider);
+      final pairingCode = pairingService.generateCode();
+
+      // 2. Create and start the sync server
+      final server = await ref.read(syncServerProvider(pairingCode).future);
+      final port = await server.start();
+
+      // 3. Create sync service
+      final deviceId = await ref.read(deviceIdProvider.future);
+      final client = SyncClient();
+      final coordinator = ref.read(syncCoordinatorProvider);
+      final service = SyncService(
+        server: server,
+        client: client,
+        deviceId: deviceId,
+        onRequest: coordinator.handleSyncRequest,
+        log: Logger(),
+      );
+
+      // 4. Store service and listen to state changes
+      ref.read(syncServiceProvider.notifier).state = service;
+      service.stateStream.listen((state) {
+        ref.read(syncStateProvider.notifier).state = state;
+      });
+
+      // 5. Store port + pairing code for UI consumption
+      _currentPort = port;
+      _currentPairingCode = pairingCode;
+      _currentPairingService = pairingService;
+    } catch (e, st) {
+      Logger().e('Failed to start sync', error: e, stackTrace: st);
+      ref.read(syncStateProvider.notifier).state = SyncState.error;
+      // Auto-recover after 5 seconds
+      Future<void>.delayed(const Duration(seconds: 5), () {
+        ref.read(syncStateProvider.notifier).state = SyncState.idle;
+      });
+    }
   };
 });
+
+// Track current sync session details for the UI.
+int? _currentPort;
+String? _currentPairingCode;
+PairingService? _currentPairingService;
+
+/// Current sync server port (for QR code generation).
+final syncPortProvider = Provider<int?>((ref) => _currentPort);
+
+/// Current pairing code for device pairing.
+final syncPairingCodeProvider = Provider<String?>((ref) => _currentPairingCode);
+
+/// Current pairing service (for local IP detection).
+final syncPairingServiceProvider = Provider<PairingService?>(
+  (ref) => _currentPairingService,
+);
 
 final stopSyncProvider = Provider<Future<void> Function()>((ref) {
   return () async {
     final service = ref.read(syncServiceProvider);
     if (service == null) return;
     await service.stop();
+    ref.read(syncServiceProvider.notifier).state = null;
     ref.read(syncStateProvider.notifier).state = SyncState.idle;
+    _currentPort = null;
+    _currentPairingCode = null;
+    _currentPairingService = null;
   };
 });
 

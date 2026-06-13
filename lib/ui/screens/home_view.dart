@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logger/logger.dart';
 import 'package:taul/core/constants.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/services/merge_service.dart';
@@ -31,6 +32,7 @@ class HomeView extends ConsumerStatefulWidget {
 class _HomeViewState extends ConsumerState<HomeView> {
   String? _expandedEntryId;
   bool _isSelectMode = false;
+  bool _isBatchProcessing = false;
   final Set<String> _selectedEntryIds = {};
   final Set<String> _unlockedEntryIds = {};
   final Map<String, DateTime> _unlockTimestamps = {};
@@ -548,28 +550,34 @@ class _HomeViewState extends ConsumerState<HomeView> {
     return AppBar(
       leading: IconButton(
         icon: const Icon(Icons.close),
-        onPressed: _exitSelectMode,
+        onPressed: _isBatchProcessing ? null : _exitSelectMode,
       ),
-      title: Text('$count seleccionados'),
+      title: Text(_isBatchProcessing
+          ? 'Procesando...'
+          : '$count seleccionados'),
       actions: [
         if (count >= 1) ...[
           IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Mover a la papelera',
+            onPressed: _isBatchProcessing ? null : _batchDeleteSelected,
+          ),
+          IconButton(
             icon: const Icon(Icons.star_outline_rounded),
             tooltip: 'Favorito',
-            onPressed: () => _batchToggleFavorito(),
+            onPressed: _isBatchProcessing ? null : () => _batchToggleFavorito(),
           ),
           IconButton(
             icon: const Icon(Icons.archive_outlined),
             tooltip: 'Archivar',
-            onPressed: () => _batchToggleArchivado(),
+            onPressed: _isBatchProcessing ? null : () => _batchToggleArchivado(),
           ),
         ],
         if (count >= 2)
           TextButton(
-            onPressed: _navigateToMerge,
+            onPressed: _isBatchProcessing ? null : _navigateToMerge,
             child: const Text('Combinar'),
           ),
-        TextButton(onPressed: _exitSelectMode, child: const Text('Cancelar')),
       ],
     );
   }
@@ -636,6 +644,86 @@ class _HomeViewState extends ConsumerState<HomeView> {
     ref.invalidate(entryListProvider);
     ref.invalidate(filteredEntriesProvider);
     _exitSelectMode();
+  }
+
+  Future<void> _batchDeleteSelected() async {
+    final count = _selectedEntryIds.length;
+    final noun = count == 1 ? 'entrada' : 'entradas';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mover a la papelera'),
+        content: Text(
+          count == 1
+              ? '¿Mover 1 entrada a la papelera? Podés restaurarla después.'
+              : '¿Mover $count $noun a la papelera? Podés restaurarlas después.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    setState(() => _isBatchProcessing = true);
+
+    final ref = this.ref;
+    int successCount = 0;
+    final totalCount = _selectedEntryIds.length;
+
+    for (final id in _selectedEntryIds.toList()) {
+      try {
+        await ref.read(deleteEntryProvider).call(id);
+        successCount++;
+      } catch (e) {
+        Logger().e('batchDelete: error for $id', error: e);
+      }
+    }
+
+    // Provider invalidation cascade
+    ref.invalidate(entryListProvider);
+    ref.invalidate(filteredEntriesProvider);
+    for (final id in _selectedEntryIds) {
+      ref.invalidate(entryDetailProvider(id));
+    }
+
+    // Exit selection mode
+    _exitSelectMode();
+
+    if (!mounted) return;
+    setState(() => _isBatchProcessing = false);
+
+    // SnackBar feedback
+    final verb = successCount == 1 ? 'movida' : 'movidas';
+    if (successCount == totalCount) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$successCount $noun $verb a la papelera')),
+      );
+    } else if (successCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Se movieron $successCount de $totalCount $noun a la papelera',
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudieron mover entradas a la papelera')),
+      );
+    }
   }
 
   List<Entry> _resolveSelectedEntries() {
