@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// URL del manifest.json en GitHub Releases latest.
@@ -9,7 +11,7 @@ const _manifestUrl =
     'https://github.com/marDevloz/taul/releases/latest/download/manifest.json';
 
 /// Versión actual del app (sincronizada con pubspec.yaml).
-const String appVersion = '1.3.1';
+const String appVersion = '1.3.3';
 
 /// Clave de SharedPreferences para la versión saltada.
 const _skipPrefKey = 'update_skip_version';
@@ -128,7 +130,7 @@ class UpdateService {
 
   /// Descarga el installer/APK a un archivo temporal y retorna la ruta.
   Future<String> downloadUpdate(String url) async {
-    final tempDir = Directory.systemTemp.path;
+    final tempDir = (await getTemporaryDirectory()).path;
     final fileName = url.split('?').first.split('/').last;
     if (fileName.isEmpty) {
       throw Exception('URL de descarga inválida');
@@ -184,27 +186,14 @@ class UpdateService {
     }
   }
 
-  /// Abre un APK en Android usando un intent.
+  static const _channel = MethodChannel('com.example.taul/installer');
+
+  /// Abre un APK en Android usando MethodChannel + FileProvider.
   Future<void> _openApk(String filePath) async {
-    // En Android, usamos Process.run para ejecutar un intent
-    // que abra el APK con el instalador del sistema
     try {
-      // Primero intentar con am start
-      await Process.run(
-        'am',
-        [
-          'start',
-          '-a',
-          'android.intent.action.VIEW',
-          '-d',
-          'file://$filePath',
-          '-t',
-          'application/vnd.android.package-archive',
-        ],
-      );
+      await _channel.invokeMethod('installApk', {'filePath': filePath});
     } catch (_) {
-      // Si am start no funciona, intentar con el instalador directo
-      // El usuario verá el instalador nativo de Android
+      // fail silencioso — el instalador nativo manejará cualquier error
     }
   }
 }
