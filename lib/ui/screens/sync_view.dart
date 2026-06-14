@@ -172,9 +172,10 @@ class _QrSectionState extends ConsumerState<_QrSection> {
     try {
       final port = ref.read(syncPortProvider);
       final pairingService = ref.read(syncPairingServiceProvider);
-      if (port == null || pairingService == null) return;
+      final pairingCode = ref.read(syncPairingCodeProvider);
+      if (port == null || pairingService == null || pairingCode == null) return;
       final ip = await pairingService.getLocalIpAddress();
-      final qrData = 'https://$ip:$port';
+      final qrData = 'https://$ip:$port?code=$pairingCode';
       if (mounted) setState(() => _qrData = qrData);
     } catch (_) {
       // IP detection failed — leave QR data null

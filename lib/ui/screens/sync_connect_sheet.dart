@@ -20,12 +20,37 @@ class _SyncConnectSheetState extends ConsumerState<SyncConnectSheet> {
   final _urlController = TextEditingController(text: 'https://');
   final _codeController = TextEditingController();
   bool _isLoading = false;
+  bool _isUpdatingCode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlController.addListener(_onUrlChanged);
+  }
 
   @override
   void dispose() {
+    _urlController.removeListener(_onUrlChanged);
     _urlController.dispose();
     _codeController.dispose();
     super.dispose();
+  }
+
+  void _onUrlChanged() {
+    // If we're programmatically updating the code, skip
+    if (_isUpdatingCode) return;
+
+    final url = _urlController.text.trim();
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasQuery) return;
+
+    final code = uri.queryParameters['code'];
+    if (code == null || !RegExp(r'^\d{6}$').hasMatch(code)) return;
+
+    _isUpdatingCode = true;
+    _codeController.text = code;
+    _isUpdatingCode = false;
+    setState(() {});
   }
 
   bool get _isValid {
