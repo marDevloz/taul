@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/domain/entities/sync_state.dart';
+import 'package:taul/domain/repositories/i_sync_repository.dart';
 import 'package:taul/infrastructure/sync/sync_client.dart';
 import 'package:taul/infrastructure/sync/sync_coordinator.dart';
 import 'package:taul/infrastructure/sync/sync_service.dart';
@@ -16,10 +17,12 @@ import 'package:taul/ui/providers/sync_providers.dart';
 // Mocks
 class MockSyncService extends Mock implements SyncService {}
 class MockSyncCoordinator extends Mock implements SyncCoordinator {}
+class MockSyncRepository extends Mock implements ISyncRepository {}
 
 void main() {
   late MockSyncService syncService;
   late MockSyncCoordinator coordinator;
+  late MockSyncRepository syncRepo;
   final now = DateTime.now();
 
   setUpAll(() {
@@ -32,6 +35,12 @@ void main() {
   setUp(() {
     syncService = MockSyncService();
     coordinator = MockSyncCoordinator();
+    syncRepo = MockSyncRepository();
+
+    // Default repo stubs — connectAndSyncProvider calls these via syncRepositoryProvider
+    when(() => syncRepo.getModifiedEntries(any())).thenAnswer((_) async => []);
+    when(() => syncRepo.getLastSyncAt(any())).thenAnswer((_) async => null);
+    when(() => syncRepo.setLastSyncAt(any(), any())).thenAnswer((_) async {});
   });
 
   group('ConnectParams', () {
@@ -152,7 +161,7 @@ void main() {
         overrides: [
           syncCoordinatorProvider.overrideWithValue(coordinator),
           syncServiceProvider.overrideWith((ref) => syncService),
-          deviceIdProvider.overrideWith((ref) async => 'local-device'),
+          syncRepositoryProvider.overrideWithValue(syncRepo),
           syncStateProvider.overrideWith((ref) => SyncState.idle),
         ],
       );
@@ -214,6 +223,7 @@ void main() {
           syncServiceProvider.overrideWith((ref) => syncService),
           deviceIdProvider.overrideWith((ref) async => 'local-device'),
           syncStateProvider.overrideWith((ref) => SyncState.idle),
+          syncRepositoryProvider.overrideWithValue(syncRepo),
         ],
       );
       addTearDown(container.dispose);
@@ -251,6 +261,7 @@ void main() {
           syncServiceProvider.overrideWith((ref) => syncService),
           deviceIdProvider.overrideWith((ref) async => 'local-device'),
           syncStateProvider.overrideWith((ref) => SyncState.idle),
+          syncRepositoryProvider.overrideWithValue(syncRepo),
         ],
       );
       addTearDown(container.dispose);
@@ -291,6 +302,7 @@ void main() {
           syncServiceProvider.overrideWith((ref) => syncService),
           deviceIdProvider.overrideWith((ref) async => 'local-device'),
           syncStateProvider.overrideWith((ref) => SyncState.idle),
+          syncRepositoryProvider.overrideWithValue(syncRepo),
         ],
       );
       addTearDown(container.dispose);
@@ -343,6 +355,7 @@ void main() {
           syncServiceProvider.overrideWith((ref) => syncService),
           deviceIdProvider.overrideWith((ref) async => 'local-device'),
           syncStateProvider.overrideWith((ref) => SyncState.idle),
+          syncRepositoryProvider.overrideWithValue(syncRepo),
         ],
       );
       addTearDown(container.dispose);
@@ -378,6 +391,7 @@ void main() {
           syncServiceProvider.overrideWith((ref) => syncService),
           deviceIdProvider.overrideWith((ref) async => 'local-device'),
           syncStateProvider.overrideWith((ref) => SyncState.idle),
+          syncRepositoryProvider.overrideWithValue(syncRepo),
         ],
       );
       addTearDown(container.dispose);
@@ -397,3 +411,4 @@ void main() {
     });
   });
 }
+

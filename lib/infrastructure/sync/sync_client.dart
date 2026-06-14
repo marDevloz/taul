@@ -170,9 +170,13 @@ class SyncClient {
       timeout: _connectTimeout,
       onBadCertificate: (_) => true,
     );
-    final der = socket.peerCertificate?.der;
+    final peerCert = socket.peerCertificate;
+    final der = peerCert?.der;
     await socket.close();
-    return der?.cast<int>() ?? [];
+    if (peerCert == null || der == null || der.isEmpty) {
+      throw const TlsFingerprintMissingException();
+    }
+    return der.cast<int>();
   }
 
   bool _matchFingerprint(List<int> expected, List<int> actual) {
@@ -190,6 +194,12 @@ class TlsFingerprintMismatchException implements Exception {
   const TlsFingerprintMismatchException();
   @override
   String toString() => 'TLS fingerprint does not match expected value';
+}
+
+class TlsFingerprintMissingException implements Exception {
+  const TlsFingerprintMissingException();
+  @override
+  String toString() => 'Server did not present a TLS certificate';
 }
 
 class PairingCodeRejectedException implements Exception {

@@ -65,9 +65,9 @@ class SyncCoordinator {
     );
     _log.d('Conflicts detected: ${conflicts.length}');
 
-    // 3. Store conflicts in the DB
-    for (final conflict in conflicts) {
-      await _conflictDao.insert(conflict);
+    // 3. Store conflicts in the DB (batch insert)
+    if (conflicts.isNotEmpty) {
+      await _conflictDao.insertBatch(conflicts);
     }
 
     // 4. Upsert non-conflicting remote entries
@@ -129,9 +129,9 @@ class SyncCoordinator {
     );
     _log.d('Conflicts detected: ${conflicts.length}');
 
-    // 3. Store conflicts in the DB
-    for (final conflict in conflicts) {
-      await _conflictDao.insert(conflict);
+    // 3. Store conflicts in the DB (batch insert)
+    if (conflicts.isNotEmpty) {
+      await _conflictDao.insertBatch(conflicts);
     }
 
     // 4. Upsert non-conflicting remote entries

@@ -27,6 +27,28 @@ class ConflictDao {
     return conflict.copyWith(id: id);
   }
 
+  /// Inserts multiple conflicts in a single batch operation.
+  Future<List<Conflict>> insertBatch(List<Conflict> conflicts) async {
+    if (conflicts.isEmpty) return [];
+    final ids = <int>[];
+    await _database.batch((batch) {
+      for (final conflict in conflicts) {
+        final companion = db.ConflictsCompanion(
+          entryId: Value(conflict.entryId),
+          localVersion: Value(jsonEncode(conflict.localVersion.toJson())),
+          remoteVersion: Value(jsonEncode(conflict.remoteVersion.toJson())),
+          resolution: Value(conflict.resolution.label),
+          peerDeviceId: Value(conflict.peerDeviceId),
+          createdAt: Value(conflict.createdAt),
+          resolvedAt: Value(conflict.resolvedAt),
+        );
+        // insert returns the ID for auto-increment columns
+        ids.add(batch.insert(_database.conflicts, companion) as int);
+      }
+    });
+    return conflicts.asMap().entries.map((e) => e.value.copyWith(id: ids[e.key])).toList();
+  }
+
   Future<void> updateResolution(
       int id, ConflictResolution resolution) async {
     await (_database.update(_database.conflicts)

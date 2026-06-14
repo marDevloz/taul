@@ -33,6 +33,7 @@ class _SyncConnectSheetState extends ConsumerState<SyncConnectSheet> {
     final code = _codeController.text.trim();
     return url.isNotEmpty &&
         url != 'https://' &&
+        !url.startsWith('http://') &&
         RegExp(r'^\d{6}$').hasMatch(code);
   }
 
@@ -60,7 +61,12 @@ class _SyncConnectSheetState extends ConsumerState<SyncConnectSheet> {
         timeout: const Duration(seconds: 10),
         onBadCertificate: (_) => true,
       );
-      final fingerprint = socket.peerCertificate?.der.cast<int>() ?? [];
+      final peerCert = socket.peerCertificate;
+      if (peerCert == null || peerCert.der.isEmpty) {
+        await socket.close();
+        throw const TlsFingerprintMissingException();
+      }
+      final fingerprint = peerCert.der.cast<int>();
       await socket.close();
 
       // Connect and sync
@@ -77,6 +83,8 @@ class _SyncConnectSheetState extends ConsumerState<SyncConnectSheet> {
       _showError('Código de emparejamiento incorrecto');
     } on TlsFingerprintMismatchException {
       _showError('Certificado desconocido — reconectar');
+    } on TlsFingerprintMissingException {
+      _showError('Servidor sin certificado TLS — verificar URL');
     } on SocketException {
       _showError('Servidor no encontrado — verificar URL');
     } on TimeoutException {

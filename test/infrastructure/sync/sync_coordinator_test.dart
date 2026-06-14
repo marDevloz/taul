@@ -114,14 +114,16 @@ void main() {
       );
 
       when(() => repo.getModifiedEntries(any())).thenAnswer((_) async => [localEntry]);
-      when(() => conflictDao.insert(any())).thenAnswer((_) async => Conflict(
-        id: 1,
-        entryId: entryId,
-        localVersion: localEntry,
-        remoteVersion: remoteEntry,
-        peerDeviceId: 'remote-device',
-        createdAt: DateTime.now(),
-      ));
+      when(() => conflictDao.insertBatch(any())).thenAnswer((_) async => [
+        Conflict(
+          id: 1,
+          entryId: entryId,
+          localVersion: localEntry,
+          remoteVersion: remoteEntry,
+          peerDeviceId: 'remote-device',
+          createdAt: DateTime.now(),
+        ),
+      ]);
       when(() => repo.setLastSyncAt(any(), any())).thenAnswer((_) async {});
 
       final response = await coordinator.handleSyncRequest(request);
@@ -130,7 +132,7 @@ void main() {
       expect(response.entriesReceived, 1);
       // Conflicting entry should NOT be upserted
       verifyNever(() => repo.upsertEntries(any()));
-      verify(() => conflictDao.insert(any())).called(1);
+      verify(() => conflictDao.insertBatch(any())).called(1);
     });
 
     test('should_not_detect_conflict_for_new_remote_entries', () async {
@@ -274,21 +276,23 @@ void main() {
 
       when(() => repo.getModifiedEntries(any()))
           .thenAnswer((_) async => [localEntry]);
-      when(() => conflictDao.insert(any())).thenAnswer((_) async => Conflict(
-            id: 1,
-            entryId: entryId,
-            localVersion: localEntry,
-            remoteVersion: remoteEntry,
-            peerDeviceId: 'remote-device',
-            createdAt: DateTime.now(),
-          ));
+      when(() => conflictDao.insertBatch(any())).thenAnswer((_) async => [
+            Conflict(
+              id: 1,
+              entryId: entryId,
+              localVersion: localEntry,
+              remoteVersion: remoteEntry,
+              peerDeviceId: 'remote-device',
+              createdAt: DateTime.now(),
+            ),
+          ]);
       when(() => repo.setLastSyncAt(any(), any())).thenAnswer((_) async {});
 
       final result = await coordinator.processSyncResponse(response);
 
       expect(result.conflictsCount, 1);
       expect(result.entriesUpserted, 0);
-      verify(() => conflictDao.insert(any())).called(1);
+      verify(() => conflictDao.insertBatch(any())).called(1);
       verifyNever(() => repo.upsertEntries(any()));
       verify(() => repo.setLastSyncAt('remote-device', now)).called(1);
     });
@@ -323,20 +327,23 @@ void main() {
 
       when(() => repo.getModifiedEntries(any()))
           .thenAnswer((_) async => [localEntry]);
-      when(() => conflictDao.insert(any())).thenAnswer((_) async => Conflict(
-            id: 1,
-            entryId: entryId,
-            localVersion: localEntry,
-            remoteVersion: remoteEntry,
-            peerDeviceId: 'remote-device',
-            createdAt: DateTime.now(),
-          ));
+      when(() => conflictDao.insertBatch(any())).thenAnswer((_) async => [
+            Conflict(
+              id: 1,
+              entryId: entryId,
+              localVersion: localEntry,
+              remoteVersion: remoteEntry,
+              peerDeviceId: 'remote-device',
+              createdAt: DateTime.now(),
+            ),
+          ]);
       when(() => repo.setLastSyncAt(any(), any())).thenAnswer((_) async {});
 
       await coordinator.processSyncResponse(response);
 
-      final captured = verify(() => conflictDao.insert(captureAny())).captured;
-      final conflict = captured.single as Conflict;
+      final captured = verify(() => conflictDao.insertBatch(captureAny())).captured;
+      final conflicts = captured.single as List<Conflict>;
+      final conflict = conflicts.single;
       expect(conflict.entryId, entryId);
       expect(conflict.localVersion, localEntry);
       expect(conflict.remoteVersion, remoteEntry);

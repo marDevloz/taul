@@ -3,6 +3,7 @@ import 'package:logger/logger.dart';
 import 'package:taul/domain/entities/conflict.dart';
 import 'package:taul/domain/entities/conflict_resolution.dart';
 import 'package:taul/domain/entities/sync_state.dart';
+import 'package:taul/domain/repositories/i_sync_repository.dart';
 import 'package:taul/infrastructure/database/conflict_dao.dart';
 import 'package:taul/infrastructure/database/entry_dao.dart';
 import 'package:taul/infrastructure/sync/certificate_manager.dart';
@@ -23,18 +24,30 @@ final certificateManagerProvider = FutureProvider<CertificateManager>((ref) {
   return CertificateManager.create();
 });
 
-/// Coordinates the sync exchange on the server side.
-final syncCoordinatorProvider = Provider<SyncCoordinator>((ref) {
+/// Sync repository for delta sync operations (getModifiedEntries, upsertEntries, lastSyncAt).
+final syncRepositoryProvider = Provider<ISyncRepository>((ref) {
   final db = ref.watch(databaseProvider);
   final entryDao = EntryDao(db);
   final conflictDao = ConflictDao(db);
-  final repo = SyncRepositoryImpl(entryDao: entryDao, conflictDao: conflictDao);
+  return SyncRepositoryImpl(entryDao: entryDao, conflictDao: conflictDao);
+});
+
+/// Coordinates the sync exchange on the server side.
+final syncCoordinatorProvider = Provider<SyncCoordinator>((ref) {
+  final repo = ref.watch(syncRepositoryProvider);
+  final conflictDao = ref.watch(conflictDaoProvider);
   final deviceId = ref.watch(deviceIdProvider).valueOrNull ?? 'unknown';
   return SyncCoordinator(
     repo: repo,
     conflictDao: conflictDao,
     localDeviceId: deviceId,
   );
+});
+
+/// Conflict DAO provider (extracted for reuse).
+final conflictDaoProvider = Provider<ConflictDao>((ref) {
+  final db = ref.watch(databaseProvider);
+  return ConflictDao(db);
 });
 
 /// Manages pairing codes and IP detection.

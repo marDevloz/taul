@@ -157,14 +157,16 @@ void main() {
       // Device A receives entry from B where both modified the same entry
       when(() => deviceARepo.getModifiedEntries(any()))
           .thenAnswer((_) async => [localVersion]);
-      when(() => deviceAConflictDao.insert(any())).thenAnswer((_) async => Conflict(
-        id: 1,
-        entryId: entryId,
-        localVersion: localVersion,
-        remoteVersion: remoteVersion,
-        peerDeviceId: 'device-b',
-        createdAt: DateTime.now(),
-      ));
+      when(() => deviceAConflictDao.insertBatch(any())).thenAnswer((_) async => [
+        Conflict(
+          id: 1,
+          entryId: entryId,
+          localVersion: localVersion,
+          remoteVersion: remoteVersion,
+          peerDeviceId: 'device-b',
+          createdAt: DateTime.now(),
+        ),
+      ]);
       when(() => deviceARepo.setLastSyncAt(any(), any()))
           .thenAnswer((_) async {});
 
@@ -178,7 +180,7 @@ void main() {
       expect(response.conflictsCount, 1);
       // Conflicting entry should NOT be upserted
       verifyNever(() => deviceARepo.upsertEntries(any()));
-      verify(() => deviceAConflictDao.insert(any())).called(1);
+      verify(() => deviceAConflictDao.insertBatch(any())).called(1);
     });
 
     test('should_handle_first_sync_with_no_prior_lastSyncAt', () async {
