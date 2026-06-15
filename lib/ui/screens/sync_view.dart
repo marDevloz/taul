@@ -6,6 +6,7 @@ import 'package:taul/domain/entities/sync_state.dart';
 import 'package:taul/ui/providers/device_id_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/providers/sync_providers.dart';
+import 'package:taul/ui/screens/sync_connect_sheet.dart';
 
 class SyncView extends ConsumerWidget {
   const SyncView({super.key});
@@ -105,6 +106,14 @@ class _SyncBody extends ConsumerWidget {
         const SizedBox(height: 16),
         _StatusCard(syncState: syncState),
         const SizedBox(height: 16),
+        if (syncState.canStart) ...[
+          _ConnectCard(syncState: syncState),
+          const SizedBox(height: 16),
+        ],
+        if (syncState == SyncState.complete) ...[
+          const _SyncResultCard(),
+          const SizedBox(height: 16),
+        ],
         _QrSection(syncState: syncState),
         const SizedBox(height: 16),
         conflictCount.when(
@@ -163,9 +172,10 @@ class _QrSectionState extends ConsumerState<_QrSection> {
     try {
       final port = ref.read(syncPortProvider);
       final pairingService = ref.read(syncPairingServiceProvider);
-      if (port == null || pairingService == null) return;
+      final pairingCode = ref.read(syncPairingCodeProvider);
+      if (port == null || pairingService == null || pairingCode == null) return;
       final ip = await pairingService.getLocalIpAddress();
-      final qrData = 'https://$ip:$port';
+      final qrData = 'https://$ip:$port?code=$pairingCode';
       if (mounted) setState(() => _qrData = qrData);
     } catch (_) {
       // IP detection failed — leave QR data null
@@ -187,7 +197,17 @@ class _QrSectionState extends ConsumerState<_QrSection> {
                   QrImageView(
                     data: _qrData!,
                     version: QrVersions.auto,
-                    size: 160,
+                    size: 240,
+                    errorCorrectionLevel: QrErrorCorrectLevel.H,
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: Colors.black,
+                    ),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: Colors.black,
+                    ),
+                    backgroundColor: Colors.white,
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -240,6 +260,11 @@ class _StatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final (icon, label, color) = switch (syncState) {
       SyncState.idle => (Icons.check_circle_outline, 'Inactivo', Colors.grey),
+      SyncState.connecting => (
+          Icons.sync,
+          'Conectando...',
+          Colors.blue,
+        ),
       SyncState.pairing => (
           Icons.handshake,
           'Esperando conexión...',
@@ -287,6 +312,64 @@ class _SyncActionButton extends ConsumerWidget {
       },
       icon: Icon(isActive ? Icons.stop : Icons.sync),
       label: Text(isActive ? 'Detener' : 'Iniciar sincronización'),
+    );
+  }
+}
+
+/// Card that opens the connect sheet when tapped.
+class _ConnectCard extends StatelessWidget {
+  const _ConnectCard({required this.syncState});
+
+  final SyncState syncState;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.link),
+        title: const Text('Conectar a dispositivo'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            builder: (_) => const SyncConnectSheet(),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Card showing the result of the last completed sync.
+class _SyncResultCard extends ConsumerWidget {
+  const _SyncResultCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final result = ref.watch(lastSyncResultProvider);
+    if (result == null) return const SizedBox.shrink();
+
+    final hasConflicts = result.conflictsCount > 0;
+    final label = hasConflicts
+        ? '${result.entriesUpserted} entradas sincronizadas, '
+            '${result.conflictsCount} conflictos'
+        : '${result.entriesUpserted} entradas sincronizadas, sin conflictos';
+
+    return Card(
+      child: ListTile(
+        leading: Icon(
+          hasConflicts ? Icons.warning_amber : Icons.check_circle,
+          color: hasConflicts ? Colors.orange : Colors.green,
+        ),
+        title: Text(label),
+        trailing: hasConflicts
+            ? FilledButton.tonal(
+                onPressed: () => context.push('/sync/conflicts'),
+                child: const Text('Resolver conflictos'),
+              )
+            : null,
+      ),
     );
   }
 }

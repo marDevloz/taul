@@ -40,3 +40,11 @@ class SyncErrorResponse with _$SyncErrorResponse {
   factory SyncErrorResponse.fromJson(Map<String, dynamic> json) =>
       _$SyncErrorResponseFromJson(json);
 }
+
+@freezed
+class ProcessSyncResult with _$ProcessSyncResult {
+  const factory ProcessSyncResult({
+    required int entriesUpserted,
+    required int conflictsCount,
+  }) = _ProcessSyncResult;
+}
