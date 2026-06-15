@@ -3,8 +3,126 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_zxing/flutter_zxing.dart';
 import 'package:taul/infrastructure/sync/sync_client.dart';
 import 'package:taul/ui/providers/sync_client_providers.dart';
+
+/// Full-screen QR scanner page using flutter_zxing.
+///
+/// Returns the scanned text on success, or null if cancelled.
+class _QrScannerPage extends StatefulWidget {
+  const _QrScannerPage();
+
+  @override
+  State<_QrScannerPage> createState() => _QrScannerPageState();
+}
+
+class _QrScannerPageState extends State<_QrScannerPage> {
+  bool _showScanner = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Delay showing the scanner slightly so the push transition completes
+    // before the camera initializes.
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _showScanner = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          if (_showScanner)
+            ReaderWidget(
+              onScan: (Code code) {
+                if (code.text != null && code.text!.isNotEmpty) {
+                  Navigator.of(context).pop(code.text);
+                }
+              },
+              onScanFailure: (_) {
+                // Continue scanning — next frame will retry
+              },
+              codeFormat: Format.qrCode,
+              showScannerOverlay: true,
+              showFlashlight: true,
+              showGallery: true,
+              showToggleCamera: true,
+              tryHarder: true,
+              cropPercent: 0.6,
+              scanDelay: const Duration(milliseconds: 500),
+              scanDelaySuccess: const Duration(milliseconds: 1500),
+              loading: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Colors.white),
+                    SizedBox(height: 16),
+                    Text(
+                      'Iniciando cámara…',
+                      style: TextStyle(color: Colors.white70, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: Colors.white),
+                  SizedBox(height: 16),
+                  Text(
+                    'Preparando cámara…',
+                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
+
+          // Close button at top-left
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Helper text at the bottom
+          const SafeArea(
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: EdgeInsets.only(bottom: 24),
+                child: Text(
+                  'Enfocá el código QR',
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// Bottom sheet for connecting to a remote sync server.
 ///
@@ -121,11 +239,44 @@ class _SyncConnectSheetState extends ConsumerState<SyncConnectSheet> {
     }
   }
 
+  Future<void> _openQrScanner() async {
+    final scannedText = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => const _QrScannerPage(),
+        fullscreenDialog: true,
+      ),
+    );
+
+    if (scannedText == null || scannedText.isEmpty) return;
+    if (!mounted) return;
+
+    final uri = Uri.tryParse(scannedText.trim());
+    if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
+      _showError('QR inválido — no se pudo extraer la URL');
+      return;
+    }
+
+    // Rebuild URL with scheme + host:port (strip any path/query so it's clean)
+    final port = uri.port > 0 ? ':${uri.port}' : '';
+    final cleanUrl = '${uri.scheme}://${uri.host}$port';
+    _urlController.text = cleanUrl;
+
+    // Extract pairing code from query params
+    final code = uri.queryParameters['code'];
+    if (code != null && RegExp(r'^\d{6}$').hasMatch(code)) {
+      _isUpdatingCode = true;
+      _codeController.text = code;
+      _isUpdatingCode = false;
+    }
+
+    setState(() {});
+  }
+
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -162,10 +313,15 @@ class _SyncConnectSheetState extends ConsumerState<SyncConnectSheet> {
               controller: _urlController,
               onChanged: (_) => setState(() {}),
               enabled: !_isLoading,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'URL del servidor',
                 hintText: 'https://192.168.1.x:54321',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.qr_code_scanner),
+                  tooltip: 'Escanear QR',
+                  onPressed: _isLoading ? null : _openQrScanner,
+                ),
               ),
               keyboardType: TextInputType.url,
               autofocus: true,

@@ -197,7 +197,17 @@ class _QrSectionState extends ConsumerState<_QrSection> {
                   QrImageView(
                     data: _qrData!,
                     version: QrVersions.auto,
-                    size: 160,
+                    size: 240,
+                    errorCorrectionLevel: QrErrorCorrectLevel.H,
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: Colors.black,
+                    ),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: Colors.black,
+                    ),
+                    backgroundColor: Colors.white,
                   ),
                   const SizedBox(height: 12),
                   Text(

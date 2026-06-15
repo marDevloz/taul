@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- QR scanner via flutter_zxing (runtime-granted on Android 6+) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <!-- Needed on Android 8+ (API 26+) to install APK from auto-updater.
          The app only installs its own updates, which is a permitted use
          under Google Play's REQUEST_INSTALL_PACKAGES policy. -->
