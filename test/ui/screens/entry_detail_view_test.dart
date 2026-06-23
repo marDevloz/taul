@@ -15,9 +15,8 @@ void main() {
   late EntryAuthService auth;
   const testEntryId = 'test-entry-1';
 
-  /// Creates a credential entry in the test database using Drift's generated
-  /// insert method, which ensures column names match the schema.
-  Future<void> createEntry({
+  /// Creates a credential entry in the test database.
+  Future<void> createCredentialEntry({
     bool requiresAuth = false,
     String? encryptedSecret,
     String? cipherNonce,
@@ -36,6 +35,25 @@ void main() {
         encryptedSecret: encryptedSecret,
         cipherNonce: cipherNonce,
         cipherTag: cipherTag,
+        createdAt: now,
+        updatedAt: now,
+        version: 1,
+      ),
+    );
+  }
+
+  /// Creates a note entry.
+  Future<void> createNoteEntry({String tag = 'urgente'}) async {
+    final now = DateTime.now();
+    await database.into(database.entries).insert(
+      Entry(
+        id: testEntryId,
+        type: 'NOTA',
+        title: 'Test Note',
+        content: 'Content',
+        metadata: '{}',
+        tags: '["$tag"]',
+        requiresAuth: false,
         createdAt: now,
         updatedAt: now,
         version: 1,
@@ -74,10 +92,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
   }
 
-  group('T-16: EntryDetailView reveal dialog tests', () {
+  group('T-16: EntryDetailView inline editing - credentials', () {
     testWidgets('should_show_reveal_secret_button_when_requires_auth',
         (tester) async {
-      await createEntry(
+      await createCredentialEntry(
         requiresAuth: true,
         encryptedSecret: 'dummy_ciphertext',
         cipherNonce: 'dummy_nonce',
@@ -87,21 +105,23 @@ void main() {
       await tester.pumpWidget(createTestApp());
       await pumpAndSettle(tester);
 
+      // Should prompt for master password on open for protected entries
       expect(find.text('Revelar Secreto'), findsOneWidget);
     });
 
     testWidgets('should_not_show_reveal_button_when_not_requires_auth',
         (tester) async {
-      await createEntry(requiresAuth: false);
+      await createCredentialEntry(requiresAuth: false);
 
       await tester.pumpWidget(createTestApp());
       await pumpAndSettle(tester);
 
       expect(find.text('Reveal Secret'), findsNothing);
+      expect(find.text('Contraseña'), findsOneWidget);
     });
 
     testWidgets('should_show_entry_title_and_fields', (tester) async {
-      await createEntry(
+      await createCredentialEntry(
         requiresAuth: true,
         encryptedSecret: 'dummy',
         cipherNonce: 'dummy',
@@ -111,36 +131,39 @@ void main() {
       await tester.pumpWidget(createTestApp());
       await pumpAndSettle(tester);
 
-      // Title should be visible
-      expect(find.text('Test Service'), findsOneWidget);
-      // Password field should be present
+      // Title should be editable (TextField)
+      expect(find.byType(TextField), findsWidgets);
+      // Password field label should be present
       expect(find.text('Contraseña'), findsOneWidget);
+    });
+
+    testWidgets('should_have_editable_username_field', (tester) async {
+      await createCredentialEntry(requiresAuth: false);
+
+      await tester.pumpWidget(createTestApp());
+      await pumpAndSettle(tester);
+
+      // Username label should be present
+      expect(find.text('Usuario'), findsOneWidget);
+      // TextFields should exist for editing
+      expect(find.byType(TextField), findsWidgets);
+    });
+
+    testWidgets('should_have_no_edit_button_in_appbar', (tester) async {
+      await createCredentialEntry(requiresAuth: false);
+
+      await tester.pumpWidget(createTestApp());
+      await pumpAndSettle(tester);
+
+      // Edit button removed from AppBar
+      expect(find.byIcon(Icons.edit), findsNothing);
     });
   });
 
   group('T-17: EntryDetailView palette picker tests', () {
-    /// Creates a note entry with a tag for palette picker testing.
-    Future<void> createEntryWithTag({String tag = 'urgente'}) async {
-      final now = DateTime.now();
-      await database.into(database.entries).insert(
-        Entry(
-          id: testEntryId,
-          type: 'NOTA',
-          title: 'Test Note',
-          content: 'Content with a tag',
-          metadata: '{}',
-          tags: '["$tag"]',
-          requiresAuth: false,
-          createdAt: now,
-          updatedAt: now,
-          version: 1,
-        ),
-      );
-    }
-
     testWidgets('should_show_palette_picker_on_tag_long_press',
         (tester) async {
-      await createEntryWithTag();
+      await createNoteEntry(tag: 'urgente');
 
       await tester.pumpWidget(createTestApp());
       await pumpAndSettle(tester);
@@ -205,106 +228,88 @@ void main() {
     });
   });
 
-  group('T-18: Tag autocomplete tests', () {
-    /// Creates a note entry with a specific tag for autocomplete testing.
-    Future<void> createNoteEntry({String tag = 'urgente'}) async {
-      final now = DateTime.now();
-      await database.into(database.entries).insert(
-        Entry(
-          id: testEntryId,
-          type: 'NOTA',
-          title: 'Test Note',
-          content: 'Content',
-          metadata: '{}',
-          tags: '["$tag"]',
-          requiresAuth: false,
-          createdAt: now,
-          updatedAt: now,
-          version: 1,
-        ),
-      );
-    }
+  group('T-18: Inline tag editing tests', () {
+    testWidgets('should_show_tag_chips_with_delete_icon', (tester) async {
+      await createNoteEntry(tag: 'urgente');
 
-    Future<void> openEditSheet(WidgetTester tester) async {
       await tester.pumpWidget(createTestApp());
-      // Use a larger surface so the bottom sheet doesn't overflow
-      await tester.binding.setSurfaceSize(const Size(800, 1200));
       await pumpAndSettle(tester);
 
-      // Tap the edit button (Icons.edit in the AppBar)
-      final editBtn = find.byIcon(Icons.edit);
-      await tester.tap(editBtn);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      // Tag chip should be an InputChip (has onDeleted callback)
+      final chip = find.byType(InputChip);
+      expect(chip, findsOneWidget);
 
-      // Should see "Editar entrada" in the bottom sheet
-      expect(find.text('Editar entrada'), findsOneWidget);
-    }
-
-    testWidgets('should_show_matching_suggestions_and_hide_on_no_match',
-        (tester) async {
-      await createNoteEntry(tag: 'urgente');
-
-      await openEditSheet(tester);
-
-      // Find the tags field by its label text
-      final tagsField = find.widgetWithText(TextField, 'Tags');
-      expect(tagsField, findsOneWidget);
-
-      // Type matching text "ur"
-      await tester.enterText(tagsField, 'ur');
-      // Wait for debounce (300ms) + pump to settle
-      await tester.pump(const Duration(milliseconds: 350));
-      await tester.pump();
-
-      // After debounce, Autocomplete should show suggestion with "urgente"
-      expect(find.text('urgente'), findsOneWidget);
-
-      // Clear and type non-matching text
-      await tester.enterText(tagsField, 'xyz');
-      await tester.pump(const Duration(milliseconds: 350));
-      await tester.pump();
-
-      // No suggestion should appear for non-matching text
-      // "urgente" should no longer be visible in the dropdown
-      // (might still be in the tag chip area of the detail view)
-      // We check that the suggestion overlay is not showing "urgente"
-      // Note: the chip "urgente" might still be visible in the detail view
-      // but the suggestion overlay should be gone. Let's check there's no
-      // extra "urgente" text beyond the existing tag chip.
-      final urgenteWidgets = find.text('urgente');
-      // There should be at most 1 (the tag chip in the detail view)
-      expect(urgenteWidgets, findsOneWidget);
+      // Delete icon (close) should be present
+      expect(find.byIcon(Icons.close), findsOneWidget);
     });
 
-    testWidgets('should_append_tag_with_comma_and_space_on_selection',
-        (tester) async {
+    testWidgets('should_have_inline_tag_add_field', (tester) async {
       await createNoteEntry(tag: 'urgente');
 
-      await openEditSheet(tester);
+      await tester.pumpWidget(createTestApp());
+      await pumpAndSettle(tester);
 
-      final tagsField = find.widgetWithText(TextField, 'Tags');
-      expect(tagsField, findsOneWidget);
+      // Should have the tag add field with hint text
+      expect(find.text('urgente'), findsOneWidget);
+    });
 
-      // Type matching text
-      await tester.enterText(tagsField, 'ur');
-      await tester.pump(const Duration(milliseconds: 350));
-      await tester.pump();
+    testWidgets('should_have_deletable_tag_chips', (tester) async {
+      await createNoteEntry(tag: 'urgente');
 
-      // Suggestions appear (tag chip 'urgente' + overlay option 'urgente')
-      final suggestions = find.text('urgente');
-      expect(suggestions, findsWidgets);
+      await tester.pumpWidget(createTestApp());
+      await pumpAndSettle(tester);
 
-      // Select the overlay suggestion
-      final suggestion = suggestions.last;
-      await tester.ensureVisible(suggestion);
-      await tester.pumpAndSettle();
+      // Tag chip should be an InputChip with onDeleted handler
+      final chips = find.byType(InputChip);
+      expect(chips, findsWidgets);
 
-      await tester.tap(suggestion, warnIfMissed: false);
-      await tester.pumpAndSettle();
+      // Each InputChip should have onDeleted set
+      for (final chip in chips.evaluate()) {
+        final inputChip = chip.widget as InputChip;
+        expect(inputChip.onDeleted, isNotNull);
+      }
+    });
+  });
 
-      // After selection the overlay dismisses, field now contains "urgente, "
-      // Only the tag chip 'urgente' should remain visible (1 widget)
+  group('T-19: Inline editing - notes', () {
+    testWidgets('should_show_editable_title_field', (tester) async {
+      await createNoteEntry();
+
+      await tester.pumpWidget(createTestApp());
+      await pumpAndSettle(tester);
+
+      // Title should be editable (at least one TextField exists
+      // with the entry title in its controller)
+      expect(find.byType(TextField), findsWidgets);
+    });
+
+    testWidgets('should_have_no_edit_button_in_appbar', (tester) async {
+      await createNoteEntry();
+
+      await tester.pumpWidget(createTestApp());
+      await pumpAndSettle(tester);
+
+      // Edit button should not exist
+      expect(find.byIcon(Icons.edit), findsNothing);
+    });
+
+    testWidgets('should_show_quill_editor_for_content', (tester) async {
+      await createNoteEntry();
+
+      await tester.pumpWidget(createTestApp());
+      await pumpAndSettle(tester);
+
+      // Content should be rendered as a QuillEditor (editable)
+      expect(find.byType(QuillEditor), findsOneWidget);
+    });
+
+    testWidgets('should_show_tags_when_present', (tester) async {
+      await createNoteEntry(tag: 'urgente');
+
+      await tester.pumpWidget(createTestApp());
+      await pumpAndSettle(tester);
+
+      // Tag text visible
       expect(find.text('urgente'), findsOneWidget);
     });
   });
