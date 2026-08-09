@@ -152,6 +152,21 @@ class UpdateService {
     }
     final destPath = '$tempDir${Platform.pathSeparator}$fileName';
 
+    // Remove stale installer from a previous (possibly interrupted) attempt.
+    // Best-effort: if the file doesn't exist or can't be deleted, proceed anyway.
+    // Files live in getTemporaryDirectory() → Android's getCacheDir(), so the OS
+    // may reclaim them at any time. Post-install cleanup is intentionally omitted
+    // because on Android the PackageInstaller reads the APK asynchronously after
+    // installUpdate() returns — deleting immediately causes a TOCTOU race.
+    try {
+      final existing = File(destPath);
+      if (await existing.exists()) {
+        await existing.delete();
+      }
+    } catch (_) {
+      // Best-effort — stale removal failure is non-fatal
+    }
+
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 60);
     try {

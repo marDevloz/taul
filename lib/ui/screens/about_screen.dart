@@ -114,12 +114,12 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
       // installUpdate: Windows lanza installer, Android abre APK
       await service.installUpdate(path);
 
-      // Cleanup after installation — never blocks user
-      try {
-        await service.cleanup(path);
-      } catch (e) {
-        Logger().w('APK cleanup failed', error: e);
-      }
+      // No post-install cleanup here. On Android, the system PackageInstaller
+      // reads the APK asynchronously after the intent fires — deleting
+      // immediately causes a TOCTOU race ("problem parsing the package").
+      // On Windows, the Inno Setup installer kills our process via taskkill
+      // so a post-launch delete wouldn't run reliably either.
+      // Stale installers are cleaned up pre-download instead (see downloadUpdate).
 
       // Success notification
       if (mounted) {
