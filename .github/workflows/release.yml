@@ -114,6 +114,12 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           mv dist/app-release.apk "dist/Taul-v${version}.apk"
 
+      - name: Compute APK SHA-256
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          apk_sha=$(sha256sum "dist/Taul-v${version}.apk" | awk '{print $1}')
+          echo "APK_SHA256=$apk_sha" >> "$GITHUB_ENV"
+
       - name: Generate manifest.json
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -124,6 +130,7 @@ jobs:
             "version": "$version",
             "url": "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$exeName",
             "android_url": "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$apkName",
+            "sha256": "$APK_SHA256",
             "notes": "Consultá las release notes en GitHub para conocer las novedades."
           }
           EOF
