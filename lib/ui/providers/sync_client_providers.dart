@@ -114,9 +114,15 @@ final connectAndSyncProvider =
     );
 
     // 2. Fetch local entries modified since last sync with this peer
-    // Use host:port as the peer identifier for client-side lastSyncAt tracking
-    final peerKey = '${params.host}:${params.port}';
-    final lastSyncAt = await syncRepo.getLastSyncAt(peerKey);
+    // Look up the server's deviceId from our mapping (host:port → deviceId)
+    final prefs = await SharedPreferences.getInstance();
+    final hostPortKey = '${params.host}:${params.port}';
+    final remoteDeviceId = prefs.getString('peer_device_id_$hostPortKey');
+
+    // If we know the remote deviceId, use it to get lastSyncAt; otherwise null (first sync)
+    final lastSyncAt = remoteDeviceId != null
+        ? await syncRepo.getLastSyncAt(remoteDeviceId)
+        : null;
     final localEntries = await syncRepo.getModifiedEntries(lastSyncAt);
 
     // 3. Build and send sync request with local delta
@@ -137,9 +143,11 @@ final connectAndSyncProvider =
     // 4. Process the response
     final result = await coordinator.processSyncResponse(response);
 
-    // 5. Store server's lastSyncAt for next sync
-    if (response.serverLastSyncAt != null) {
-      await syncRepo.setLastSyncAt(peerKey, response.serverLastSyncAt!);
+    // 5. Store server's lastSyncAt for next sync using deviceId as key (consistent with server)
+    //    Also store the host:port → deviceId mapping for future lookups
+    if (response.serverLastSyncAt != null && response.deviceId.isNotEmpty) {
+      await syncRepo.setLastSyncAt(response.deviceId, response.serverLastSyncAt!);
+      await prefs.setString('peer_device_id_$hostPortKey', response.deviceId);
     }
 
     // 6. Store result and set state to complete
