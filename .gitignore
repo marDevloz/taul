@@ -1,34 +1,55 @@
-# Local AI runtime state
-.atl/
+# Compiled and build artifacts
+*.pyc
+__pycache__/
+*.o
+*.obj
+*.class
+*.exe
+*.dll
+*.so
+*.a
+*.out
 
-# Flutter
-.dart_tool/
-.dart/
-.packages
+# Dependencies
+node_modules/
+venv/
+.venv/
+.env
+.env.local
+*.env.*
+
+# Build outputs
+dist/
 build/
-*.lock
-*.log
+target/
+*.jar
+*.war
+*.zip
+*.tar.gz
 
-# Generated Dart files
-*.freezed.dart
-*.g.dart
-*.drift.dart
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
 
 # Coverage
 coverage/
-
-# IDE
-.idea/
-.vscode/
-*.iml
+htmlcov/
+.coverage
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Flutter generated
-.flutter-plugins
-.flutter-plugins-dependencies
-
-dist/
-*.exe
+# Cache
+.mypy_cache/
+.pytest_cache/
+.gradle/
+.cargo/

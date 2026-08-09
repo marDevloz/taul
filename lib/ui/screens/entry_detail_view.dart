@@ -22,6 +22,7 @@ import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/providers/tag_settings_providers.dart';
+import 'package:taul/ui/widgets/entry_form/entry_type_selector.dart' show iconForType;
 import 'package:taul/ui/widgets/master_password_recovery_dialog.dart';
 import 'package:taul/ui/widgets/palette_picker.dart';
 
@@ -518,17 +519,56 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
           // Type chip + complete button
           Row(
             children: [
-              Chip(
-                label: Text(
-                  (_selectedType ?? entry.type).label,
-                  style: const TextStyle(fontSize: 12),
+              PopupMenuButton<EntryType>(
+                onSelected: (EntryType newType) async {
+                  if (newType == entry.type) return;
+                  setState(() {
+                    _selectedType = newType;
+                  });
+                  await ref.read(updateEntryProvider).call(
+                    entry,
+                    type: newType,
+                  );
+                  ref.invalidate(entryDetailProvider(widget.entryId));
+                  ref.invalidate(filteredEntriesProvider);
+                },
+                tooltip: 'Cambiar tipo',
+                child: Chip(
+                  label: Text(
+                    (_selectedType ?? entry.type).label,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 0,
+                  ),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  avatar: Icon(
+                    iconForType(_selectedType ?? entry.type),
+                    size: 14,
+                  ),
                 ),
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 0,
-                ),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                itemBuilder: (_) => EntryType.values.map((t) {
+                  final currentType = _selectedType ?? entry.type;
+                  return PopupMenuItem(
+                    value: t,
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(iconForType(t), size: 18),
+                      title: Text(
+                        t.label,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      trailing: currentType == t
+                          ? const Icon(
+                              Icons.check,
+                              size: 16,
+                            )
+                          : null,
+                    ),
+                  );
+                }).toList(),
               ),
               if (isCompleted) ...[
                 const SizedBox(width: 8),
