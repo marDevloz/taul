@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -15,6 +17,16 @@ const String appVersion = '1.5.1';
 
 /// Clave de SharedPreferences para la versión saltada.
 const _skipPrefKey = 'update_skip_version';
+
+/// Thrown when downloaded APK hash doesn't match the manifest hash.
+class HashMismatchException implements Exception {
+  final String expected;
+  final String actual;
+  const HashMismatchException(this.expected, this.actual);
+  @override
+  String toString() =>
+      'Hash mismatch: expected $expected, got $actual';
+}
 
 /// Modelo del manifest.json que se sube como release asset.
 ///
@@ -33,19 +45,22 @@ class UpdateManifest {
   final String url;
   final String? androidUrl;
   final String? notes;
+  final String? sha256;
 
   const UpdateManifest({
     required this.version,
     required this.url,
     this.androidUrl,
     this.notes,
+    this.sha256,
   });
 
   UpdateManifest.fromJson(Map<String, dynamic> json)
       : version = json['version'] as String,
         url = json['url'] as String,
         androidUrl = json['android_url'] as String?,
-        notes = json['notes'] as String?;
+        notes = json['notes'] as String?,
+        sha256 = json['sha256'] as String?;
 
   /// URL del installer/APK para la plataforma actual.
   String get downloadUrl {
@@ -137,6 +152,21 @@ class UpdateService {
     }
     final destPath = '$tempDir${Platform.pathSeparator}$fileName';
 
+    // Remove stale installer from a previous (possibly interrupted) attempt.
+    // Best-effort: if the file doesn't exist or can't be deleted, proceed anyway.
+    // Files live in getTemporaryDirectory() → Android's getCacheDir(), so the OS
+    // may reclaim them at any time. Post-install cleanup is intentionally omitted
+    // because on Android the PackageInstaller reads the APK asynchronously after
+    // installUpdate() returns — deleting immediately causes a TOCTOU race.
+    try {
+      final existing = File(destPath);
+      if (await existing.exists()) {
+        await existing.delete();
+      }
+    } catch (_) {
+      // Best-effort — stale removal failure is non-fatal
+    }
+
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 60);
     try {
@@ -160,6 +190,40 @@ class UpdateService {
       return destPath;
     } finally {
       client.close(force: true);
+    }
+  }
+
+  /// Validates SHA-256 of [filePath] against [expectedHash].
+  ///
+  /// Skips validation when [expectedHash] is null (backward compatibility).
+  /// Throws [HashMismatchException] on mismatch, [FileSystemException] when
+  /// the file does not exist or is unreadable.
+  Future<void> validateHash(String filePath, String? expectedHash) async {
+    if (expectedHash == null) return;
+
+    final file = File(filePath);
+    if (!await file.exists()) {
+      throw FileSystemException('File not found', filePath);
+    }
+
+    final bytes = await file.readAsBytes();
+    final digest = await Sha256().hash(bytes);
+    final actualHex = digest.bytes
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join();
+
+    if (actualHex.toLowerCase() != expectedHash.toLowerCase()) {
+      throw HashMismatchException(expectedHash, actualHex);
+    }
+  }
+
+  /// Deletes temporary file after installation. Idempotent — no-op when the
+  /// file does not exist. Callers MUST wrap in try/catch and log failures;
+  /// cleanup errors are never user-facing.
+  Future<void> cleanup(String filePath) async {
+    final file = File(filePath);
+    if (await file.exists()) {
+      await file.delete();
     }
   }
 
@@ -200,3 +264,17 @@ class UpdateService {
 final updateServiceProvider = Provider<UpdateService>((ref) {
   return UpdateService();
 });
+
+/// Returns a user-friendly error message for update-related exceptions.
+String updateErrorMessage(Object error) {
+  if (error is HashMismatchException) {
+    return 'Archivo corrupto. Intentá de nuevo.';
+  }
+  if (error is SocketException || error is TimeoutException) {
+    return 'Sin conexión. Verificá tu red.';
+  }
+  if (error is FileSystemException) {
+    return 'Error al guardar. ¿Espacio insuficiente?';
+  }
+  return 'No se pudo completar la actualización.';
+}

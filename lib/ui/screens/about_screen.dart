@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logger/logger.dart';
 import 'package:taul/core/auto_updater.dart';
 import 'package:taul/ui/widgets/update_dialog.dart';
 
@@ -88,17 +91,50 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
 
     try {
       final path = await service.downloadUpdate(manifest.downloadUrl);
+
+      // Validate hash before installation (Android only — Windows installer
+      // hash is a separate future scope; emitting APK hash in manifest only).
+      if (Platform.isAndroid) {
+        try {
+          await service.validateHash(path, manifest.sha256);
+        } on HashMismatchException {
+          // Delete corrupted file best-effort
+          try {
+            final file = File(path);
+            if (await file.exists()) await file.delete();
+          } catch (cleanupError) {
+            Logger().w('Failed to delete corrupted APK', error: cleanupError);
+          }
+          rethrow;
+        }
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).clearSnackBars();
       // installUpdate: Windows lanza installer, Android abre APK
       await service.installUpdate(path);
+
+      // No post-install cleanup here. On Android, the system PackageInstaller
+      // reads the APK asynchronously after the intent fires — deleting
+      // immediately causes a TOCTOU race ("problem parsing the package").
+      // On Windows, the Inno Setup installer kills our process via taskkill
+      // so a post-launch delete wouldn't run reliably either.
+      // Stale installers are cleaned up pre-download instead (see downloadUpdate).
+
+      // Success notification
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Actualización a v${manifest.version} instalada'),
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo completar la actualización. Intentá de nuevo más tarde.'),
-          ),
+          SnackBar(content: Text(updateErrorMessage(e))),
         );
       }
     }
