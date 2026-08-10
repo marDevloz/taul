@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:taul/core/quick_capture_bus.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
+import 'package:taul/ui/screens/create_entry_sheet.dart';
 import 'package:taul/ui/screens/home_view.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
@@ -19,6 +22,45 @@ void main() {
 
   tearDown(() {
     database.close();
+  });
+
+  Widget buildHomeApp() {
+    return ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(database),
+      ],
+      child: const MaterialApp(
+        localizationsDelegates: FlutterQuillLocalizations.localizationsDelegates,
+        home: HomeView(),
+      ),
+    );
+  }
+
+  group('Quick capture bus', () {
+    testWidgets('should_open_create_sheet_when_bus_triggered',
+        (tester) async {
+      await tester.pumpWidget(buildHomeApp());
+      await tester.pumpAndSettle();
+
+      QuickCaptureBus.trigger();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CreateEntrySheet), findsOneWidget);
+    });
+
+    testWidgets('should_not_crash_when_bus_triggered_after_dispose',
+        (tester) async {
+      await tester.pumpWidget(buildHomeApp());
+      await tester.pumpAndSettle();
+
+      // Tear down the tree so HomeView disposes.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+
+      // A trigger arriving after dispose must not throw.
+      QuickCaptureBus.trigger();
+      await tester.pump();
+    });
   });
 
   group('SnakeFab Task filter', () {

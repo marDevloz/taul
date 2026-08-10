@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:taul/core/constants.dart';
 import 'package:taul/core/errors/error_mapper.dart';
+import 'package:taul/core/quick_capture_bus.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/services/merge_service.dart';
 import 'package:taul/domain/entities/entry_type.dart';
@@ -48,12 +49,18 @@ class _HomeViewState extends ConsumerState<HomeView> {
   void initState() {
     super.initState();
     _startAutoLockTimer();
+    QuickCaptureBus.counter.addListener(_onQuickCaptureBus);
   }
 
   @override
   void dispose() {
+    QuickCaptureBus.counter.removeListener(_onQuickCaptureBus);
     _autoLockTimer?.cancel();
     super.dispose();
+  }
+
+  void _onQuickCaptureBus() {
+    if (mounted) _showQuickAdd(context);
   }
 
   void _startAutoLockTimer() {

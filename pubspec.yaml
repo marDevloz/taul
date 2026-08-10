@@ -43,9 +43,10 @@ dependencies:
   # File picker (import/export)
   file_picker: ^11.0.2
 
-  # System tray (minimize to tray on desktop)
+  # System tray + global hotkey (minimize to tray / quick capture on desktop)
   system_tray: ^0.1.1
   window_manager: ^0.5.1
+  hotkey_manager: ^0.2.3
 
   # Rich text editor
   flutter_quill: ^11.5.1

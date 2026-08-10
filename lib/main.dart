@@ -1,9 +1,12 @@
 import 'dart:io' show Platform, exit;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:system_tray/system_tray.dart';
 import 'package:taul/app.dart';
+import 'package:taul/core/quick_capture_bus.dart';
 import 'package:window_manager/window_manager.dart';
 
 void main() {
@@ -50,13 +53,32 @@ class _WindowAppState extends State<_WindowApp> with WindowListener {
   Widget build(BuildContext context) => const TaulApp();
 }
 
-/// Desktop tray setup. Gracefully falls back if tray isn't available.
+/// Desktop tray + global hotkey setup. Gracefully falls back if unavailable.
 Future<void> _initDesktopTray() async {
   try {
     await windowManager.ensureInitialized();
     await _initSystemTray();
   } catch (_) {
     // System tray no disponible — la app funciona igual
+  }
+  await _initGlobalHotkey();
+}
+
+/// Global hotkey for instant quick capture (Ctrl+Alt+N). Fires the shared
+/// [QuickCaptureBus] so HomeView opens the create form from anywhere.
+Future<void> _initGlobalHotkey() async {
+  try {
+    await hotKeyManager.unregisterAll();
+    await hotKeyManager.register(
+      HotKey(
+        key: PhysicalKeyboardKey.keyN,
+        modifiers: [HotKeyModifier.control, HotKeyModifier.alt],
+        scope: HotKeyScope.system, // system-wide = global hotkey
+      ),
+      keyDownHandler: (_) => QuickCaptureBus.trigger(),
+    );
+  } catch (_) {
+    // Hotkey no disponible — la app funciona igual
   }
 }
 
@@ -79,6 +101,10 @@ Future<void> _initSystemTray() async {
       onClicked: _showWindow,
     ),
     MenuItem(
+      label: 'Captura rápida',
+      onClicked: _quickCaptureFromTray,
+    ),
+    MenuItem(
       label: 'Salir',
       onClicked: _exitApp,
     ),
@@ -99,6 +125,14 @@ Future<void> _initSystemTray() async {
 Future<void> _showWindow() async {
   await windowManager.show();
   await windowManager.focus();
+}
+
+/// Shows the window and fires quick capture. The listener only opens the
+/// create form when HomeView is mounted, so a window that is still focusing
+/// retries safely.
+void _quickCaptureFromTray() {
+  _showWindow();
+  QuickCaptureBus.trigger();
 }
 
 void _exitApp() {
