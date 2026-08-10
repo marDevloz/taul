@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taul/infrastructure/database/app_database.dart';
+import 'package:taul/infrastructure/export/encrypted_export_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/screens/settings_screen.dart';
@@ -14,6 +16,7 @@ void main() {
   late MasterPasswordStore store;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     database = AppDatabase.forTesting();
     store = MasterPasswordStore(database);
   });
@@ -22,13 +25,25 @@ void main() {
     database.close();
   });
 
-  Widget createTestApp() {
+  Widget createTestApp({EncryptedExportService? exportService}) {
     return ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(database),
         entryAuthServiceProvider.overrideWithValue(createFakeAuthService()),
+        if (exportService != null)
+          encryptedExportServiceProvider.overrideWithValue(exportService),
       ],
       child: const MaterialApp(home: SettingsScreen()),
+    );
+  }
+
+  Future<void> seedConfiguredMasterPassword() async {
+    await store.saveFull(
+      hashHex: 'abc123',
+      saltHex: 'def456',
+      encryptedStorageKeyHex: 'ciphertexthex',
+      encryptedStorageKeyNonceHex: 'noncehex',
+      encryptedStorageKeyTagHex: 'taghex',
     );
   }
 
@@ -297,4 +312,117 @@ void main() {
       expect(find.text('Regenerar Códigos de Respaldo'), findsOneWidget);
     });
   });
+
+  group('T-13b: backup status persistence and reminder', () {
+    testWidgets(
+        'should_persist_last_backup_timestamp_after_successful_export',
+        (tester) async {
+      await seedConfiguredMasterPassword();
+      final exportService =
+          _FakeExportService(authService: createFakeAuthService());
+
+      await tester.pumpWidget(createTestApp(exportService: exportService));
+      await tester.pump();
+      await tester.pump();
+
+      // Scroll to the Data section: no backup recorded yet.
+      await tester.scrollUntilVisible(find.text('Exportar datos'), 200.0);
+      expect(find.text('Última copia: nunca'), findsOneWidget);
+
+      // Export flow: disclaimer -> passphrase -> encryption -> fake save.
+      await tester.tap(find.text('Exportar datos'));
+      await tester.pump();
+      expect(find.text('Entendido, exportar'), findsOneWidget);
+      await tester.tap(find.text('Entendido, exportar'));
+      await tester.pump();
+
+      expect(find.text('Contraseña de exportación'), findsOneWidget);
+      await tester.enterText(find.byType(TextField).at(0), 'test-passphrase-123');
+      await tester.enterText(find.byType(TextField).at(1), 'test-passphrase-123');
+      await tester.tap(find.text('Cifrar y exportar'));
+      await tester.pump();
+
+      // Drain the async export, file save, and timestamp persistence.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      // Timestamp was persisted only on success.
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('last_backup_at'), isNotNull);
+      expect(
+        DateTime.tryParse(prefs.getString('last_backup_at')!),
+        isNotNull,
+      );
+
+      // Invalidation applied: UI now shows the last backup date.
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Última copia: nunca'), findsNothing);
+      expect(find.textContaining('Última copia:'), findsOneWidget);
+
+      // Flush the snackbar timer before the test ends.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    }, timeout: const Timeout(Duration(seconds: 20)));
+
+    testWidgets(
+        'should_show_stale_backup_reminder_when_backup_is_older_than_14_days',
+        (tester) async {
+      await seedConfiguredMasterPassword();
+      SharedPreferences.setMockInitialValues({
+        'last_backup_at': DateTime.now()
+            .toUtc()
+            .subtract(const Duration(days: 20))
+            .toIso8601String(),
+      });
+
+      await tester.pumpWidget(createTestApp());
+      await tester.pump();
+      await tester.pump();
+
+      await tester.scrollUntilVisible(find.text('Exportar datos'), 200.0);
+
+      expect(find.textContaining('Última copia:'), findsOneWidget);
+      expect(find.textContaining('tiene más de 14 días'), findsOneWidget);
+      expect(find.textContaining('Exportá una copia nueva'), findsOneWidget);
+    });
+
+    testWidgets(
+        'should_show_last_backup_date_without_stale_reminder_when_recent',
+        (tester) async {
+      await seedConfiguredMasterPassword();
+      SharedPreferences.setMockInitialValues({
+        'last_backup_at': DateTime.now()
+            .toUtc()
+            .subtract(const Duration(hours: 2))
+            .toIso8601String(),
+      });
+
+      await tester.pumpWidget(createTestApp());
+      await tester.pump();
+      await tester.pump();
+
+      await tester.scrollUntilVisible(find.text('Exportar datos'), 200.0);
+
+      expect(find.textContaining('Última copia:'), findsOneWidget);
+      expect(find.text('Última copia: nunca'), findsNothing);
+      expect(find.textContaining('tiene más de 14 días'), findsNothing);
+    });
+  });
+}
+
+/// EncryptedExportService that skips the real FilePicker save so the export
+/// flow can be exercised in widget tests. Mirrors `saveEncryptedToFile's`
+/// contract: returns a non-null path when the backup was saved.
+class _FakeExportService extends EncryptedExportService {
+  _FakeExportService({required super.authService});
+
+  @override
+  Future<String?> saveEncryptedToFile(
+    String encryptedJson,
+    BuildContext context,
+  ) async {
+    return '/tmp/fake-backup.json';
+  }
 }

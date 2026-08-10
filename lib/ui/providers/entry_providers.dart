@@ -21,6 +21,7 @@ import 'package:taul/infrastructure/database/entry_repository_impl.dart';
 import 'package:taul/infrastructure/database/tag_settings_dao.dart';
 import 'package:taul/infrastructure/database/tag_settings_repository_impl.dart';
 import 'package:taul/domain/repositories/i_tag_settings_repository.dart';
+import 'package:taul/infrastructure/backup/backup_timestamp_store.dart';
 import 'package:taul/infrastructure/export/export_service.dart';
 import 'package:taul/infrastructure/export/encrypted_export_service.dart';
 import 'package:taul/infrastructure/export/import_service.dart';
@@ -166,6 +167,15 @@ final encryptedExportServiceProvider = Provider<EncryptedExportService>((ref) {
 
 final importServiceProvider = Provider<ImportService>((ref) {
   return ImportService(repository: ref.watch(entryRepositoryProvider));
+});
+
+final backupTimestampStoreProvider = Provider<BackupTimestampStore>((ref) {
+  return BackupTimestampStore();
+});
+
+/// Date of the last successful encrypted backup, or null if none yet.
+final lastBackupAtProvider = FutureProvider.autoDispose<DateTime?>((ref) {
+  return ref.watch(backupTimestampStoreProvider).getLastBackupAt();
 });
 
 // --- Use case providers ---

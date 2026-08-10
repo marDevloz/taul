@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:logger/logger.dart';
+import 'package:taul/core/constants.dart';
 import 'package:taul/core/errors/error_mapper.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/auto_lock_provider.dart';
@@ -110,6 +111,7 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Exportar datos',
             onTap: () => _exportData(context, ref),
           ),
+          _lastBackupStatus(context, ref),
           _actionTile(
             context,
             icon: Icons.file_upload,
@@ -641,6 +643,81 @@ class SettingsScreen extends ConsumerWidget {
 
   // ── Import / Export ──
 
+  /// Shows the last successful backup date, plus a discreet reminder when the
+  /// backup is older than [AppConstants.staleBackupReminderDays].
+  Widget _lastBackupStatus(BuildContext context, WidgetRef ref) {
+    final lastBackupAsync = ref.watch(lastBackupAtProvider);
+    return lastBackupAsync.when(
+      data: (lastBackup) {
+        if (lastBackup == null) {
+          return _backupStatusLine(
+            context,
+            icon: Icons.shield_outlined,
+            text: 'Última copia: nunca',
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          );
+        }
+        final local = lastBackup.toLocal();
+        final age = DateTime.now().difference(local);
+        final isStale = age.inDays > AppConstants.staleBackupReminderDays;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _backupStatusLine(
+              context,
+              icon: Icons.shield_outlined,
+              text: 'Última copia: ${_formatBackupDate(local)}',
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            if (isStale)
+              _backupStatusLine(
+                context,
+                icon: Icons.warning_amber_rounded,
+                text: 'La copia de seguridad tiene más de '
+                    '${AppConstants.staleBackupReminderDays} días. '
+                    'Exportá una copia nueva para evitar la pérdida de datos.',
+                color: Colors.orange,
+              ),
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _backupStatusLine(
+    BuildContext context, {
+    required IconData icon,
+    required String text,
+    required Color color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 12.5, color: color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatBackupDate(DateTime dt) {
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = dt.month.toString().padLeft(2, '0');
+    final hour = dt.hour.toString().padLeft(2, '0');
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return '$day/$month/${dt.year} $hour:$minute';
+  }
+
   Future<void> _exportData(BuildContext context, WidgetRef ref) async {
     // 0. Disclaimer dialog
     if (!context.mounted) return;
@@ -693,14 +770,29 @@ class SettingsScreen extends ConsumerWidget {
       );
 
       // 5. Dismiss progress
-      if (context.mounted) Navigator.of(context).pop();
+      if (!context.mounted) return;
+      Navigator.of(context).pop();
 
       // 6. Save file via FilePicker
       final savedPath = await encryptedExportService.saveEncryptedToFile(json, context);
 
       // 7. Snackbar
-      if (!context.mounted) return;
       if (savedPath != null) {
+        // Persist the backup timestamp ONLY on a successful export so the
+        // Settings screen can show the last backup date and stale reminder.
+        try {
+          await ref
+              .read(backupTimestampStoreProvider)
+              .recordBackup(timestamp: DateTime.now());
+          ref.invalidate(lastBackupAtProvider);
+        } catch (e, st) {
+          Logger().e(
+            'Failed to record backup timestamp',
+            error: e,
+            stackTrace: st,
+          );
+        }
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Exportación cifrada guardada en $savedPath')),
         );
