@@ -3,13 +3,18 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:logger/logger.dart';
 import 'package:taul/core/constants.dart';
+import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/domain/entities/search_match.dart';
 import 'package:taul/infrastructure/database/tag_settings_dao.dart';
 
 import 'app_database.dart' as db;
 
 class EntryDao {
+  /// Caracteres de contexto a cada lado del término en el snippet de búsqueda.
+  static const int _snippetContextChars = 80;
+
   final db.AppDatabase _database;
   final TagSettingsDao _tagSettingsDao;
   final Logger _log = Logger();
@@ -221,6 +226,52 @@ class EntryDao {
     bool? completedOnly,
     bool excludeArchived = false,
   }) async {
+    final matches = await _dispatchSearch(
+      query,
+      limit: limit,
+      type: type,
+      tag: tag,
+      completedOnly: completedOnly,
+      excludeArchived: excludeArchived,
+      includeSnippets: false,
+    );
+    return matches.map((m) => m.entry).toList();
+  }
+
+  /// Igual que [search] pero además devuelve, por cada entrada, un
+  /// [SearchSnippet] con el contexto alrededor del término que matcheó y los
+  /// términos de búsqueda, para que la UI pueda resaltar el match. El snippet
+  /// se calcula sobre el texto plano del contenido (client-side) tanto en el
+  /// camino FTS5 como en el fallback LIKE, así la forma del resultado es
+  /// uniforme en ambos.
+  Future<List<SearchMatch>> searchWithSnippets(
+    String query, {
+    int limit = AppConstants.fts5MaxResults,
+    String? type,
+    String? tag,
+    bool? completedOnly,
+    bool excludeArchived = false,
+  }) {
+    return _dispatchSearch(
+      query,
+      limit: limit,
+      type: type,
+      tag: tag,
+      completedOnly: completedOnly,
+      excludeArchived: excludeArchived,
+      includeSnippets: true,
+    );
+  }
+
+  Future<List<SearchMatch>> _dispatchSearch(
+    String query, {
+    required int limit,
+    String? type,
+    String? tag,
+    bool? completedOnly,
+    bool excludeArchived = false,
+    required bool includeSnippets,
+  }) async {
     final sanitized = query.replaceAll('"', '""');
     final tokens = sanitized
         .trim()
@@ -233,6 +284,7 @@ class EntryDao {
       return await _searchFts(
         tokens,
         limit,
+        includeSnippets: includeSnippets,
         type: type,
         tag: tag,
         completedOnly: completedOnly,
@@ -247,6 +299,7 @@ class EntryDao {
       return _searchLike(
         tokens,
         limit,
+        includeSnippets: includeSnippets,
         type: type,
         tag: tag,
         completedOnly: completedOnly,
@@ -257,13 +310,14 @@ class EntryDao {
 
   /// Full-text search via FTS5. Throws when the FTS table is missing or the
   /// FTS5 extension is unavailable (e.g. on Android system SQLite).
-  Future<List<Entry>> _searchFts(
+  Future<List<SearchMatch>> _searchFts(
     List<String> tokens,
     int limit, {
     String? type,
     String? tag,
     bool? completedOnly,
     bool excludeArchived = false,
+    bool includeSnippets = false,
   }) async {
     // Prefix match so "git" matches "github", "gitlab", etc.
     final ftsQuery = tokens.map((t) => '$t*').join(' ');
@@ -294,7 +348,7 @@ class EntryDao {
 
     return rows.map((row) {
       final data = Map<String, dynamic>.from(row.data);
-      return _fromMap(data);
+      return _toSearchMatch(data, tokens, includeSnippets);
     }).toList();
   }
 
@@ -303,13 +357,14 @@ class EntryDao {
   /// token must match (AND semantics), mirroring the FTS query. Non-deleted
   /// entries only, most recently updated first, capped by [limit]. The active
   /// filters are applied the same way as in the FTS path.
-  Future<List<Entry>> _searchLike(
+  Future<List<SearchMatch>> _searchLike(
     List<String> tokens,
     int limit, {
     String? type,
     String? tag,
     bool? completedOnly,
     bool excludeArchived = false,
+    bool includeSnippets = false,
   }) async {
     final conditions = <String>[];
     final variables = <Variable>[];
@@ -348,8 +403,77 @@ class EntryDao {
 
     return rows.map((row) {
       final data = Map<String, dynamic>.from(row.data);
-      return _fromMap(data);
+      return _toSearchMatch(data, tokens, includeSnippets);
     }).toList();
+  }
+
+  SearchMatch _toSearchMatch(
+    Map<String, dynamic> data,
+    List<String> tokens,
+    bool includeSnippets,
+  ) {
+    final entry = _fromMap(data);
+    return SearchMatch(
+      entry: entry,
+      terms: tokens,
+      snippet: includeSnippets ? _buildSnippet(entry, tokens) : null,
+    );
+  }
+
+  /// Builds a context snippet around the earliest match of any [tokens] in
+  /// the plain text of [entry].content. A window of [_snippetContextChars]
+  /// characters on each side of the match, with ellipsis markers when the
+  /// window is clipped. Returns null when no token matches the content (the
+  /// match is in the title/tags or there is nothing to highlight), so the UI
+  /// falls back to the normal preview.
+  SearchSnippet? _buildSnippet(Entry entry, List<String> tokens) {
+    if (entry.content.isEmpty || tokens.isEmpty) return null;
+    final plain = RichTextHelper.documentToPlainText(
+      RichTextHelper.getDocument(entry.content),
+    ).replaceAll(RegExp(r'\n+$'), '');
+    if (plain.isEmpty) return null;
+    final lower = plain.toLowerCase();
+
+    String? matchedToken;
+    int? firstMatch;
+    for (final token in tokens) {
+      final idx = lower.indexOf(token.toLowerCase());
+      if (idx != -1 && (firstMatch == null || idx < firstMatch)) {
+        firstMatch = idx;
+        matchedToken = token;
+      }
+    }
+    if (firstMatch == null) return null;
+
+    var start = firstMatch - _snippetContextChars;
+    if (start < 0) start = 0;
+    var end = firstMatch + matchedToken!.length + _snippetContextChars;
+    if (end > plain.length) end = plain.length;
+
+    final hasEllipsisPrefix = start > 0;
+    final hasEllipsisSuffix = end < plain.length;
+    final text = plain.substring(start, end);
+    final prefixed = hasEllipsisPrefix ? '…$text' : text;
+    final snippetText = hasEllipsisSuffix ? '$prefixed…' : prefixed;
+    final prefixLen = hasEllipsisPrefix ? 1 : 0;
+
+    final snippetLower = snippetText.toLowerCase();
+    final highlights = <HighlightRange>[];
+    for (final token in tokens) {
+      final t = token.toLowerCase();
+      if (t.isEmpty) continue;
+      var from = prefixLen;
+      while (true) {
+        final idx = snippetLower.indexOf(t, from);
+        if (idx == -1) break;
+        highlights.add((start: idx, end: idx + t.length));
+        from = idx + t.length;
+      }
+    }
+    if (highlights.isEmpty) return null;
+
+    highlights.sort((a, b) => a.start.compareTo(b.start));
+    return SearchSnippet(text: snippetText, highlights: highlights);
   }
 
   /// Compiles the SQL conditions of the active filters (type, tag, task

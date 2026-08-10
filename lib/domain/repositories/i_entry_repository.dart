@@ -1,6 +1,7 @@
 import 'package:taul/core/constants.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/domain/entities/search_match.dart';
 
 abstract class IEntryRepository {
   Future<Entry> create(Entry entry);
@@ -11,6 +12,14 @@ abstract class IEntryRepository {
     bool excludeArchived = false,
   });
   Future<List<Entry>> search(
+    String query, {
+    int limit = AppConstants.fts5MaxResults,
+    EntryType? type,
+    String? tag,
+    bool? completedOnly,
+    bool excludeArchived = false,
+  });
+  Future<List<SearchMatch>> searchWithSnippets(
     String query, {
     int limit = AppConstants.fts5MaxResults,
     EntryType? type,

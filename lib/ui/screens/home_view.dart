@@ -9,6 +9,7 @@ import 'package:taul/core/errors/error_mapper.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/services/merge_service.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/domain/entities/search_match.dart';
 import 'package:taul/ui/providers/color_providers.dart';
 import 'package:taul/ui/providers/effective_auth_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
@@ -91,9 +92,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
     });
 
     final searchQuery = ref.watch(entrySearchProvider);
-    final entriesAsync = searchQuery.isEmpty
-        ? ref.watch(filteredEntriesProvider)
-        : ref.watch(searchResultsProvider);
+    final entriesAsync = ref.watch(searchResultsProvider);
 
     return Scaffold(
       appBar: _isSelectMode ? _buildSelectAppBar() : _buildNormalAppBar(),
@@ -113,7 +112,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             itemCount: entries.length,
                             itemBuilder: (context, index) {
-                              final entry = entries[index];
+                              final match = entries[index];
+                              final entry = match.entry;
                               return Consumer(
                                 builder: (context, ref, _) {
                                   final color = ref.watch(
@@ -130,6 +130,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
                                       entry.type.label == 'credential';
                                   return EntryCard(
                                     entry: entry,
+                                    searchSnippet: match.snippet,
+                                    searchTerms: match.terms,
                                     displayColor: color,
                                     isExpanded:
                                         !_isSelectMode &&
@@ -216,7 +218,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
                               ),
                           itemCount: entries.length,
                           itemBuilder: (context, index) {
-                            final entry = entries[index];
+                            final match = entries[index];
+                            final entry = match.entry;
                             return Consumer(
                               builder: (context, ref, _) {
                                 final color = ref.watch(
@@ -234,6 +237,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
                                 return EntryCard(
                                   entry: entry,
                                   isGrid: true,
+                                  searchSnippet: match.snippet,
+                                  searchTerms: match.terms,
                                   displayColor: color,
                                   isSecure: showLocked,
                                   isSelected: _selectedEntryIds.contains(
@@ -731,11 +736,12 @@ class _HomeViewState extends ConsumerState<HomeView> {
   }
 
   List<Entry> _resolveSelectedEntries() {
-    final entriesAsync = ref.read(entrySearchProvider).isEmpty
-        ? ref.read(filteredEntriesProvider)
-        : ref.read(searchResultsProvider);
-    final entries = entriesAsync.valueOrNull ?? [];
-    return entries.where((e) => _selectedEntryIds.contains(e.id)).toList();
+    final matches =
+        ref.read(searchResultsProvider).valueOrNull ?? const <SearchMatch>[];
+    return matches
+        .map((m) => m.entry)
+        .where((e) => _selectedEntryIds.contains(e.id))
+        .toList();
   }
 
   void _exitSelectMode() {
@@ -748,37 +754,35 @@ class _HomeViewState extends ConsumerState<HomeView> {
   void _navigateToMerge() {
     if (_selectedEntryIds.length < 2) return;
 
-    // Collect selected entries from the current entries list
-    final entriesAsync = ref.read(entrySearchProvider).isEmpty
-        ? ref.read(filteredEntriesProvider)
-        : ref.read(searchResultsProvider);
+    // Collect selected entries from the current search results (searchResults
+    // includes the filtered list when the search box is empty).
+    final matches = ref.read(searchResultsProvider).valueOrNull;
+    if (matches == null) return;
+    final selected = matches
+        .map((m) => m.entry)
+        .where((e) => _selectedEntryIds.contains(e.id))
+        .toList();
+    if (selected.length < 2) return;
 
-    entriesAsync.whenData((entries) {
-      final selected = entries
-          .where((e) => _selectedEntryIds.contains(e.id))
-          .toList();
+    final mergedText = MergeService.concatenate(selected);
+    final navigator = Navigator.of(context);
 
-      if (selected.length < 2) return;
-
-      final mergedText = MergeService.concatenate(selected);
-
-      Navigator.of(context)
-          .push(
-            MaterialPageRoute(
-              builder: (_) => MergeEditorScreen(
-                initialText: mergedText,
-                sourceEntries: selected,
-              ),
+    navigator
+        .push(
+          MaterialPageRoute(
+            builder: (_) => MergeEditorScreen(
+              initialText: mergedText,
+              sourceEntries: selected,
             ),
-          )
-          .then((saved) {
-            if (saved == true) {
-              _exitSelectMode();
-              // Refresh the list by invalidating providers
-              ref.invalidate(entryListProvider);
-            }
-          });
-    });
+          ),
+        )
+        .then((saved) {
+          if (saved == true) {
+            _exitSelectMode();
+            // Refresh the list by invalidating providers
+            ref.invalidate(entryListProvider);
+          }
+        });
   }
 
   void _showShortcuts(BuildContext context) {

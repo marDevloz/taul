@@ -56,7 +56,7 @@ void main() {
 
       final results = await container.read(searchResultsProvider.future);
 
-      expect(results.map((e) => e.id), ['1']);
+      expect(results.map((m) => m.entry.id), ['1']);
     });
 
     test('should_search_within_active_type_filter', () async {
@@ -70,7 +70,7 @@ void main() {
 
       final results = await container.read(searchResultsProvider.future);
 
-      expect(results.map((e) => e.id), ['2']);
+      expect(results.map((m) => m.entry.id), ['2']);
     });
 
     test('should_combine_tag_filter_with_search_query', () async {
@@ -84,7 +84,7 @@ void main() {
 
       final results = await container.read(searchResultsProvider.future);
 
-      expect(results.map((e) => e.id), ['1']);
+      expect(results.map((m) => m.entry.id), ['1']);
     });
   });
 }

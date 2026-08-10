@@ -2,6 +2,7 @@ import 'package:taul/core/constants.dart';
 import 'package:taul/core/errors/failures.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/domain/entities/search_match.dart';
 import 'package:taul/domain/repositories/i_entry_repository.dart';
 import 'package:taul/infrastructure/database/entry_dao.dart';
 
@@ -45,6 +46,25 @@ class EntryRepositoryImpl implements IEntryRepository {
     bool excludeArchived = false,
   }) {
     return _dao.search(
+      query,
+      limit: limit,
+      type: type?.label,
+      tag: tag,
+      completedOnly: completedOnly,
+      excludeArchived: excludeArchived,
+    );
+  }
+
+  @override
+  Future<List<SearchMatch>> searchWithSnippets(
+    String query, {
+    int limit = AppConstants.fts5MaxResults,
+    EntryType? type,
+    String? tag,
+    bool? completedOnly,
+    bool excludeArchived = false,
+  }) {
+    return _dao.searchWithSnippets(
       query,
       limit: limit,
       type: type?.label,

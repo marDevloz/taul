@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/domain/entities/search_match.dart';
 import 'package:taul/domain/repositories/i_entry_repository.dart';
 import 'package:taul/ui/providers/entry_draft_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
@@ -27,6 +28,16 @@ class _FakeEntryRepository implements IEntryRepository {
 
   @override
   Future<List<Entry>> search(
+    String query, {
+    int limit = 100,
+    EntryType? type,
+    String? tag,
+    bool? completedOnly,
+    bool excludeArchived = false,
+  }) async => [];
+
+  @override
+  Future<List<SearchMatch>> searchWithSnippets(
     String query, {
     int limit = 100,
     EntryType? type,

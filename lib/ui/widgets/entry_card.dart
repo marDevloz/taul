@@ -4,6 +4,7 @@ import 'package:taul/core/credential_parser.dart';
 import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/domain/entities/search_match.dart';
 import 'package:taul/ui/widgets/entry_expanded_content.dart';
 
 class EntryCard extends StatelessWidget {
@@ -26,6 +27,13 @@ class EntryCard extends StatelessWidget {
   final bool isFavorito;
   final bool isArchivado;
 
+  /// Snippet de contexto de búsqueda: cuando no es nulo, reemplaza la preview
+  /// de contenido por el snippet con los términos resaltados.
+  final SearchSnippet? searchSnippet;
+
+  /// Términos de búsqueda para resaltar en el título cuando el match cae ahí.
+  final List<String> searchTerms;
+
   const EntryCard({
     super.key,
     required this.entry,
@@ -46,6 +54,8 @@ class EntryCard extends StatelessWidget {
     this.onToggleCompletado,
     this.isFavorito = false,
     this.isArchivado = false,
+    this.searchSnippet,
+    this.searchTerms = const [],
   });
 
   IconData get _typeIcon {
@@ -74,6 +84,127 @@ class EntryCard extends StatelessWidget {
 
   bool get _isCompact =>
       entry.type == EntryType.task && entry.completedAt != null;
+
+  /// Título de la tarjeta. En contexto de búsqueda resalta los [searchTerms]
+  /// en negrita con el color primario; fuera de búsqueda es el Text plano de
+  /// siempre (árbol de widgets idéntico).
+  Widget _buildTitle(ThemeData theme) {
+    final style = theme.textTheme.titleSmall;
+    final ranges = _rangesForTerms(entry.title, searchTerms);
+    if (ranges.isEmpty) {
+      return Text(
+        entry.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+      );
+    }
+    return Text.rich(
+      _highlightedSpan(
+        text: entry.title,
+        ranges: ranges,
+        baseStyle: style,
+        highlightStyle: _highlightStyle(theme, style),
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  /// Preview de contenido: el snippet resaltado si la búsqueda lo proveyó,
+  /// si no el texto plano de siempre.
+  Widget _buildContentPreview(ThemeData theme, {required int maxLines}) {
+    final style = theme.textTheme.bodySmall;
+    final snippet = searchSnippet;
+    if (snippet != null) {
+      return Text.rich(
+        _highlightedSpan(
+          text: snippet.text,
+          ranges: snippet.highlights,
+          baseStyle: style,
+          highlightStyle: _highlightStyle(theme, style),
+        ),
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+    return Text(
+      _displayContent,
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
+      style: style,
+    );
+  }
+
+  TextStyle _highlightStyle(ThemeData theme, TextStyle? baseStyle) {
+    return baseStyle?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.primary,
+        ) ??
+        TextStyle(
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.primary,
+        );
+  }
+
+  /// Encuentra (case-insensitive) todas las ocurrencias de cada término en
+  /// [text]. Devuelve una lista vacía si no hay ningún match.
+  List<HighlightRange> _rangesForTerms(String text, List<String> terms) {
+    if (text.isEmpty) return const [];
+    final lower = text.toLowerCase();
+    final ranges = <HighlightRange>[];
+    for (final term in terms) {
+      final t = term.toLowerCase();
+      if (t.isEmpty) continue;
+      var from = 0;
+      while (true) {
+        final idx = lower.indexOf(t, from);
+        if (idx == -1) break;
+        ranges.add((start: idx, end: idx + t.length));
+        from = idx + t.length;
+      }
+    }
+    return ranges;
+  }
+
+  /// Construye un [TextSpan] con los rangos resaltados sobre [text], mergeando
+  /// rangos superpuestos y preservando [baseStyle] en el resto del texto.
+  TextSpan _highlightedSpan({
+    required String text,
+    required List<HighlightRange> ranges,
+    required TextStyle? baseStyle,
+    required TextStyle highlightStyle,
+  }) {
+    if (ranges.isEmpty) return TextSpan(text: text, style: baseStyle);
+
+    final sorted = List<HighlightRange>.from(ranges)
+      ..sort((a, b) => a.start.compareTo(b.start));
+    final merged = <HighlightRange>[];
+    for (final r in sorted) {
+      if (merged.isEmpty || r.start > merged.last.end) {
+        merged.add(r);
+      } else if (r.end > merged.last.end) {
+        final last = merged.removeLast();
+        merged.add((start: last.start, end: r.end));
+      }
+    }
+
+    final children = <InlineSpan>[];
+    var cursor = 0;
+    for (final r in merged) {
+      if (r.start > cursor) {
+        children.add(TextSpan(text: text.substring(cursor, r.start)));
+      }
+      children.add(
+        TextSpan(text: text.substring(r.start, r.end), style: highlightStyle),
+      );
+      cursor = r.end;
+    }
+    if (cursor < text.length) {
+      children.add(TextSpan(text: text.substring(cursor)));
+    }
+    return TextSpan(style: baseStyle, children: children);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -160,12 +291,7 @@ class EntryCard extends StatelessWidget {
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         )
-                      : Text(
-                          entry.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall,
-                        ),
+                      : _buildTitle(theme),
                   subtitle: _isCompact
                       ? null
                       : subtitle ?? Column(
@@ -189,12 +315,7 @@ class EntryCard extends StatelessWidget {
                           ],
                         )
                       else if (!isExpanded && !_isCompact)
-                        Text(
-                          _displayContent,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall,
-                        ),
+                        _buildContentPreview(theme, maxLines: 2),
                       // Show completedAt timestamp if present
                       if (entry.completedAt != null)
                         Padding(
@@ -389,12 +510,7 @@ class EntryCard extends StatelessWidget {
                       ),
                     )
                   else
-                    Text(
-                      entry.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall,
-                    ),
+                    _buildTitle(theme),
                   const SizedBox(height: 4),
                   if (isSecure)
                     Row(
@@ -413,12 +529,7 @@ class EntryCard extends StatelessWidget {
                       ],
                     )
                   else
-                    Text(
-                      _displayContent,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
-                    ),
+                    _buildContentPreview(theme, maxLines: 3),
                 ],
               ),
             ),

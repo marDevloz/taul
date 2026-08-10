@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/domain/entities/search_match.dart';
 import 'package:taul/domain/repositories/i_entry_repository.dart';
 import 'package:taul/domain/services/master_password_recovery_service.dart';
 import 'package:taul/domain/usecases/create_entry.dart';
@@ -251,15 +252,21 @@ final trashListProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
 
 final entrySearchProvider = StateProvider<String>((ref) => '');
 
-final searchResultsProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
+final searchResultsProvider = FutureProvider.autoDispose<List<SearchMatch>>((ref) {
   final query = ref.watch(entrySearchProvider);
   final excludeArchived = ref.watch(excludeArchivedProvider);
-  if (query.isEmpty) return ref.watch(filteredEntriesProvider.future);
+  if (query.isEmpty) {
+    return ref.watch(filteredEntriesProvider.future).then(
+      (entries) => entries
+          .map((e) => SearchMatch(entry: e))
+          .toList(),
+    );
+  }
 
   final type = ref.watch(selectedTypeFilterProvider);
   final tag = ref.watch(selectedTagFilterProvider);
   final taskStatus = ref.watch(taskStatusFilterProvider);
-  return ref.watch(searchEntriesProvider).call(
+  return ref.watch(searchEntriesProvider).callWithSnippets(
     query,
     type: type,
     tag: tag,
