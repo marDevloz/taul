@@ -86,6 +86,8 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
   bool _showPassword = false;
   String? _revealedSecret;
   Timer? _hideTimer;
+  Timer? _clipboardClearTimer;
+  String? _lastCopiedSecret;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────
   @override
@@ -121,6 +123,7 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
     _quillCtrl.removeListener(_onQuillChanged);
     _quillCtrl.dispose();
     _hideTimer?.cancel();
+    _clipboardClearTimer?.cancel();
     if (_cachedDek != null) {
       ref.read(masterPasswordProvider.notifier).clearMasterPassword();
     }
@@ -905,6 +908,7 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
     required String label,
     required TextEditingController controller,
     bool obscure = false,
+    bool isSecret = false,
     VoidCallback? onToggleObscure,
   }) {
     final theme = Theme.of(context);
@@ -960,7 +964,7 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
                 icon: const Icon(Icons.copy, size: 18),
                 tooltip: 'Copiar',
                 onPressed: () =>
-                    Clipboard.setData(ClipboardData(text: controller.text)),
+                    _copyFieldValue(controller, isSecret: isSecret),
               ),
             if (onToggleObscure != null)
               IconButton(
@@ -977,6 +981,66 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
     );
   }
 
+  // ── Credential copy feedback ──────────────────────────────────────────
+  void _copyFieldValue(
+    TextEditingController controller, {
+    required bool isSecret,
+  }) {
+    final text = controller.text;
+    if (text.isEmpty) return;
+    Clipboard.setData(ClipboardData(text: text));
+
+    if (isSecret) {
+      _lastCopiedSecret = text;
+      // Coordinated with the reveal auto-hide timer: both secrets are
+      // forgotten (screen + clipboard) after the same 30s window.
+      _scheduleClipboardClear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Contraseña copiada. Se limpiará en '
+            '${AppConstants.clipboardAutoClearSeconds} segundos.',
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Contenido copiado'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _scheduleClipboardClear() {
+    _clipboardClearTimer?.cancel();
+    _clipboardClearTimer = Timer(
+      const Duration(seconds: AppConstants.clipboardAutoClearSeconds),
+      _clearClipboardBestEffort,
+    );
+  }
+
+  Future<void> _clearClipboardBestEffort() async {
+    _clipboardClearTimer = null;
+    final copiedSecret = _lastCopiedSecret;
+    _lastCopiedSecret = null;
+    if (copiedSecret == null) return;
+    try {
+      // Only clear if the clipboard still holds what we copied: if the user
+      // copied something else in the meantime, never wipe that content.
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      if (data?.text != copiedSecret) return;
+      // Flutter does not expose Clipboard.clear(); writing empty text is the
+      // supported best-effort equivalent.
+      await Clipboard.setData(const ClipboardData(text: ''));
+    } catch (_) {
+      // Best-effort: some platforms cannot read/clear the system clipboard;
+      // failing silently here is acceptable.
+    }
+  }
+
   Widget _buildPasswordField(
     ThemeData theme,
     String displayedSecret,
@@ -988,6 +1052,7 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
       label: 'Contraseña',
       controller: _passwordCtrl,
       obscure: isObscured,
+      isSecret: true,
       onToggleObscure: () =>
           setState(() => _showPassword = !_showPassword),
     );
@@ -1013,9 +1078,12 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
           offset: _passwordCtrl.text.length,
         );
         _hideTimer?.cancel();
-        _hideTimer = Timer(const Duration(seconds: 30), () {
-          if (mounted) setState(() => _revealedSecret = null);
-        });
+        _hideTimer = Timer(
+          const Duration(seconds: AppConstants.clipboardAutoClearSeconds),
+          () {
+            if (mounted) setState(() => _revealedSecret = null);
+          },
+        );
       }
       return;
     }
@@ -1114,10 +1182,13 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
       _passwordCtrl.text = plaintext;
 
       _hideTimer?.cancel();
-      _hideTimer = Timer(const Duration(seconds: 30), () {
-        if (!mounted) return;
-        setState(() => _revealedSecret = null);
-      });
+      _hideTimer = Timer(
+        const Duration(seconds: AppConstants.clipboardAutoClearSeconds),
+        () {
+          if (!mounted) return;
+          setState(() => _revealedSecret = null);
+        },
+      );
     } catch (e, st) {
       Logger().e('Failed to decrypt credential secret', error: e, stackTrace: st);
       if (mounted) {

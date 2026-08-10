@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:taul/infrastructure/database/app_database.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
-import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:taul/ui/screens/entry_detail_view.dart';
 import 'package:taul/ui/widgets/palette_picker.dart';
 import '../../helpers/test_auth.dart';
@@ -18,6 +18,7 @@ void main() {
   /// Creates a credential entry in the test database.
   Future<void> createCredentialEntry({
     bool requiresAuth = false,
+    String? secret,
     String? encryptedSecret,
     String? cipherNonce,
     String? cipherTag,
@@ -32,6 +33,7 @@ void main() {
         metadata: '{"username":"testuser","url":"https://test.com"}',
         tags: '[]',
         requiresAuth: requiresAuth,
+        secret: secret,
         encryptedSecret: encryptedSecret,
         cipherNonce: cipherNonce,
         cipherTag: cipherTag,
@@ -311,6 +313,177 @@ void main() {
 
       // Tag text visible
       expect(find.text('urgente'), findsOneWidget);
+    });
+  });
+
+  group('T-21: credential copy feedback - clipboard auto-clear', () {
+    const copyFeedback = 'Contraseña copiada. Se limpiará en 30 segundos.';
+
+    /// Warm the detail provider before the view mounts so the text
+    /// controllers are populated (the screen reads them in initState).
+    Future<void> pumpWithWarmProvider(WidgetTester tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          databaseProvider.overrideWithValue(database),
+          entryAuthServiceProvider.overrideWithValue(auth),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subscription =
+          container.listen(entryDetailProvider(testEntryId), (_, _) {});
+      addTearDown(subscription.close);
+      await container.read(entryDetailProvider(testEntryId).future);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            localizationsDelegates:
+                FlutterQuillLocalizations.localizationsDelegates,
+            supportedLocales: FlutterQuillLocalizations.supportedLocales,
+            home: EntryDetailView(entryId: testEntryId),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    /// Advances the clock so the clipboard clear timer and the snackbar
+    /// auto-dismiss timer can fire, then unmounts the tree so riverpod can
+    /// schedule its deferred provider disposal before the test ends.
+    Future<void> flushPendingTimers(WidgetTester tester) async {
+      await tester.pump(const Duration(seconds: 35));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    testWidgets('should_show_secret_copy_feedback_when_copying_password',
+        (tester) async {
+      await createCredentialEntry(
+        requiresAuth: false,
+        secret: 'clave-secreta',
+      );
+
+      await pumpWithWarmProvider(tester);
+
+      final copyButtons = find.byTooltip('Copiar');
+      expect(copyButtons, findsWidgets);
+
+      await tester.tap(copyButtons.at(1));
+      await tester.pump();
+
+      expect(find.text(copyFeedback), findsOneWidget);
+
+      await flushPendingTimers(tester);
+    });
+
+    testWidgets('should_show_generic_feedback_when_copying_username',
+        (tester) async {
+      await createCredentialEntry(
+        requiresAuth: false,
+        secret: 'clave-secreta',
+      );
+
+      await pumpWithWarmProvider(tester);
+
+      await tester.tap(find.byTooltip('Copiar').at(0));
+      await tester.pump();
+
+      expect(find.text('Contenido copiado'), findsOneWidget);
+
+      await flushPendingTimers(tester);
+    });
+
+    testWidgets('should_clear_clipboard_after_seconds_when_copying_password',
+        (tester) async {
+      // Simulates a real system clipboard: setData stores the text, getData
+      // returns it. Enables testing the content-aware clear guard.
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (MethodCall call) async {
+          if (call.method == 'Clipboard.setData') {
+            final args = Map<String, dynamic>.from(call.arguments as Map);
+            clipboardText = args['text'] as String?;
+          } else if (call.method == 'Clipboard.getData') {
+            return <String, dynamic>{'text': clipboardText};
+          }
+          return null;
+        },
+      );
+      addTearDown(() {
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        );
+      });
+
+      await createCredentialEntry(
+        requiresAuth: false,
+        secret: 'clave-secreta',
+      );
+
+      await pumpWithWarmProvider(tester);
+
+      await tester.tap(find.byTooltip('Copiar').at(1));
+      await tester.pump();
+
+      expect(clipboardText, 'clave-secreta');
+
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pump();
+
+      expect(clipboardText, '');
+
+      await flushPendingTimers(tester);
+    });
+
+    testWidgets('should_not_clear_clipboard_when_user_copied_something_else',
+        (tester) async {
+      // Simulates a real system clipboard with state.
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (MethodCall call) async {
+          if (call.method == 'Clipboard.setData') {
+            final args = Map<String, dynamic>.from(call.arguments as Map);
+            clipboardText = args['text'] as String?;
+          } else if (call.method == 'Clipboard.getData') {
+            return <String, dynamic>{'text': clipboardText};
+          }
+          return null;
+        },
+      );
+      addTearDown(() {
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        );
+      });
+
+      await createCredentialEntry(
+        requiresAuth: false,
+        secret: 'clave-secreta',
+      );
+
+      await pumpWithWarmProvider(tester);
+
+      await tester.tap(find.byTooltip('Copiar').at(1));
+      await tester.pump();
+
+      expect(clipboardText, 'clave-secreta');
+
+      // The user copies something else before the 30s window elapses.
+      clipboardText = 'otra-cosa';
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pump();
+
+      // Our timer must NOT wipe the user's newer clipboard content.
+      expect(clipboardText, 'otra-cosa');
+
+      await flushPendingTimers(tester);
     });
   });
 }

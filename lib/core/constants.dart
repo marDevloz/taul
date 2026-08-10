@@ -7,6 +7,7 @@ class AppConstants {
   static const String databaseName = 'taul.db';
   static const int fts5MaxResults = 100;
   static const int staleBackupReminderDays = 14;
+  static const int clipboardAutoClearSeconds = 30;
   static const int maxTitleLength = 255;
   static const int maxContentLength = 100000;
 }
