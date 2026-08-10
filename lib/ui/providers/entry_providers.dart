@@ -243,8 +243,23 @@ final entrySearchProvider = StateProvider<String>((ref) => '');
 
 final searchResultsProvider = FutureProvider.autoDispose<List<Entry>>((ref) {
   final query = ref.watch(entrySearchProvider);
-  if (query.isEmpty) return ref.watch(entryListProvider.future);
-  return ref.watch(searchEntriesProvider).call(query);
+  final excludeArchived = ref.watch(excludeArchivedProvider);
+  if (query.isEmpty) return ref.watch(filteredEntriesProvider.future);
+
+  final type = ref.watch(selectedTypeFilterProvider);
+  final tag = ref.watch(selectedTagFilterProvider);
+  final taskStatus = ref.watch(taskStatusFilterProvider);
+  return ref.watch(searchEntriesProvider).call(
+    query,
+    type: type,
+    tag: tag,
+    completedOnly: switch (taskStatus) {
+      TaskStatusFilter.completed => true,
+      TaskStatusFilter.pending => false,
+      null => null,
+    },
+    excludeArchived: excludeArchived,
+  );
 });
 
 final selectedTypeFilterProvider = StateProvider<EntryType?>((ref) => null);

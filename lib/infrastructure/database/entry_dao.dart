@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:logger/logger.dart';
+import 'package:taul/core/constants.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/infrastructure/database/tag_settings_dao.dart';
@@ -147,7 +148,20 @@ class EntryDao {
     return rows.map(_fromDbEntry).toList();
   }
 
-  Future<List<Entry>> search(String query, {int limit = 100}) async {
+  /// Busca entradas cuyo título/contenido/tags coincidan con [query],
+  /// acotando el resultado a los filtros activos ([type], [tag],
+  /// [completedOnly] y [excludeArchived]) para que la búsqueda respete el
+  /// contexto actual de filtrado. El camino FTS5 aplica los filtros en el SQL;
+  /// si la extensión no está disponible, el fallback LIKE aplica los mismos
+  /// filtros.
+  Future<List<Entry>> search(
+    String query, {
+    int limit = AppConstants.fts5MaxResults,
+    String? type,
+    String? tag,
+    bool? completedOnly,
+    bool excludeArchived = false,
+  }) async {
     final sanitized = query.replaceAll('"', '""');
     final tokens = sanitized
         .trim()
@@ -157,31 +171,66 @@ class EntryDao {
     if (tokens.isEmpty) return [];
 
     try {
-      return await _searchFts(tokens, limit);
+      return await _searchFts(
+        tokens,
+        limit,
+        type: type,
+        tag: tag,
+        completedOnly: completedOnly,
+        excludeArchived: excludeArchived,
+      );
     } catch (err) {
       if (!_isFtsUnavailableError(err)) rethrow;
       _log.w(
         'FTS5 unavailable, degrading search to LIKE fallback',
         error: err,
       );
-      return _searchLike(tokens, limit);
+      return _searchLike(
+        tokens,
+        limit,
+        type: type,
+        tag: tag,
+        completedOnly: completedOnly,
+        excludeArchived: excludeArchived,
+      );
     }
   }
 
   /// Full-text search via FTS5. Throws when the FTS table is missing or the
   /// FTS5 extension is unavailable (e.g. on Android system SQLite).
-  Future<List<Entry>> _searchFts(List<String> tokens, int limit) async {
+  Future<List<Entry>> _searchFts(
+    List<String> tokens,
+    int limit, {
+    String? type,
+    String? tag,
+    bool? completedOnly,
+    bool excludeArchived = false,
+  }) async {
     // Prefix match so "git" matches "github", "gitlab", etc.
     final ftsQuery = tokens.map((t) => '$t*').join(' ');
+    final filters = _filterConditions(
+      type: type,
+      tag: tag,
+      completedOnly: completedOnly,
+      excludeArchived: excludeArchived,
+    );
+    final where = [
+      'entries_fts MATCH ?',
+      'e.deleted_at IS NULL',
+      ...filters.conditions,
+    ].join(' AND ');
 
     final rows = await _database.customSelect(
       'SELECT e.* FROM entries e '
       'INNER JOIN entries_fts ON e.id = entries_fts.id '
-      'WHERE entries_fts MATCH ? '
-      'AND e.deleted_at IS NULL '
+      'WHERE $where '
       'ORDER BY bm25(entries_fts) '
       'LIMIT ?',
-      variables: [Variable.withString(ftsQuery), Variable.withInt(limit)],
+      variables: [
+        Variable.withString(ftsQuery),
+        ...filters.variables,
+        Variable.withInt(limit),
+      ],
     ).get();
 
     return rows.map((row) {
@@ -193,8 +242,16 @@ class EntryDao {
   /// Cheap degraded search used when FTS5 is unavailable: substring match on
   /// title, content and tags (the same columns the FTS index covers). Every
   /// token must match (AND semantics), mirroring the FTS query. Non-deleted
-  /// entries only, most recently updated first, capped by [limit].
-  Future<List<Entry>> _searchLike(List<String> tokens, int limit) async {
+  /// entries only, most recently updated first, capped by [limit]. The active
+  /// filters are applied the same way as in the FTS path.
+  Future<List<Entry>> _searchLike(
+    List<String> tokens,
+    int limit, {
+    String? type,
+    String? tag,
+    bool? completedOnly,
+    bool excludeArchived = false,
+  }) async {
     final conditions = <String>[];
     final variables = <Variable>[];
     for (final token in tokens) {
@@ -210,19 +267,73 @@ class EntryDao {
         ..add(Variable.withString(pattern));
     }
 
+    final filters = _filterConditions(
+      type: type,
+      tag: tag,
+      completedOnly: completedOnly,
+      excludeArchived: excludeArchived,
+    );
+    final where = [
+      'e.deleted_at IS NULL',
+      '(${conditions.join(' AND ')})',
+      ...filters.conditions,
+    ].join(' AND ');
+
     final rows = await _database.customSelect(
       'SELECT e.* FROM entries e '
-      'WHERE e.deleted_at IS NULL '
-      'AND (${conditions.join(' AND ')}) '
+      'WHERE $where '
       'ORDER BY e.updated_at DESC '
       'LIMIT ?',
-      variables: [...variables, Variable.withInt(limit)],
+      variables: [...variables, ...filters.variables, Variable.withInt(limit)],
     ).get();
 
     return rows.map((row) {
       final data = Map<String, dynamic>.from(row.data);
       return _fromMap(data);
     }).toList();
+  }
+
+  /// Compiles the SQL conditions of the active filters (type, tag, task
+  /// status, archived), mirroring the semantics of `filteredEntriesProvider`:
+  /// all filters AND together. The tag match is case-insensitive (SQLite LIKE
+  /// is CI by default) over the JSON tags column, same criterion `list()`
+  /// uses for archived. `completedOnly == true` restricts to completed tasks,
+  /// `false` to pending tasks, `null` leaves the task status open.
+  ({List<String> conditions, List<Variable> variables}) _filterConditions({
+    String? type,
+    String? tag,
+    bool? completedOnly,
+    bool excludeArchived = false,
+  }) {
+    final conditions = <String>[];
+    final variables = <Variable>[];
+
+    if (type != null) {
+      conditions.add('e.type = ?');
+      variables.add(Variable.withString(type));
+    }
+
+    if (tag != null && tag.isNotEmpty) {
+      conditions.add("e.tags LIKE ? ESCAPE '\\'");
+      variables.add(Variable.withString('%"${_escapeLikePattern(tag)}"%'));
+    }
+
+    if (completedOnly != null) {
+      conditions.add("e.type = '${EntryType.task.label}'");
+      conditions.add(
+        completedOnly
+            ? 'e.completed_at IS NOT NULL'
+            : 'e.completed_at IS NULL',
+      );
+    }
+
+    if (excludeArchived) {
+      // Mismo criterio que list(): una entrada está archivada si el tag
+      // 'archivado' aparece en su JSON de tags.
+      conditions.add("NOT (e.tags LIKE '%\"archivado\"%')");
+    }
+
+    return (conditions: conditions, variables: variables);
   }
 
   /// Detects errors caused by an unavailable FTS5 extension. A missing table

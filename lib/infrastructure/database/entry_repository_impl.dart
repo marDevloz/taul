@@ -1,3 +1,4 @@
+import 'package:taul/core/constants.dart';
 import 'package:taul/core/errors/failures.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
@@ -35,8 +36,22 @@ class EntryRepositoryImpl implements IEntryRepository {
   }
 
   @override
-  Future<List<Entry>> search(String query, {int limit = 100}) {
-    return _dao.search(query, limit: limit);
+  Future<List<Entry>> search(
+    String query, {
+    int limit = AppConstants.fts5MaxResults,
+    EntryType? type,
+    String? tag,
+    bool? completedOnly,
+    bool excludeArchived = false,
+  }) {
+    return _dao.search(
+      query,
+      limit: limit,
+      type: type?.label,
+      tag: tag,
+      completedOnly: completedOnly,
+      excludeArchived: excludeArchived,
+    );
   }
 
   @override

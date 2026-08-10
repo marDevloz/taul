@@ -23,11 +23,24 @@ void main() {
     });
 
     test('should_call_repository_with_sanitized_query', () async {
-      when(() => repository.search('flutter', limit: 100))
-          .thenAnswer((_) => Future.value([]));
+      when(() => repository.search(
+            'flutter',
+            limit: 100,
+            type: null,
+            tag: null,
+            completedOnly: null,
+            excludeArchived: false,
+          )).thenAnswer((_) => Future.value([]));
 
       await useCase.call('flutter');
-      verify(() => repository.search('flutter', limit: 100)).called(1);
+      verify(() => repository.search(
+            'flutter',
+            limit: 100,
+            type: null,
+            tag: null,
+            completedOnly: null,
+            excludeArchived: false,
+          )).called(1);
     });
 
     test('should_return_matching_entries', () async {
@@ -42,12 +55,47 @@ void main() {
         ),
       ];
 
-      when(() => repository.search('flutter', limit: 100))
-          .thenAnswer((_) => Future.value(entries));
+      when(() => repository.search(
+            'flutter',
+            limit: 100,
+            type: null,
+            tag: null,
+            completedOnly: null,
+            excludeArchived: false,
+          )).thenAnswer((_) => Future.value(entries));
 
       final result = await useCase.call('flutter');
       expect(result.length, 1);
       expect(result.first.title, contains('Flutter'));
+    });
+
+    test('should_forward_active_filters_to_repository', () async {
+      when(() => repository.search(
+            'flutter',
+            limit: 100,
+            type: EntryType.note,
+            tag: 'work',
+            completedOnly: true,
+            excludeArchived: true,
+          )).thenAnswer((_) => Future.value([]));
+
+      final result = await useCase.call(
+        'flutter',
+        type: EntryType.note,
+        tag: 'work',
+        completedOnly: true,
+        excludeArchived: true,
+      );
+
+      expect(result, isEmpty);
+      verify(() => repository.search(
+            'flutter',
+            limit: 100,
+            type: EntryType.note,
+            tag: 'work',
+            completedOnly: true,
+            excludeArchived: true,
+          )).called(1);
     });
   });
 }

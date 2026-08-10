@@ -1,3 +1,4 @@
+import 'package:taul/core/constants.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 
@@ -9,7 +10,14 @@ abstract class IEntryRepository {
     bool includeDeleted = false,
     bool excludeArchived = false,
   });
-  Future<List<Entry>> search(String query, {int limit = 100});
+  Future<List<Entry>> search(
+    String query, {
+    int limit = AppConstants.fts5MaxResults,
+    EntryType? type,
+    String? tag,
+    bool? completedOnly,
+    bool excludeArchived = false,
+  });
   Future<Entry> update(Entry entry);
   Future<void> softDelete(String id);
   Future<void> hardDelete(String id);

@@ -26,7 +26,14 @@ class _FakeEntryRepository implements IEntryRepository {
   }) async => [];
 
   @override
-  Future<List<Entry>> search(String query, {int limit = 100}) async => [];
+  Future<List<Entry>> search(
+    String query, {
+    int limit = 100,
+    EntryType? type,
+    String? tag,
+    bool? completedOnly,
+    bool excludeArchived = false,
+  }) async => [];
 
   @override
   Future<Entry> update(Entry entry) async => entry;
