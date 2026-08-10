@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 
 class EncryptionPayload {
@@ -54,6 +54,24 @@ class EntryAuthService {
     );
     final bytes = await key.extractBytes();
     return Uint8List.fromList(bytes);
+  }
+
+  /// Derives the master key off the UI isolate via [compute].
+  ///
+  /// The synchronous [deriveMasterKey] instance method is preserved for
+  /// test usage (e.g. FastAuthService).
+  static Future<Uint8List> deriveMasterKeyIsolated({
+    required String password,
+    required Uint8List salt,
+  }) {
+    return compute(_deriveInIsolate, (password: password, salt: salt));
+  }
+
+  static Future<Uint8List> _deriveInIsolate(
+    ({String password, Uint8List salt}) args,
+  ) async {
+    final service = EntryAuthService();
+    return service.deriveMasterKey(password: args.password, salt: args.salt);
   }
 
   Future<String> hashMasterPassword({

@@ -171,23 +171,28 @@ class CredentialProtectionController {
       if (!context.mounted) return null;
 
       final salt = _authService.hexToBytes(config.saltHex);
+      Uint8List? capturedKek;
       final password = await _askForPassword(
         context,
         verify: (pwd) async {
-          return _authService.verifyMasterPassword(
-            password: pwd,
-            salt: salt,
-            expectedHashHex: config.hashHex,
-          );
+          final kek =
+              await EntryAuthService.deriveMasterKeyIsolated(
+                password: pwd,
+                salt: salt,
+              );
+          final computedHash = _authService.bytesToHex(kek);
+          final expectedHash = config.hashHex.toLowerCase();
+          if (computedHash == expectedHash) {
+            capturedKek = kek;
+            return true;
+          }
+          return false;
         },
       );
       if (password == null) return null;
 
-      // Derive KEK and unwrap DEK
-      final kek = await _authService.deriveMasterKey(
-        password: password,
-        salt: salt,
-      );
+      // Reuse the KEK derived in the verify callback (single derivation)
+      final kek = capturedKek!;
       final dek = await _authService.unwrapStorageKey(
         payload: EncryptionPayload(
           ciphertextHex: config.encryptedStorageKeyHex!,
@@ -205,21 +210,26 @@ class CredentialProtectionController {
       if (!context.mounted) return null;
 
       final salt = _authService.hexToBytes(config.saltHex);
+      Uint8List? capturedKey;
       final password = await _askForPassword(
         context,
         verify: (pwd) async {
-          return _authService.verifyMasterPassword(
-            password: pwd,
-            salt: salt,
-            expectedHashHex: config.hashHex,
-          );
+          final key =
+              await EntryAuthService.deriveMasterKeyIsolated(
+                password: pwd,
+                salt: salt,
+              );
+          final computedHash = _authService.bytesToHex(key);
+          final expectedHash = config.hashHex.toLowerCase();
+          if (computedHash == expectedHash) {
+            capturedKey = key;
+            return true;
+          }
+          return false;
         },
       );
       if (password == null) return null;
-      final key = await _authService.deriveMasterKey(
-        password: password,
-        salt: salt,
-      );
+      final key = capturedKey!;
       _masterPasswordNotifier?.setMasterPassword(key);
       return key;
     }
@@ -321,22 +331,28 @@ class CredentialProtectionController {
     }
 
     final salt = _authService.hexToBytes(config.saltHex);
+    Uint8List? capturedKek;
     final password = await _askForPassword(
       context,
       verify: (pwd) async {
-        return _authService.verifyMasterPassword(
-          password: pwd,
-          salt: salt,
-          expectedHashHex: config.hashHex,
-        );
+        final kek =
+            await EntryAuthService.deriveMasterKeyIsolated(
+              password: pwd,
+              salt: salt,
+            );
+        final computedHash = _authService.bytesToHex(kek);
+        final expectedHash = config.hashHex.toLowerCase();
+        if (computedHash == expectedHash) {
+          capturedKek = kek;
+          return true;
+        }
+        return false;
       },
     );
     if (password == null) throw const UserCancelledException();
 
-    final kek = await _authService.deriveMasterKey(
-      password: password,
-      salt: salt,
-    );
+    // Reuse the KEK derived in the verify callback (single derivation)
+    final kek = capturedKek!;
     final dek = await _authService.unwrapStorageKey(
       payload: EncryptionPayload(
         ciphertextHex: config.encryptedStorageKeyHex!,
@@ -421,27 +437,39 @@ class CredentialProtectionController {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocalState) => AlertDialog(
           title: const Text('Master password'),
-          content: TextField(
-            controller: ctrl,
-            obscureText: obscurePassword,
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            onSubmitted: loading
-                ? null
-                : (_) => onVerify(setLocalState, ctrl.text),
-            decoration: InputDecoration(
-              labelText: 'Ingresá tu master password',
-              errorText: error,
-              suffixIcon: IconButton(
-                icon: Icon(
-                  obscurePassword
-                      ? Icons.visibility_off_rounded
-                      : Icons.visibility_rounded,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: ctrl,
+                obscureText: obscurePassword,
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: loading
+                    ? null
+                    : (_) => onVerify(setLocalState, ctrl.text),
+                decoration: InputDecoration(
+                  labelText: 'Ingresá tu master password',
+                  errorText: error,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      obscurePassword
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded,
+                    ),
+                    onPressed: () =>
+                        setLocalState(() => obscurePassword = !obscurePassword),
+                  ),
                 ),
-                onPressed: () =>
-                    setLocalState(() => obscurePassword = !obscurePassword),
               ),
-            ),
+              if (loading) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Verificando, puede tardar unos segundos…',
+                  style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                ),
+              ],
+            ],
           ),
           actions: [
             TextButton(
