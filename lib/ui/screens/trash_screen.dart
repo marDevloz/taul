@@ -6,6 +6,8 @@ import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/widgets/entry_card.dart';
 
+enum TrashAction { restore, delete }
+
 class TrashScreen extends ConsumerWidget {
   const TrashScreen({super.key});
 
@@ -108,20 +110,20 @@ class TrashScreen extends ConsumerWidget {
           ),
         ],
       ),
-      trailingAction: PopupMenuButton<String>(
+      trailingAction: PopupMenuButton<TrashAction>(
         icon: const Icon(Icons.more_vert),
-        onSelected: (value) =>
-            _handleAction(context, ref, entry, value),
+        onSelected: (action) =>
+            _handleAction(context, ref, entry, action),
         itemBuilder: (_) => [
           const PopupMenuItem(
-            value: 'restore',
+            value: TrashAction.restore,
             child: ListTile(
               leading: Icon(Icons.restore),
               title: Text('Restaurar'),
             ),
           ),
           const PopupMenuItem(
-            value: 'delete',
+            value: TrashAction.delete,
             child: ListTile(
               leading: Icon(Icons.delete_forever, color: Colors.red),
               title: Text(
@@ -139,11 +141,11 @@ class TrashScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Entry entry,
-    String value,
+    TrashAction action,
   ) async {
-    if (value == 'restore') {
+    if (action == TrashAction.restore) {
       await _restoreEntry(context, ref, entry);
-    } else if (value == 'delete') {
+    } else if (action == TrashAction.delete) {
       await _permanentlyDelete(context, ref, entry);
     }
   }
@@ -190,7 +192,7 @@ class TrashScreen extends ConsumerWidget {
     );
     if (confirmed != true) return;
 
-    await ref.read(entryRepositoryProvider).hardDelete(entry.id);
+    await ref.read(permanentlyDeleteEntryProvider).call(entry.id);
     ref.invalidate(trashListProvider);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

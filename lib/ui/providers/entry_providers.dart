@@ -12,6 +12,7 @@ import 'package:taul/domain/usecases/empty_trash.dart';
 import 'package:taul/domain/usecases/get_entry.dart';
 import 'package:taul/domain/usecases/list_entries.dart';
 import 'package:taul/domain/usecases/mark_as_completed.dart';
+import 'package:taul/domain/usecases/permanently_delete_entry.dart';
 import 'package:taul/domain/usecases/restore_entry.dart';
 import 'package:taul/domain/usecases/search_entries.dart';
 import 'package:taul/domain/usecases/toggle_entry_tag.dart';
@@ -23,7 +24,6 @@ import 'package:taul/infrastructure/database/tag_settings_dao.dart';
 import 'package:taul/infrastructure/database/tag_settings_repository_impl.dart';
 import 'package:taul/domain/repositories/i_tag_settings_repository.dart';
 import 'package:taul/infrastructure/backup/backup_timestamp_store.dart';
-import 'package:taul/infrastructure/export/export_service.dart';
 import 'package:taul/infrastructure/export/encrypted_export_service.dart';
 import 'package:taul/infrastructure/export/import_service.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
@@ -156,10 +156,6 @@ final tagSettingsRepositoryProvider = Provider<ITagSettingsRepository>((ref) {
   return TagSettingsRepositoryImpl(dao: ref.watch(tagSettingsDaoProvider));
 });
 
-final exportServiceProvider = Provider<ExportService>((ref) {
-  return ExportService();
-});
-
 final encryptedExportServiceProvider = Provider<EncryptedExportService>((ref) {
   return EncryptedExportService(
     authService: ref.watch(entryAuthServiceProvider),
@@ -204,6 +200,10 @@ final updateEntryProvider = Provider<UpdateEntry>((ref) {
 
 final deleteEntryProvider = Provider<DeleteEntry>((ref) {
   return DeleteEntry(repository: ref.watch(entryRepositoryProvider));
+});
+
+final permanentlyDeleteEntryProvider = Provider<PermanentlyDeleteEntry>((ref) {
+  return PermanentlyDeleteEntry(repository: ref.watch(entryRepositoryProvider));
 });
 
 final restoreEntryProvider = Provider<RestoreEntry>((ref) {

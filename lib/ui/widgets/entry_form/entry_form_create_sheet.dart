@@ -171,6 +171,12 @@ class _EntryFormCreateSheetState extends ConsumerState<EntryFormCreateSheet> {
             _buildHeader(theme, state),
             const SizedBox(height: 16),
 
+            // 0. Detected type hint (ported from quick_add_sheet)
+            if (state.detectedType != null) ...[
+              _buildDetectedTypeBanner(theme, state.detectedType!),
+              const SizedBox(height: 12),
+            ],
+
             // 1. Title
             TextField(
               controller: widget.titleCtrl,
@@ -282,6 +288,36 @@ class _EntryFormCreateSheetState extends ConsumerState<EntryFormCreateSheet> {
           onSelected: _onTypeSelected,
         ),
       ],
+    );
+  }
+
+  /// Banner compacto que muestra el tipo de entrada detectado del contenido.
+  /// Portado del antiguo quick_add_sheet.
+  Widget _buildDetectedTypeBanner(ThemeData theme, EntryType detected) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            iconForType(detected),
+            size: 14,
+            color: theme.colorScheme.secondary,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Detectado: ${labelForType(detected)} — ${_typeHints[detected]}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSecondaryContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

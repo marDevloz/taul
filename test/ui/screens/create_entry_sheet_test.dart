@@ -10,6 +10,7 @@ import 'package:taul/ui/providers/entry_draft_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/providers/tag_settings_providers.dart';
 import 'package:taul/ui/screens/create_entry_sheet.dart';
+import 'package:taul/ui/widgets/rich_text_editor.dart';
 
 /// Fake repository that never touches the DB.
 class _FakeEntryRepository implements IEntryRepository {
@@ -138,6 +139,70 @@ void main() {
 
       // Draft title should NOT exist
       expect(find.text('Restored Title'), findsNothing);
+    });
+  });
+
+  group('CreateEntrySheet — detected type banner', () {
+    // Shared overrides: fake repo + empty providers, no draft.
+    ProviderContainer buildContainer() {
+      final container = ProviderContainer(
+        overrides: [
+          entryRepositoryProvider.overrideWith((ref) => _FakeEntryRepository()),
+          entryListProvider.overrideWith((ref) async => []),
+          tagSettingsListProvider.overrideWith((ref) async => []),
+          entryDraftProvider.overrideWith((ref) => EntryDraftNotifier()),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    testWidgets('should_show_detected_type_banner_when_content_triggers_a_type',
+        (tester) async {
+      await tester.pumpWidget(_buildApp(buildContainer()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final editor =
+          tester.state<RichTextEditorState>(find.byType(RichTextEditor));
+      editor.controller.replaceText(
+        0,
+        0,
+        '!idea genial',
+        const TextSelection.collapsed(offset: '!idea genial'.length),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('Detectado: Idea'), findsOneWidget);
+    });
+
+    testWidgets('should_hide_detected_type_banner_when_content_is_cleared',
+        (tester) async {
+      await tester.pumpWidget(_buildApp(buildContainer()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final editor =
+          tester.state<RichTextEditorState>(find.byType(RichTextEditor));
+      editor.controller.replaceText(
+        0,
+        0,
+        'Término: definición',
+        const TextSelection.collapsed(offset: 'Término: definición'.length),
+      );
+      await tester.pump();
+      expect(find.textContaining('Detectado: Glosario'), findsOneWidget);
+
+      final fullLength = editor.controller.document.toPlainText().length;
+      editor.controller.replaceText(
+        0,
+        fullLength,
+        '',
+        const TextSelection.collapsed(offset: 0),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('Detectado:'), findsNothing);
     });
   });
 }
