@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:logger/logger.dart';
 import 'package:taul/core/constants.dart';
 import 'package:taul/core/errors/error_mapper.dart';
+import 'package:taul/infrastructure/export/import_service.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/auto_lock_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
@@ -846,20 +847,73 @@ class SettingsScreen extends ConsumerWidget {
     // 2. Progress dialog
     _showProgressDialog(context, 'Importando datos...');
 
+    final importService = ref.read(importServiceProvider);
+    var progressShown = true;
+
     try {
-      // 3. Import
-      final importService = ref.read(importServiceProvider);
-      final result = await importService.importFromFile(context);
+      // 3. Pick the file ONCE and classify it (plain vs encrypted backup).
+      final picked = await importService.pickImportFile(context);
 
       if (!context.mounted) return;
 
-      // 4. Dismiss progress
+      // 4. Dismiss progress before prompting for a passphrase (if needed).
       Navigator.of(context).pop();
+      progressShown = false;
 
-      // 5. Invalidate entry list
+      if (picked.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(picked.error!)),
+        );
+        return;
+      }
+      // User cancelled the file picker.
+      if (picked.json == null) return;
+
+      // 5. Import
+      final ImportResult result;
+      if (picked.encrypted) {
+        // Encrypted backup: ask for the passphrase used at export time.
+        final passphrase = await showDialog<String>(
+          context: context,
+          builder: (_) => const ExportPassphraseDialog(
+            title: 'Contraseña del backup',
+            description: 'Ingresá la contraseña que usaste al exportar el '
+                'backup. Es independiente de tu contraseña maestra.',
+            confirmButtonLabel: 'Importar backup',
+          ),
+        );
+        if (passphrase == null || passphrase.isEmpty || !context.mounted) {
+          return;
+        }
+
+        result = await importService.importEncryptedJson(
+          picked.json!,
+          passphrase: passphrase,
+          exportService: ref.read(encryptedExportServiceProvider),
+        );
+      } else {
+        result = await importService.importFromJsonString(picked.json!);
+      }
+
+      if (!context.mounted) return;
+
+      // 6. Wrong passphrase or corrupted backup: single friendly message.
+      if (result.imported == 0 &&
+          result.skipped == 0 &&
+          result.errors.length == 1 &&
+          result.errors.single == ImportService.wrongPassphraseErrorMessage) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(ImportService.wrongPassphraseErrorMessage),
+          ),
+        );
+        return;
+      }
+
+      // 7. Invalidate entry list
       ref.invalidate(entryListProvider);
 
-      // 6. Build result message
+      // 8. Build result message
       final buffer = StringBuffer();
       buffer.write('Se importaron ${result.imported} entradas.');
       if (result.skipped > 0) {
@@ -909,7 +963,10 @@ class SettingsScreen extends ConsumerWidget {
     } catch (e, st) {
       Logger().e('Data import failed', error: e, stackTrace: st);
       if (context.mounted) {
-        Navigator.of(context).pop();
+        // Only pop the progress dialog if it is still the top route.
+        if (progressShown) {
+          Navigator.of(context).pop();
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(

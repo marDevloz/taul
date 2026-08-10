@@ -4,7 +4,18 @@ import 'package:flutter/material.dart';
 ///
 /// Returns the passphrase string if confirmed, or null if cancelled.
 class ExportPassphraseDialog extends StatefulWidget {
-  const ExportPassphraseDialog({super.key});
+  const ExportPassphraseDialog({
+    super.key,
+    this.title = 'Contraseña de exportación',
+    this.description =
+        'Creá una contraseña para cifrar la exportación. '
+        'Es independiente de tu contraseña maestra.',
+    this.confirmButtonLabel = 'Cifrar y exportar',
+  });
+
+  final String title;
+  final String description;
+  final String confirmButtonLabel;
 
   @override
   State<ExportPassphraseDialog> createState() => _ExportPassphraseDialogState();
@@ -46,14 +57,13 @@ class _ExportPassphraseDialogState extends State<ExportPassphraseDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Contraseña de exportación'),
+      title: Text(widget.title),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'Creá una contraseña para cifrar la exportación. '
-            'Es independiente de tu contraseña maestra.',
-            style: TextStyle(fontSize: 13),
+          Text(
+            widget.description,
+            style: const TextStyle(fontSize: 13),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -93,7 +103,7 @@ class _ExportPassphraseDialogState extends State<ExportPassphraseDialog> {
         ),
         FilledButton(
           onPressed: _onConfirm,
-          child: const Text('Cifrar y exportar'),
+          child: Text(widget.confirmButtonLabel),
         ),
       ],
     );
