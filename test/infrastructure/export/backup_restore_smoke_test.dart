@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -118,7 +119,18 @@ void main() {
       );
       expect(decrypted, isNotNull);
 
-      final result = await importService.importFromJsonString(decrypted!);
+      // The backup carries an export timestamp and entry count that survive
+      // encryption/decryption untouched.
+      final backupJson = jsonDecode(decrypted!) as Map<String, dynamic>;
+      expect(backupJson['entryCount'], 4);
+      final exportedAt = DateTime.tryParse(backupJson['exportedAt'] as String);
+      expect(exportedAt, isNotNull);
+      expect(
+        DateTime.now().toUtc().difference(exportedAt!.toUtc()).inSeconds.abs(),
+        lessThan(60),
+      );
+
+      final result = await importService.importFromJsonString(decrypted);
       expect(result.imported, 4);
       expect(result.skipped, 0);
       expect(result.hasErrors, isFalse);
