@@ -76,7 +76,11 @@ Future<String?> _askForMasterPassword(
   var obscurePassword = true;
   var loading = false;
 
-  Future<void> onVerify(StateSetter setLocalState, String password) async {
+  Future<void> onVerify(
+    StateSetter setLocalState,
+    String password,
+    BuildContext dialogContext,
+  ) async {
     if (password.isEmpty) {
       setLocalState(() => error = 'Ingresá tu contraseña');
       return;
@@ -95,7 +99,7 @@ Future<String?> _askForMasterPassword(
       final isValid = await verify(password);
       if (isValid) {
         lockout.resetAttempts('master_password');
-        Navigator.pop(context, password);
+        Navigator.pop(dialogContext, password);
       } else {
         final locked = lockout.recordFailedAttempt('master_password');
         setLocalState(() {
@@ -124,7 +128,7 @@ Future<String?> _askForMasterPassword(
           obscureText: obscurePassword,
           autofocus: true,
           textInputAction: TextInputAction.done,
-          onSubmitted: loading ? null : (_) => onVerify(setLocalState, ctrl.text),
+          onSubmitted: loading ? null : (_) => onVerify(setLocalState, ctrl.text, ctx),
           decoration: InputDecoration(
             labelText: 'Ingresá tu master password',
             errorText: error,
@@ -145,7 +149,7 @@ Future<String?> _askForMasterPassword(
             child: const Text('Cancelar'),
           ),
           FilledButton(
-            onPressed: loading ? null : () => onVerify(setLocalState, ctrl.text),
+            onPressed: loading ? null : () => onVerify(setLocalState, ctrl.text, ctx),
             child: loading
                 ? const SizedBox(
                     width: 16,

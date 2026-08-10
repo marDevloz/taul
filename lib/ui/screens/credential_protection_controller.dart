@@ -315,11 +315,17 @@ class CredentialProtectionController {
   /// Throws [UserCancelledException] if the user cancels the password dialog.
   /// Throws [Exception] if the password is wrong or the MP is not configured.
   Future<Uint8List> requireMasterKey(BuildContext context) async {
-    if (_cachedDek != null) return _cachedDek!;
+    final swTotal = Stopwatch()..start();
+    print('[TIMING] requireMasterKey start');
+    if (_cachedDek != null) {
+      print('[TIMING] requireMasterKey: returning cached DEK (${swTotal.elapsedMilliseconds}ms)');
+      return _cachedDek!;
+    }
 
     final cached = _masterPasswordNotifier?.cachedKey;
     if (cached != null) {
       _cachedDek = cached;
+      print('[TIMING] requireMasterKey: returning notifier-cached DEK (${swTotal.elapsedMilliseconds}ms)');
       return cached;
     }
 
@@ -332,27 +338,38 @@ class CredentialProtectionController {
 
     final salt = _authService.hexToBytes(config.saltHex);
     Uint8List? capturedKek;
+    final swVerify = Stopwatch()..start();
+    print('[TIMING] _askForPassword start');
     final password = await _askForPassword(
       context,
       verify: (pwd) async {
+        print('[TIMING] verify callback: deriveMasterKeyIsolated start');
+        final swDerive = Stopwatch()..start();
         final kek =
             await EntryAuthService.deriveMasterKeyIsolated(
               password: pwd,
               salt: salt,
             );
+        print('[TIMING] deriveMasterKeyIsolated: ${swDerive.elapsedMilliseconds}ms');
         final computedHash = _authService.bytesToHex(kek);
         final expectedHash = config.hashHex.toLowerCase();
-        if (computedHash == expectedHash) {
+        final match = computedHash == expectedHash;
+        print('[TIMING] hash comparison: ${match ? "MATCH" : "MISMATCH"} (computed=${computedHash.substring(0, 16)}..., expected=${expectedHash.substring(0, 16)}...)');
+        if (match) {
           capturedKek = kek;
           return true;
         }
         return false;
       },
     );
+    print('[TIMING] _askForPassword total: ${swVerify.elapsedMilliseconds}ms');
+    print('[TIMING] _askForPassword returned: ${password != null ? "password received" : "null (cancelled)"}');
     if (password == null) throw const UserCancelledException();
 
     // Reuse the KEK derived in the verify callback (single derivation)
     final kek = capturedKek!;
+    print('[TIMING] About to unwrapStorageKey');
+    final swUnwrap = Stopwatch()..start();
     final dek = await _authService.unwrapStorageKey(
       payload: EncryptionPayload(
         ciphertextHex: config.encryptedStorageKeyHex!,
@@ -361,8 +378,11 @@ class CredentialProtectionController {
       ),
       kek: kek,
     );
+    print('[TIMING] unwrapStorageKey: ${swUnwrap.elapsedMilliseconds}ms');
+    print('[TIMING] requireMasterKey total: ${swTotal.elapsedMilliseconds}ms');
 
     _cachedDek = dek;
+    print('[TIMING] requireMasterKey returning dek (${dek.length} bytes)');
     return dek;
   }
 
@@ -392,7 +412,11 @@ class CredentialProtectionController {
     var obscurePassword = true;
     var loading = false;
 
-    Future<void> onVerify(StateSetter setLocalState, String password) async {
+    Future<void> onVerify(
+      StateSetter setLocalState,
+      String password,
+      BuildContext dialogContext,
+    ) async {
       if (password.isEmpty) {
         setLocalState(() => error = 'Ingresá tu contraseña');
         return;
@@ -410,10 +434,14 @@ class CredentialProtectionController {
         error = null;
       });
       try {
+        print('[TIMING] Calling verify callback');
         final isValid = await verify(password);
+        print('[TIMING] verify returned: $isValid');
         if (isValid) {
           lockout.resetAttempts('master_password');
-          Navigator.pop(context, password);
+          print('[TIMING] About to Navigator.pop with password');
+          Navigator.pop(dialogContext, password);
+          print('[TIMING] Navigator.pop executed');
         } else {
           final locked = lockout.recordFailedAttempt('master_password');
           setLocalState(() {
@@ -423,7 +451,9 @@ class CredentialProtectionController {
                 : 'Contraseña incorrecta';
           });
         }
-      } catch (_) {
+      } catch (e, st) {
+        print('[TIMING] ERROR in verify: $e');
+        print('[TIMING] Stack trace: $st');
         setLocalState(() {
           loading = false;
           error = 'Error al verificar';
@@ -447,7 +477,7 @@ class CredentialProtectionController {
                 textInputAction: TextInputAction.done,
                 onSubmitted: loading
                     ? null
-                    : (_) => onVerify(setLocalState, ctrl.text),
+                    : (_) => onVerify(setLocalState, ctrl.text, ctx),
                 decoration: InputDecoration(
                   labelText: 'Ingresá tu master password',
                   errorText: error,
@@ -479,7 +509,7 @@ class CredentialProtectionController {
             FilledButton(
               onPressed: loading
                   ? null
-                  : () => onVerify(setLocalState, ctrl.text),
+                  : () => onVerify(setLocalState, ctrl.text, ctx),
               child: loading
                   ? const SizedBox(
                       width: 18,
