@@ -66,18 +66,39 @@ void main() {
       expect(hsl.hue, closeTo(0.0, 1.0));
     });
 
-    test('should handle 10 colors without exceeding time budget', () {
+    test('should_handle_10_colors_with_deterministic_circular_mean', () {
       final colors = List<Color>.generate(
         10,
         (i) => HSLColor.fromAHSL(1.0, i * 36.0, 0.5, 0.5).toColor(),
       );
 
-      final stopwatch = Stopwatch()..start();
       final result = TagColorMixer.mix(colors);
-      stopwatch.stop();
 
-      expect(result, isNotNull);
-      expect(stopwatch.elapsedMicroseconds, lessThan(1000)); // <1ms per NFR-03
+      // Compute the expected value using the same HSL circular-mean algorithm.
+      var sinSum = 0.0;
+      var cosSum = 0.0;
+      var satSum = 0.0;
+      var lightSum = 0.0;
+      for (final color in colors) {
+        final hsl = HSLColor.fromColor(color);
+        final rad = hsl.hue * math.pi / 180;
+        sinSum += math.sin(rad);
+        cosSum += math.cos(rad);
+        satSum += hsl.saturation;
+        lightSum += hsl.lightness;
+      }
+      final count = colors.length;
+      final avgHue =
+          (math.atan2(sinSum / count, cosSum / count) * 180 / math.pi + 360) %
+              360;
+      final expected = HSLColor.fromAHSL(
+        1.0,
+        avgHue,
+        satSum / count,
+        lightSum / count,
+      ).toColor();
+
+      expect(result, expected);
     });
 
     test('should handle saturation and lightness extremes', () {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -83,7 +84,8 @@ void main() {
         req.headers.contentType = ContentType.json;
         req.write('{"deviceId":"dev1"}');
         final res = await req.close().timeout(
-          const Duration(seconds: 5),
+          // Fail-fast guard against a hung connection, not a deliberate wait.
+          const Duration(seconds: 2),
         );
         expect(res.statusCode, 403);
       } finally {
@@ -98,11 +100,18 @@ void main() {
       when(() => certManager.getContext())
           .thenAnswer((_) => realCert.getContext());
 
+      // Hold the first request open with a gate so the second request is
+      // guaranteed to arrive while the first is still being handled. This
+      // replaces the previous 2s wall-clock sleep in the handler.
+      final handlerStarted = Completer<void>();
+      final releaseResponse = Completer<void>();
+
       server = SyncServer(
         certManager: certManager,
         pairingCode: '123456',
         onRequest: (_) async {
-          await Future<void>.delayed(const Duration(seconds: 2));
+          if (!handlerStarted.isCompleted) handlerStarted.complete();
+          await releaseResponse.future;
           return const SyncResponse(
             deviceId: 'test',
             entriesReceived: 0,
@@ -122,6 +131,11 @@ void main() {
         req1.headers.set('x-pairing-code', '123456');
         req1.headers.contentType = ContentType.json;
         req1.write('{"deviceId":"dev1"}');
+        final res1Future = req1.close();
+
+        // Wait until the server has started handling the first request
+        // before sending the concurrent one.
+        await handlerStarted.future;
 
         final req2 = await client.postUrl(
           Uri.parse('https://localhost:$port/sync'),
@@ -130,13 +144,17 @@ void main() {
         req2.headers.contentType = ContentType.json;
         req2.write('{"deviceId":"dev2"}');
 
-        final res1 = await req1.close();
         final res2 = await req2.close();
+
+        // Release the first handler so req1 completes with 200.
+        releaseResponse.complete();
+        final res1 = await res1Future;
 
         final codes = [res1.statusCode, res2.statusCode]..sort();
         expect(codes, contains(429));
       } finally {
         client.close();
+        if (!releaseResponse.isCompleted) releaseResponse.complete();
       }
     });
   });

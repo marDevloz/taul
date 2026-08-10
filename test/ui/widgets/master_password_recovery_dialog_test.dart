@@ -54,12 +54,30 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
   }
 
+  /// Pumps the widget tree until [done] is satisfied, advancing the fake test
+  /// clock 100ms per step. Replaces the previous real wall-clock
+  /// `Future.delayed` sleeps (fake time is deterministic and fast).
+  Future<void> pumpUntil(
+    WidgetTester tester, {
+    required bool Function() done,
+    String description = 'condition',
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    final endTime = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(endTime)) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (done()) return;
+    }
+    fail('Timed out waiting for $description');
+  }
+
   /// Shortcut: enter a valid backup code and tap Verify, then wait for
   /// the async verification + consumption to complete.
   Future<void> verifyCode(
     WidgetTester tester,
-    String code,
-  ) async {
+    String code, {
+    required Finder done,
+  }) async {
     await tester.enterText(
       find.widgetWithText(TextField, 'Código de respaldo'),
       code,
@@ -68,16 +86,13 @@ void main() {
     await tester.tap(find.text('Verificar'));
     await tester.pump();
 
-    // Wait for Argon2id verification + DB consumption
-    await tester.runAsync(() async {
-      await Future.delayed(const Duration(seconds: 3));
-    });
-    await tester.pump();
+    // Wait for verification + DB consumption to finish.
+    await pumpUntil(tester, done: () => done.evaluate().isNotEmpty);
     await tester.pump(const Duration(milliseconds: 200));
   }
 
   /// Shortcut: fill the new-password form and tap Set Password.
-  /// Returns after the async save completes.
+  /// Returns after the async save completes (dialog pops).
   Future<void> setNewPassword(
     WidgetTester tester, {
     String password = 'new-password-123',
@@ -94,11 +109,12 @@ void main() {
     await tester.tap(find.text('Establecer Contraseña'));
     await tester.pump();
 
-    // Wait for crypto operations + DB write
-    await tester.runAsync(() async {
-      await Future.delayed(const Duration(seconds: 3));
-    });
-    await tester.pump();
+    // Wait for crypto operations + DB save to finish (dialog pops).
+    await pumpUntil(
+      tester,
+      done: () => find.text('Recuperar Contraseña Maestra').evaluate().isEmpty,
+      description: 'recovery dialog to pop after saving',
+    );
     await tester.pump(const Duration(milliseconds: 200));
   }
 
@@ -161,11 +177,12 @@ void main() {
       await tester.tap(find.text('Verificar'));
       await tester.pump();
 
-      // Wait for Argon2id verification (10 codes to scan)
-      await tester.runAsync(() async {
-        await Future.delayed(const Duration(seconds: 3));
-      });
-      await tester.pump();
+      // Wait for verification to finish.
+      await pumpUntil(
+        tester,
+        done: () => find.textContaining('Código inválido').evaluate().isNotEmpty,
+        description: 'wrong-code error to appear',
+      );
       await tester.pump(const Duration(milliseconds: 200));
 
       // Should show error about invalid code
@@ -192,10 +209,12 @@ void main() {
       await tester.pump();
 
       // Wait for verification (scan fast hashes) + consumption (DB write)
-      await tester.runAsync(() async {
-        await Future.delayed(const Duration(seconds: 3));
-      });
-      await tester.pump();
+      await pumpUntil(
+        tester,
+        done: () =>
+            find.text('Configurar Nueva Contraseña Maestra').evaluate().isNotEmpty,
+        description: 'new password form to appear',
+      );
       await tester.pump(const Duration(milliseconds: 200));
 
       // Should show new MP form
@@ -286,7 +305,8 @@ void main() {
           // ── Act: recovery flow ──
           await tester.pumpWidget(createTestApp());
           await openDialog(tester);
-          await verifyCode(tester, codes.plainCodes[0]);
+          await verifyCode(tester, codes.plainCodes[0],
+              done: find.text('Configurar Nueva Contraseña Maestra'));
           await setNewPassword(tester);
 
           // ── Assert: DEK preserved ──
@@ -324,7 +344,8 @@ void main() {
           // ── Act: recovery flow ──
           await tester.pumpWidget(createTestApp());
           await openDialog(tester);
-          await verifyCode(tester, codes.plainCodes[0]);
+          await verifyCode(tester, codes.plainCodes[0],
+              done: find.text('Configurar Nueva Contraseña Maestra'));
           await setNewPassword(tester);
 
           // ── Assert: new DEK generated, new backup data saved ──
@@ -369,7 +390,8 @@ void main() {
           // ── Act ──
           await tester.pumpWidget(createTestApp());
           await openDialog(tester);
-          await verifyCode(tester, codes.plainCodes[1]); // consume index 1
+          await verifyCode(tester, codes.plainCodes[1],
+              done: find.text('Configurar Nueva Contraseña Maestra')); // consume index 1
 
           // ── Assert: both arrays consumed by 1 ──
           // We're on the new-password form now, so consumption has happened

@@ -1,3 +1,4 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:taul/domain/entities/sync_state.dart';
@@ -96,15 +97,25 @@ void main() {
       expect(states, contains(SyncState.complete));
     });
 
-    test('emits error then recovers to idle', () async {
+    test('emits error then recovers to idle', () {
       when(() => server.start()).thenThrow(Exception('fail'));
 
-      await service.startServer();
-      await Future<void>.delayed(Duration.zero);
-      expect(service.currentState, SyncState.error);
+      // The 5s recovery timer in SyncService is driven deterministically by
+      // FakeAsync instead of sleeping real wall-clock seconds.
+      fakeAsync((async) {
+        final states = <SyncState>[];
+        service.stateStream.listen(states.add);
 
-      await Future<void>.delayed(const Duration(seconds: 6));
-      expect(service.currentState, SyncState.idle);
+        service.startServer();
+        async.flushMicrotasks();
+
+        expect(states, contains(SyncState.error));
+        expect(service.currentState, SyncState.error);
+
+        async.elapse(const Duration(seconds: 6));
+        expect(service.currentState, SyncState.idle);
+        expect(states, contains(SyncState.idle));
+      });
     });
   });
 

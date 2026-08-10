@@ -49,6 +49,23 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
   }
 
+  /// Pumps the widget tree until [done] is satisfied, advancing the fake test
+  /// clock 100ms per step. Replaces the previous real wall-clock
+  /// `Future.delayed` sleeps (fake time is deterministic and fast).
+  Future<void> pumpUntil(
+    WidgetTester tester, {
+    required bool Function() done,
+    String description = 'condition',
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    final endTime = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(endTime)) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (done()) return;
+    }
+    fail('Timed out waiting for $description');
+  }
+
   group('T-14: MasterPasswordSetupDialog widget tests', () {
     group('setup mode', () {
       testWidgets('should_render_password_confirm_and_hint_fields_in_setup_mode',
@@ -126,11 +143,11 @@ void main() {
         await tester.pump();
 
         // Wait for async backup code generation (fake auth is instant)
-        await tester.runAsync(() async {
-          await Future.delayed(const Duration(milliseconds: 500));
-        });
-
-        await tester.pump();
+        await pumpUntil(
+          tester,
+          done: () => find.text('Copiar todo').evaluate().isNotEmpty,
+          description: 'backup codes step to appear',
+        );
         await tester.pump(const Duration(milliseconds: 200));
 
         // Should now show backup codes step
@@ -164,10 +181,11 @@ void main() {
         await tester.tap(find.text('Siguiente'));
         await tester.pump();
 
-        await tester.runAsync(() async {
-          await Future.delayed(const Duration(milliseconds: 500));
-        });
-        await tester.pump();
+        await pumpUntil(
+          tester,
+          done: () => find.text('Copiar todo').evaluate().isNotEmpty,
+          description: 'backup codes step to appear',
+        );
         await tester.pump(const Duration(milliseconds: 200));
 
         // Should be on codes step
@@ -200,10 +218,11 @@ void main() {
         await tester.tap(find.text('Siguiente'));
         await tester.pump();
 
-        await tester.runAsync(() async {
-          await Future.delayed(const Duration(milliseconds: 1000));
-        });
-        await tester.pump();
+        await pumpUntil(
+          tester,
+          done: () => find.text('Copiar todo').evaluate().isNotEmpty,
+          description: 'backup codes step to appear',
+        );
         await tester.pump(const Duration(milliseconds: 200));
 
         // Should be on codes step
@@ -218,10 +237,13 @@ void main() {
         await tester.tap(find.text('Confirmar'));
         await tester.pump();
 
-        await tester.runAsync(() async {
-          await Future.delayed(const Duration(milliseconds: 1000));
-        });
-        await tester.pump();
+        // Wait for the async save (dialog pops).
+        await pumpUntil(
+          tester,
+          done: () =>
+              find.text('Configurar Contraseña Maestra').evaluate().isEmpty,
+          description: 'setup dialog to pop after saving',
+        );
         await tester.pump(const Duration(milliseconds: 200));
 
         // Verify backup_code_data was stored in the DB
@@ -302,10 +324,11 @@ void main() {
         await tester.pump();
 
         // Wait for async verification (fake auth is instant)
-        await tester.runAsync(() async {
-          await Future.delayed(const Duration(milliseconds: 500));
-        });
-        await tester.pump();
+        await pumpUntil(
+          tester,
+          done: () => find.text('Nueva contraseña maestra').evaluate().isNotEmpty,
+          description: 'new password form to appear',
+        );
         await tester.pump(const Duration(milliseconds: 200));
 
         // Should show new password form
@@ -341,10 +364,13 @@ void main() {
         await tester.tap(find.text('Verificar'));
         await tester.pump();
 
-        await tester.runAsync(() async {
-          await Future.delayed(const Duration(milliseconds: 500));
-        });
-        await tester.pump();
+        // Wait for async verification (fake auth is instant)
+        await pumpUntil(
+          tester,
+          done: () =>
+              find.text('La contraseña actual es incorrecta').evaluate().isNotEmpty,
+          description: 'wrong-password error to appear',
+        );
         await tester.pump(const Duration(milliseconds: 200));
 
         expect(find.text('La contraseña actual es incorrecta'), findsOneWidget);
