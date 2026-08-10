@@ -210,6 +210,55 @@ void main() {
       expect(results.first.id, 'search-4');
     });
 
+    test('should_remove_tag_from_all_entries_and_rebuild_fts', () async {
+      // Regression guard for the propagation pattern #38 (tag rename) will copy.
+      await repository.create(Entry(
+        id: 'tag-1',
+        type: EntryType.note,
+        title: 'Primera',
+        content: 'Contenido uno',
+        tags: ['Trabajo'], // case-insensitive variant
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+      await repository.create(Entry(
+        id: 'tag-2',
+        type: EntryType.note,
+        title: 'Segunda',
+        content: 'Contenido dos',
+        tags: ['trabajo', 'otro'],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+      await repository.create(Entry(
+        id: 'tag-3',
+        type: EntryType.note,
+        title: 'Control',
+        content: 'Contenido tres',
+        tags: ['otro'],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+
+      // Before removal the tag matches in FTS (including case variant)
+      expect((await repository.search('trabajo')).length, 2);
+
+      final affected = await dao.removeTagFromAllEntries('trabajo');
+      expect(affected.toSet(), {'tag-1', 'tag-2'});
+
+      // Entries no longer carry the tag (case-insensitive); control untouched
+      for (final id in ['tag-1', 'tag-2']) {
+        final e = await repository.getById(id);
+        expect(e.tags.where((t) => t.toLowerCase() == 'trabajo'), isEmpty);
+      }
+      expect((await repository.getById('tag-3')).tags, ['otro']);
+
+      // FTS rebuilt: old tag no longer matches, remaining tags still do
+      expect(await repository.search('trabajo'), isEmpty);
+      expect((await repository.search('otro')).map((e) => e.id).toSet(),
+          {'tag-2', 'tag-3'});
+    });
+
     test('should_exclude_archived_entries_when_excludeArchived_true', () async {
       await repository.create(Entry(
         id: 'repo-1',
