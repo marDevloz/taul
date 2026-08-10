@@ -66,6 +66,15 @@ class ImportService {
       );
     }
 
+    return importFromJsonString(jsonString);
+  }
+
+  /// Importa las entries contenidas en un string JSON en formato de
+  /// exportación (un wrapper con "version" y "entries").
+  ///
+  /// Las entries cuyo ID ya exista en la base de datos se saltan.
+  /// Retorna un [ImportResult] con el resumen de la operación.
+  Future<ImportResult> importFromJsonString(String jsonString) async {
     // Parsear el JSON
     late Map<String, dynamic> wrapper;
     try {
