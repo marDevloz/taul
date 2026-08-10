@@ -24,7 +24,8 @@ class TrashScreen extends ConsumerWidget {
                 : IconButton(
                     icon: const Icon(Icons.delete_sweep),
                     tooltip: 'Vaciar papelera',
-                    onPressed: () => _confirmEmptyTrash(context, ref),
+                    onPressed: () =>
+                        _confirmEmptyTrash(context, ref, entries.length),
                   ),
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
@@ -198,15 +199,25 @@ class TrashScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _confirmEmptyTrash(BuildContext context, WidgetRef ref) async {
+  Future<void> _confirmEmptyTrash(
+    BuildContext context,
+    WidgetRef ref,
+    int trashCount,
+  ) async {
+    if (trashCount <= 0) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No hay entradas en la papelera')),
+        );
+      }
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Vaciar papelera'),
-        content: const Text(
-          '¿Eliminar todas las entradas de la papelera '
-          'permanentemente? Esta acción no se puede deshacer.',
-        ),
+        content: Text(_emptyTrashConfirmText(trashCount)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -224,15 +235,25 @@ class TrashScreen extends ConsumerWidget {
     );
     if (confirmed != true) return;
 
-    final count = await ref.read(emptyTrashProvider).call();
+    final deletedCount = await ref.read(emptyTrashProvider).call();
     ref.invalidate(trashListProvider);
     ref.invalidate(entryListProvider);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$count entradas eliminadas permanentemente')),
+        SnackBar(content: Text(_deletedSnackBarText(deletedCount))),
       );
     }
   }
+
+  String _emptyTrashConfirmText(int count) => count == 1
+      ? '¿Eliminar 1 entrada de la papelera permanentemente? '
+          'Esta acción no se puede deshacer.'
+      : '¿Eliminar $count entradas de la papelera permanentemente? '
+          'Esta acción no se puede deshacer.';
+
+  String _deletedSnackBarText(int count) => count == 1
+      ? '1 entrada eliminada permanentemente'
+      : '$count entradas eliminadas permanentemente';
 
   String _formatDate(DateTime dt) {
     final now = DateTime.now();
