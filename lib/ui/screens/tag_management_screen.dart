@@ -469,18 +469,103 @@ class _TagSettingTile extends ConsumerWidget {
     );
 
     if (result == null || result == setting.name || !context.mounted) return;
+    final newName = result.trim();
+
+    // Detección de merge: ya existe otra TagSetting con el nuevo nombre
+    // (case-insensitive). El destino conserva su configuración.
+    TagSetting? destination;
+    final sourceLower = setting.name.toLowerCase();
+    final newLower = newName.toLowerCase();
+    final settings =
+        ref.read(tagSettingsListProvider).valueOrNull ?? const <TagSetting>[];
+    for (final s in settings) {
+      if (s.name.toLowerCase() == sourceLower) continue;
+      if (s.name.toLowerCase() == newLower) {
+        destination = s;
+        break;
+      }
+    }
+
+    // El nombre canónico que las entradas llevarán: el del destino cuando se
+    // mergea (para que coincida con la TagSetting sobreviviente), si no el
+    // nuevo nombre tipeado.
+    final canonicalName = destination?.name ?? newName;
+
+    // Guard de downgrade: al mergear hacia un destino que no es seguro, se
+    // pide confirmación explícita mostrando cuántas entradas pierden la
+    // protección. Solo este sentido confirma; renombrar hacia un destino
+    // seguro no requiere confirmación.
+    if (destination != null && setting.isSecure && !destination.isSecure) {
+      final counts = ref.read(tagUsageCountProvider);
+      final affectedCount = counts[sourceLower] ?? 0;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('¿Renombrar etiqueta?'),
+          content: Text(
+            affectedCount == 1
+                ? '"$canonicalName" no requiere autenticación. '
+                    '1 entrada dejará de estar protegida. ¿Continuar?'
+                : '"$canonicalName" no requiere autenticación. '
+                    '$affectedCount entradas dejarán de estar protegidas. '
+                    '¿Continuar?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Continuar'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+    }
 
     final deleteUseCase = ref.read(deleteTagSettingProvider);
     final saveUseCase = ref.read(saveTagSettingProvider);
+    final renameTag = ref.read(renameTagOnEntriesProvider);
 
-    await deleteUseCase.call(setting.name);
-    await saveUseCase.call(
-      result,
-      color: setting.color,
-      isSecure: setting.isSecure,
-      isSystem: setting.isSystem,
-    );
-    ref.invalidate(tagSettingsListProvider);
+    try {
+      final affectedEntryIds = await renameTag(setting.name, canonicalName);
+
+      if (destination != null) {
+        // Merge: el destino conserva su configuración, se elimina la fuente
+        await deleteUseCase.call(setting.name);
+      } else {
+        await deleteUseCase.call(setting.name);
+        await saveUseCase.call(
+          newName,
+          color: setting.color,
+          isSecure: setting.isSecure,
+          isSystem: setting.isSystem,
+        );
+      }
+
+      // Invalidation cascade, igual que _executeBatchDelete
+      ref.invalidate(tagSettingsListProvider);
+      ref.invalidate(tagSettingsMapProvider);
+      ref.invalidate(entryListProvider);
+      for (final id in affectedEntryIds) {
+        ref.invalidate(entryDetailProvider(id));
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Etiqueta renombrada')),
+        );
+      }
+    } catch (e) {
+      Logger().e('Failed to rename tag ${setting.name}', error: e);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo renombrar la etiqueta')),
+        );
+      }
+    }
   }
 
   Future<void> _toggleSecure(BuildContext context, bool newValue) async {

@@ -53,6 +53,30 @@ class _ControllableDeleteRepo extends _StubTagSettingsRepository {
   }
 }
 
+/// Stub that records delete/save calls so rename-flow tests can assert what
+/// happens to TagSettings (simple rename vs. merge).
+class _RecordingRepo extends _StubTagSettingsRepository {
+  final List<String> deleted = [];
+  final List<({String name, String? color, bool isSecure, bool isSystem})>
+      saved = [];
+
+  @override
+  Future<void> delete(String name) async {
+    deleted.add(name);
+  }
+
+  @override
+  Future<void> save(String name,
+      {String? color, bool isSecure = false, bool isSystem = false}) async {
+    saved.add((
+      name: name,
+      color: color,
+      isSecure: isSecure,
+      isSystem: isSystem,
+    ));
+  }
+}
+
 void main() {
   group('TagManagementScreen', () {
     testWidgets('should_render_empty_state_when_no_tags', (tester) async {
@@ -948,6 +972,228 @@ void main() {
 
         // All-fail SnackBar
         expect(find.text('No se pudieron eliminar tags'), findsOneWidget);
+      });
+    });
+
+    // --- TAG RENAME ---
+
+    group('tag rename', () {
+      Future<void> pumpTagScreen(
+        WidgetTester tester, {
+        required List<TagSetting> tags,
+        required ITagSettingsRepository repo,
+        Map<String, int> tagUsage = const {},
+        Future<List<String>> Function(String, String)? onRename,
+      }) {
+        return tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              tagSettingsListProvider.overrideWith(
+                (ref) => Future.value(tags),
+              ),
+              tagSettingsRepositoryProvider.overrideWith((ref) => repo),
+              tagUsageCountProvider.overrideWith((ref) => tagUsage),
+              if (onRename != null)
+                renameTagOnEntriesProvider.overrideWith(
+                  (ref) => (oldName, newName) => onRename(oldName, newName),
+                ),
+            ],
+            child: const MaterialApp(home: TagManagementScreen()),
+          ),
+        );
+      }
+
+      testWidgets('should_rename_tag_and_propagate_to_entries',
+          (tester) async {
+        final repo = _RecordingRepo();
+        final renamed = <(String, String)>[];
+
+        await pumpTagScreen(
+          tester,
+          tags: [
+            TagSetting(
+              name: 'work',
+              color: '#E06C75',
+              isSecure: false,
+              createdAt: DateTime(2024, 1, 1),
+            ),
+          ],
+          repo: repo,
+          onRename: (oldName, newName) async {
+            renamed.add((oldName, newName));
+            return ['entry-1', 'entry-2'];
+          },
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('work'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'proyecto');
+        await tester.tap(find.text('Renombrar'));
+        await tester.pumpAndSettle();
+
+        // Entries renamed before the TagSetting swap
+        expect(renamed, [('work', 'proyecto')]);
+        // Old setting deleted, new one saved with the source config
+        expect(repo.deleted, ['work']);
+        expect(repo.saved.single.name, 'proyecto');
+        expect(repo.saved.single.color, '#E06C75');
+        expect(repo.saved.single.isSecure, isFalse);
+        expect(find.text('Etiqueta renombrada'), findsOneWidget);
+      });
+
+      testWidgets('should_merge_when_destination_tag_exists', (tester) async {
+        final repo = _RecordingRepo();
+        final renamed = <(String, String)>[];
+
+        await pumpTagScreen(
+          tester,
+          tags: [
+            TagSetting(
+              name: 'work',
+              color: '#E06C75',
+              isSecure: false,
+              createdAt: DateTime(2024, 1, 1),
+            ),
+            TagSetting(
+              name: 'proyecto',
+              color: '#98C379',
+              isSecure: true,
+              createdAt: DateTime(2024, 1, 2),
+            ),
+          ],
+          repo: repo,
+          onRename: (oldName, newName) async {
+            renamed.add((oldName, newName));
+            return ['entry-1'];
+          },
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('work'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'proyecto');
+        await tester.tap(find.text('Renombrar'));
+        await tester.pumpAndSettle();
+
+        // Entries unify under the destination name; only the source setting
+        // is deleted, destination config is preserved (no new save)
+        expect(renamed, [('work', 'proyecto')]);
+        expect(repo.deleted, ['work']);
+        expect(repo.saved, isEmpty);
+      });
+
+      testWidgets('should_ask_confirmation_before_secure_downgrade_merge',
+          (tester) async {
+        final repo = _RecordingRepo();
+        final renamed = <(String, String)>[];
+
+        await pumpTagScreen(
+          tester,
+          tags: [
+            TagSetting(
+              name: 'work',
+              color: '#E06C75',
+              isSecure: true,
+              createdAt: DateTime(2024, 1, 1),
+            ),
+            TagSetting(
+              name: 'proyecto',
+              color: '#98C379',
+              isSecure: false,
+              createdAt: DateTime(2024, 1, 2),
+            ),
+          ],
+          repo: repo,
+          tagUsage: {'work': 3},
+          onRename: (oldName, newName) async {
+            renamed.add((oldName, newName));
+            return ['entry-1', 'entry-2', 'entry-3'];
+          },
+        );
+        await tester.pumpAndSettle();
+
+        // Start the rename, cancel the downgrade confirmation
+        await tester.tap(find.text('work'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'proyecto');
+        await tester.tap(find.text('Renombrar'));
+        await tester.pumpAndSettle();
+
+        // Confirmation shows how many entries lose protection
+        expect(
+          find.text('"proyecto" no requiere autenticación. '
+              '3 entradas dejarán de estar protegidas. ¿Continuar?'),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Cancelar'));
+        await tester.pumpAndSettle();
+
+        // Cancel aborts: nothing renamed or deleted
+        expect(renamed, isEmpty);
+        expect(repo.deleted, isEmpty);
+        expect(find.text('Etiqueta renombrada'), findsNothing);
+
+        // Confirm on the second attempt → rename proceeds
+        await tester.tap(find.text('work'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'proyecto');
+        await tester.tap(find.text('Renombrar'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('"proyecto" no requiere autenticación. '
+              '3 entradas dejarán de estar protegidas. ¿Continuar?'),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Continuar'));
+        await tester.pumpAndSettle();
+
+        expect(renamed, [('work', 'proyecto')]);
+        expect(repo.deleted, ['work']);
+        expect(repo.saved, isEmpty);
+        expect(find.text('Etiqueta renombrada'), findsOneWidget);
+      });
+
+      testWidgets('should_not_ask_confirmation_when_merging_toward_secure',
+          (tester) async {
+        final repo = _RecordingRepo();
+        final renamed = <(String, String)>[];
+
+        await pumpTagScreen(
+          tester,
+          tags: [
+            TagSetting(
+              name: 'work',
+              color: '#E06C75',
+              isSecure: false,
+              createdAt: DateTime(2024, 1, 1),
+            ),
+            TagSetting(
+              name: 'proyecto',
+              color: '#98C379',
+              isSecure: true,
+              createdAt: DateTime(2024, 1, 2),
+            ),
+          ],
+          repo: repo,
+          onRename: (oldName, newName) async {
+            renamed.add((oldName, newName));
+            return ['entry-1'];
+          },
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('work'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'proyecto');
+        await tester.tap(find.text('Renombrar'));
+        await tester.pumpAndSettle();
+
+        // Renaming toward a secure destination needs no confirmation
+        expect(find.textContaining('no requiere autenticación'), findsNothing);
+        expect(renamed, [('work', 'proyecto')]);
+        expect(repo.deleted, ['work']);
       });
     });
   });

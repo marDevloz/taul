@@ -297,6 +297,16 @@ final removeTagFromEntriesProvider =
   return (String tagName) => dao.removeTagFromAllEntries(tagName);
 });
 
+/// Provider para renombrar una tag en todas las entradas que la usan,
+/// aplicando el nuevo nombre con match case-insensitive y dedupe intra-entry.
+/// Devuelve los IDs de las entradas afectadas para invalidar sus detail providers.
+final renameTagOnEntriesProvider =
+    Provider<Future<List<String>> Function(String, String)>((ref) {
+  final dao = ref.watch(daoProvider);
+  return (String oldName, String newName) =>
+      dao.renameTagOnAllEntries(oldName, newName);
+});
+
 /// Todos los tags únicos de entradas no eliminadas.
 /// Ordenados por frecuencia de uso (más usado primero).
 final tagsListProvider = Provider<List<String>>((ref) {

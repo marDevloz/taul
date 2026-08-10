@@ -114,6 +114,65 @@ class EntryDao {
     return affected;
   }
 
+  /// Renombra un tag en todas las entradas que lo usan, reemplazando
+  /// [oldName] por [newName] con match case-insensitive (igual que
+  /// removeTagFromAllEntries). Las variantes de casing del tag original
+  /// colapsan al nuevo nombre; si el nuevo nombre ya existe en una entrada,
+  /// se deduplica en vez de duplicarse. Rebuild del FTS igual que
+  /// removeTagFromAllEntries. No llama _syncTags (evita recrear la
+  /// TagSetting fuente si el caller la elimina). Devuelve los IDs de las
+  /// entradas afectadas para invalidar sus detail providers.
+  Future<List<String>> renameTagOnAllEntries(
+    String oldName,
+    String newName,
+  ) async {
+    final all = await (_database.select(_database.entries)).get();
+    final oldLower = oldName.toLowerCase();
+    final newLower = newName.toLowerCase();
+    final affected = <String>[];
+    for (final row in all) {
+      final tags = List<String>.from(jsonDecode(row.tags) as List);
+      final renamed = <String>[];
+      final seen = <String>{};
+      var renamedOccurred = false;
+      for (final t in tags) {
+        final lower = t.toLowerCase();
+        if (lower == oldLower) {
+          renamedOccurred = true;
+          if (seen.add(newLower)) renamed.add(newName);
+          continue;
+        }
+        if (seen.add(lower)) renamed.add(t);
+      }
+      if (renamed.length != tags.length || renamedOccurred) {
+        affected.add(row.id);
+        await (_database.update(_database.entries)
+          ..where((t) => t.id.equals(row.id)))
+          .write(db.EntriesCompanion(
+            tags: Value(jsonEncode(renamed)),
+            updatedAt: Value(DateTime.now()),
+          ));
+        // Update FTS index so search remains accurate
+        try {
+          await _database.customStatement(
+            'DELETE FROM entries_fts WHERE id = ?',
+            [row.id],
+          );
+          await _database.customInsert(
+            'INSERT INTO entries_fts (id, title, content, tags) VALUES (?, ?, ?, ?)',
+            variables: [
+              Variable.withString(row.id),
+              Variable.withString(row.title),
+              Variable.withString(row.content),
+              Variable.withString(renamed.join(' ')),
+            ],
+          );
+        } catch (_) {}
+      }
+    }
+    return affected;
+  }
+
   Future<void> delete(String id) async {
     await (_database.delete(_database.entries)
       ..where((t) => t.id.equals(id)))
