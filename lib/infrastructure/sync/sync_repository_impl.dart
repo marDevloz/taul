@@ -3,17 +3,22 @@ import 'package:taul/domain/entities/conflict.dart';
 import 'package:taul/domain/entities/conflict_resolution.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/repositories/i_sync_repository.dart';
+import 'package:taul/infrastructure/database/app_database.dart'
+    hide Conflict, Entry;
 import 'package:taul/infrastructure/database/conflict_dao.dart';
 import 'package:taul/infrastructure/database/entry_dao.dart';
 
 class SyncRepositoryImpl implements ISyncRepository {
+  final AppDatabase _database;
   final EntryDao _entryDao;
   final ConflictDao _conflictDao;
 
   SyncRepositoryImpl({
+    required AppDatabase database,
     required EntryDao entryDao,
     required ConflictDao conflictDao,
-  })  : _entryDao = entryDao,
+  })  : _database = database,
+        _entryDao = entryDao,
         _conflictDao = conflictDao;
 
   @override
@@ -33,8 +38,22 @@ class SyncRepositoryImpl implements ISyncRepository {
       _conflictDao.getByResolution(ConflictResolution.pending);
 
   @override
-  Future<void> resolveConflict(int id, ConflictResolution resolution) =>
-      _conflictDao.updateResolution(id, resolution);
+  Future<void> applyConflictResolution({
+    required Conflict conflict,
+    required ConflictResolution resolution,
+    Entry? entryToUpdate,
+    Entry? entryToInsert,
+  }) async {
+    await _database.transaction(() async {
+      if (entryToUpdate != null) {
+        await _entryDao.update(entryToUpdate);
+      }
+      if (entryToInsert != null) {
+        await _entryDao.insert(entryToInsert);
+      }
+      await _conflictDao.updateResolution(conflict.id, resolution);
+    });
+  }
 
   @override
   Future<DateTime?> getLastSyncAt(String peerDeviceId) async {

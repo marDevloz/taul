@@ -4,6 +4,7 @@ import 'package:taul/domain/entities/conflict.dart';
 import 'package:taul/domain/entities/conflict_resolution.dart';
 import 'package:taul/domain/entities/sync_state.dart';
 import 'package:taul/domain/repositories/i_sync_repository.dart';
+import 'package:taul/domain/usecases/resolve_conflict.dart';
 import 'package:taul/infrastructure/database/conflict_dao.dart';
 import 'package:taul/infrastructure/database/entry_dao.dart';
 import 'package:taul/infrastructure/sync/certificate_manager.dart';
@@ -29,7 +30,11 @@ final syncRepositoryProvider = Provider<ISyncRepository>((ref) {
   final db = ref.watch(databaseProvider);
   final entryDao = EntryDao(db);
   final conflictDao = ConflictDao(db);
-  return SyncRepositoryImpl(entryDao: entryDao, conflictDao: conflictDao);
+  return SyncRepositoryImpl(
+    database: db,
+    entryDao: entryDao,
+    conflictDao: conflictDao,
+  );
 });
 
 /// Coordinates the sync exchange on the server side.
@@ -56,19 +61,20 @@ final pairingServiceProvider = Provider<PairingService>((ref) {
 });
 
 /// The sync server instance. Only created when sync is started.
-final syncServerProvider = FutureProvider.family<SyncServer, String>(
-  (ref, pairingCode) async {
-    final certManager = ref.watch(certificateManagerProvider).valueOrNull;
-    if (certManager == null) throw Exception('Certificate manager not ready');
-    final coordinator = ref.watch(syncCoordinatorProvider);
-    return SyncServer(
-      certManager: certManager,
-      pairingCode: pairingCode,
-      onRequest: coordinator.handleSyncRequest,
-      logger: Logger(),
-    );
-  },
-);
+final syncServerProvider = FutureProvider.family<SyncServer, String>((
+  ref,
+  pairingCode,
+) async {
+  final certManager = ref.watch(certificateManagerProvider).valueOrNull;
+  if (certManager == null) throw Exception('Certificate manager not ready');
+  final coordinator = ref.watch(syncCoordinatorProvider);
+  return SyncServer(
+    certManager: certManager,
+    pairingCode: pairingCode,
+    onRequest: coordinator.handleSyncRequest,
+    logger: Logger(),
+  );
+});
 
 /// The main sync service. Returns null until startSync is called.
 final syncServiceProvider = StateProvider<SyncService?>((ref) => null);
@@ -76,9 +82,7 @@ final syncServiceProvider = StateProvider<SyncService?>((ref) => null);
 final syncStateProvider = StateProvider<SyncState>((ref) => SyncState.idle);
 
 /// Stores the result of the last completed client sync.
-final lastSyncResultProvider = StateProvider<ProcessSyncResult?>(
-  (ref) => null,
-);
+final lastSyncResultProvider = StateProvider<ProcessSyncResult?>((ref) => null);
 
 final conflictCountProvider = StreamProvider<int>((ref) async* {
   final db = ref.watch(databaseProvider);
@@ -209,12 +213,13 @@ void _resetSyncSession(Ref ref) {
 }
 
 final resolveConflictProvider =
-    Provider<Future<void> Function(int, ConflictResolution)>((ref) {
-  return (int id, ConflictResolution resolution) async {
-    final db = ref.read(databaseProvider);
-    final dao = ConflictDao(db);
-    await dao.updateResolution(id, resolution);
-    ref.invalidate(pendingConflictsProvider);
-    ref.invalidate(conflictCountProvider);
-  };
-});
+    Provider<Future<void> Function(Conflict, ConflictResolution)>((ref) {
+      final useCase = ResolveConflict(
+        syncRepository: ref.read(syncRepositoryProvider),
+      );
+      return (Conflict conflict, ConflictResolution resolution) async {
+        await useCase.call(conflict: conflict, resolution: resolution);
+        ref.invalidate(pendingConflictsProvider);
+        ref.invalidate(conflictCountProvider);
+      };
+    });

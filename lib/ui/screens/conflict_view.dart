@@ -156,7 +156,7 @@ class _ConflictDetail extends ConsumerWidget {
                       ? null
                       : () {
                           ref.read(resolveConflictProvider)(
-                            conflict.id,
+                            conflict,
                             ConflictResolution.keepLocal,
                           );
                           Navigator.pop(context);
@@ -171,7 +171,7 @@ class _ConflictDetail extends ConsumerWidget {
                       ? null
                       : () {
                           ref.read(resolveConflictProvider)(
-                            conflict.id,
+                            conflict,
                             ConflictResolution.keepRemote,
                           );
                           Navigator.pop(context);
@@ -189,7 +189,7 @@ class _ConflictDetail extends ConsumerWidget {
                   ? null
                   : () {
                       ref.read(resolveConflictProvider)(
-                        conflict.id,
+                        conflict,
                         ConflictResolution.keepBoth,
                       );
                       Navigator.pop(context);
@@ -231,7 +231,7 @@ class _DiffSectionState extends State<_DiffSection> {
   Widget build(BuildContext context) {
     final needsTruncation =
         (widget.local.length > _maxLen || widget.remote.length > _maxLen) &&
-            !_expanded;
+        !_expanded;
 
     return Card(
       child: Padding(
@@ -239,21 +239,12 @@ class _DiffSectionState extends State<_DiffSection> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.title,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
+            Text(widget.title, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
-            Text(
-              'Local:',
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
+            Text('Local:', style: Theme.of(context).textTheme.labelSmall),
             Text(_truncate(widget.local)),
             const SizedBox(height: 8),
-            Text(
-              'Remoto:',
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
+            Text('Remoto:', style: Theme.of(context).textTheme.labelSmall),
             Text(_truncate(widget.remote)),
             if (needsTruncation) ...[
               const SizedBox(height: 4),
