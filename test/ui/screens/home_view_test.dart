@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/screens/home_view.dart';
-import 'package:taul/infrastructure/database/app_database.dart';
+import 'package:taul/domain/entities/entry.dart';
+import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/infrastructure/database/app_database.dart'
+    hide Entry;
+import 'package:taul/infrastructure/database/entry_dao.dart';
 import 'package:taul/infrastructure/database/tag_settings_dao.dart';
 
 void main() {
@@ -90,6 +94,47 @@ void main() {
       expect(find.text('favorito'), findsOneWidget);
       expect(find.text('archivado'), findsOneWidget);
       expect(find.text('work'), findsOneWidget);
+    });
+  });
+
+  group('Search with FTS5 unavailable', () {
+    testWidgets('should_open_and_degrade_search_when_fts5_unavailable',
+        (tester) async {
+      // Simulate a device without FTS5: the entries_fts virtual table never
+      // gets created, so the FTS query throws "no such table: entries_fts".
+      await database.customStatement('DROP TABLE entries_fts');
+
+      final dao = EntryDao(database);
+      await dao.insert(Entry(
+        id: 'fts-down-1',
+        type: EntryType.note,
+        title: 'Flutter notes',
+        content: 'Some content about Flutter',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            databaseProvider.overrideWithValue(database),
+          ],
+          child: const MaterialApp(home: HomeView()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Open the search bar from the AppBar and type a query.
+      await tester.tap(find.byIcon(Icons.search));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'Flutter');
+      await tester.pumpAndSettle();
+
+      // Search degrades to LIKE instead of crashing: the matching entry shows
+      // and no raw SQL error reaches the UI.
+      expect(find.text('Flutter notes'), findsOneWidget);
+      expect(find.textContaining('no such table'), findsNothing);
     });
   });
 }

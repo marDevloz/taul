@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:logger/logger.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/infrastructure/database/tag_settings_dao.dart';
@@ -10,6 +11,7 @@ import 'app_database.dart' as db;
 class EntryDao {
   final db.AppDatabase _database;
   final TagSettingsDao _tagSettingsDao;
+  final Logger _log = Logger();
 
   EntryDao(this._database)
       : _tagSettingsDao = TagSettingsDao(_database);
@@ -147,9 +149,28 @@ class EntryDao {
 
   Future<List<Entry>> search(String query, {int limit = 100}) async {
     final sanitized = query.replaceAll('"', '""');
-    final tokens = sanitized.trim().split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+    final tokens = sanitized
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((t) => t.isNotEmpty)
+        .toList();
     if (tokens.isEmpty) return [];
 
+    try {
+      return await _searchFts(tokens, limit);
+    } catch (err) {
+      if (!_isFtsUnavailableError(err)) rethrow;
+      _log.w(
+        'FTS5 unavailable, degrading search to LIKE fallback',
+        error: err,
+      );
+      return _searchLike(tokens, limit);
+    }
+  }
+
+  /// Full-text search via FTS5. Throws when the FTS table is missing or the
+  /// FTS5 extension is unavailable (e.g. on Android system SQLite).
+  Future<List<Entry>> _searchFts(List<String> tokens, int limit) async {
     // Prefix match so "git" matches "github", "gitlab", etc.
     final ftsQuery = tokens.map((t) => '$t*').join(' ');
 
@@ -168,6 +189,56 @@ class EntryDao {
       return _fromMap(data);
     }).toList();
   }
+
+  /// Cheap degraded search used when FTS5 is unavailable: substring match on
+  /// title, content and tags (the same columns the FTS index covers). Every
+  /// token must match (AND semantics), mirroring the FTS query. Non-deleted
+  /// entries only, most recently updated first, capped by [limit].
+  Future<List<Entry>> _searchLike(List<String> tokens, int limit) async {
+    final conditions = <String>[];
+    final variables = <Variable>[];
+    for (final token in tokens) {
+      final pattern = '%${_escapeLikePattern(token)}%';
+      conditions.add(
+        "(e.title LIKE ? ESCAPE '\\' "
+        "OR e.content LIKE ? ESCAPE '\\' "
+        "OR e.tags LIKE ? ESCAPE '\\')",
+      );
+      variables
+        ..add(Variable.withString(pattern))
+        ..add(Variable.withString(pattern))
+        ..add(Variable.withString(pattern));
+    }
+
+    final rows = await _database.customSelect(
+      'SELECT e.* FROM entries e '
+      'WHERE e.deleted_at IS NULL '
+      'AND (${conditions.join(' AND ')}) '
+      'ORDER BY e.updated_at DESC '
+      'LIMIT ?',
+      variables: [...variables, Variable.withInt(limit)],
+    ).get();
+
+    return rows.map((row) {
+      final data = Map<String, dynamic>.from(row.data);
+      return _fromMap(data);
+    }).toList();
+  }
+
+  /// Detects errors caused by an unavailable FTS5 extension. A missing table
+  /// surfaces as "no such table: entries_fts"; a build without the extension
+  /// mentions "fts5". Mirrors the heuristic used by ErrorMapper so the same
+  /// errors degrade here instead of reaching the UI.
+  bool _isFtsUnavailableError(Object err) {
+    final lower = err.toString().toLowerCase();
+    return lower.contains('entries_fts') || lower.contains('fts5');
+  }
+
+  /// Escapes LIKE wildcards so user input is matched literally.
+  String _escapeLikePattern(String value) => value.replaceAllMapped(
+    RegExp(r'([\\%_])'),
+    (m) => '\\${m[1]}',
+  );
 
   /// Sincroniza los tags de un entry a TagSettings para que aparezcan
   /// en la pantalla de Gestión de etiquetas.
