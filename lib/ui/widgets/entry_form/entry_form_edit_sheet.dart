@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logger/logger.dart';
+import 'package:taul/core/errors/error_mapper.dart';
 import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
@@ -92,11 +94,19 @@ class _EntryFormEditSheetState extends ConsumerState<EntryFormEditSheet> {
       ref.invalidate(tagSettingsListProvider);
       ref.invalidate(tagSettingsMapProvider);
       if (mounted) Navigator.pop(context);
-    } catch (e) {
+    } catch (e, st) {
+      Logger().e('Failed to save entry edit', error: e, stackTrace: st);
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar: $e')),
+          SnackBar(
+            content: Text(
+              const ErrorMapper().toUserMessage(
+                e,
+                actionMessage: ErrorMapper.saveErrorMessage,
+              ),
+            ),
+          ),
         );
       }
     }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logger/logger.dart';
+import 'package:taul/core/errors/error_mapper.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
 import 'package:taul/ui/widgets/entry_card.dart';
@@ -39,7 +41,10 @@ class TrashScreen extends ConsumerWidget {
                     _buildTrashItem(context, ref, entries[index]),
               ),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+        error: (err, _) {
+          Logger().e('Trash list failed', error: err);
+          return Center(child: Text(const ErrorMapper().toUserMessage(err)));
+        },
       ),
     );
   }

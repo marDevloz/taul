@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:logger/logger.dart';
+import 'package:taul/core/errors/error_mapper.dart';
 import 'package:taul/infrastructure/security/master_password_store.dart';
 import 'package:taul/ui/providers/auto_lock_provider.dart';
 import 'package:taul/ui/providers/entry_providers.dart';
@@ -32,7 +34,10 @@ class SettingsScreen extends ConsumerWidget {
       body: configAsync.when(
         data: (config) => _buildBody(context, ref, config),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+        error: (err, _) {
+          Logger().e('Settings load failed', error: err);
+          return Center(child: Text(const ErrorMapper().toUserMessage(err)));
+        },
       ),
     );
   }
@@ -496,10 +501,22 @@ class SettingsScreen extends ConsumerWidget {
           const SnackBar(content: Text('Códigos de respaldo regenerados')),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      Logger().e(
+        'Failed to regenerate backup codes',
+        error: e,
+        stackTrace: st,
+      );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al regenerar códigos: $e')),
+          SnackBar(
+            content: Text(
+              const ErrorMapper().toUserMessage(
+                e,
+                actionMessage: ErrorMapper.regenerateCodesErrorMessage,
+              ),
+            ),
+          ),
         );
       }
     }
@@ -688,11 +705,19 @@ class SettingsScreen extends ConsumerWidget {
           SnackBar(content: Text('Exportación cifrada guardada en $savedPath')),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      Logger().e('Encrypted export failed', error: e, stackTrace: st);
       if (context.mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al exportar: $e')),
+          SnackBar(
+            content: Text(
+              const ErrorMapper().toUserMessage(
+                e,
+                actionMessage: ErrorMapper.exportErrorMessage,
+              ),
+            ),
+          ),
         );
       }
     }
@@ -789,11 +814,19 @@ class SettingsScreen extends ConsumerWidget {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      Logger().e('Data import failed', error: e, stackTrace: st);
       if (context.mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al importar: $e')),
+          SnackBar(
+            content: Text(
+              const ErrorMapper().toUserMessage(
+                e,
+                actionMessage: ErrorMapper.importErrorMessage,
+              ),
+            ),
+          ),
         );
       }
     }

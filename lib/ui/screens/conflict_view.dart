@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logger/logger.dart';
+import 'package:taul/core/errors/error_mapper.dart';
 import 'package:taul/domain/entities/conflict.dart';
 import 'package:taul/domain/entities/conflict_resolution.dart';
 import 'package:taul/ui/providers/sync_providers.dart';
@@ -30,7 +32,10 @@ class ConflictView extends ConsumerWidget {
                 itemBuilder: (_, i) => _ConflictCard(conflict: conflicts[i]),
               ),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) {
+          Logger().e('Pending conflicts load failed', error: e);
+          return Center(child: Text(const ErrorMapper().toUserMessage(e)));
+        },
       ),
     );
   }

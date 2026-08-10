@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:taul/core/constants.dart';
+import 'package:taul/core/errors/error_mapper.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/services/merge_service.dart';
 import 'package:taul/domain/entities/entry_type.dart';
@@ -265,7 +266,10 @@ class _HomeViewState extends ConsumerState<HomeView> {
                       },
                     ),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Error: $err')),
+              error: (err, _) {
+                Logger().e('Home entry list failed', error: err);
+                return Center(child: Text(const ErrorMapper().toUserMessage(err)));
+              },
             ),
           ),
         ],

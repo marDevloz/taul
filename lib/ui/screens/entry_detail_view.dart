@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:logger/logger.dart';
 import 'package:taul/core/constants.dart';
+import 'package:taul/core/errors/error_mapper.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
@@ -457,7 +458,10 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
           },
           loading: () =>
               const Center(child: CircularProgressIndicator()),
-          error: (err, _) => Center(child: Text('Error: $err')),
+          error: (err, _) {
+            Logger().e('Entry detail load failed', error: err);
+            return Center(child: Text(const ErrorMapper().toUserMessage(err)));
+          },
         ),
       ),
     );
@@ -1114,11 +1118,17 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
         if (!mounted) return;
         setState(() => _revealedSecret = null);
       });
-    } catch (e) {
+    } catch (e, st) {
+      Logger().e('Failed to decrypt credential secret', error: e, stackTrace: st);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al descifrar: ${e.toString()}'),
+            content: Text(
+              const ErrorMapper().toUserMessage(
+                e,
+                actionMessage: ErrorMapper.decryptMessage,
+              ),
+            ),
           ),
         );
       }
