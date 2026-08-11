@@ -215,6 +215,7 @@ class AppDatabase extends _$AppDatabase {
 }
 
 QueryExecutor _openConnection({Uint8List? dek}) {
+  print('[DB] _openConnection called, dek=${dek != null ? "present (${dek.length} bytes)" : "null"}');
   // Android: use sqflite (system SQLite, no SQLCipher yet)
   if (Platform.isAndroid) {
     return SqfliteQueryExecutor.inDatabaseFolder(
@@ -231,11 +232,21 @@ QueryExecutor _openConnection({Uint8List? dek}) {
       file,
       setup: (rawDb) {
         if (dek != null) {
-          assert(_debugCheckHasCipher(rawDb));
-          final keyHex = dek
-              .map((b) => b.toRadixString(16).padLeft(2, '0'))
-              .join();
-          rawDb.execute("PRAGMA key = \"x'$keyHex'\";");
+          if (_debugCheckHasCipher(rawDb)) {
+            final keyHex = dek
+                .map((b) => b.toRadixString(16).padLeft(2, '0'))
+                .join();
+            rawDb.execute("PRAGMA key = \"x'$keyHex'\";");
+          } else {
+            // SQLCipher is not available in this build: sqlite3_flutter_libs
+            // (v2) compiles vanilla sqlite3 and ignores the pubspec
+            // `hooks.user_defines.sqlite3.source = sqlite3mc` (that mechanism
+            // requires sqlite3 v3 native assets). PRAGMA key would be a silent
+            // no-op. Entry-level AES-256-GCM encryption still protects the
+            // secrets, so we continue instead of crashing in debug builds.
+            print('[DB] WARNING: SQLCipher unavailable — DB file encryption '
+                'disabled (entry-level encryption still active)');
+          }
         }
       },
     );

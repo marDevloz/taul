@@ -16,6 +16,7 @@ void main() {
   // close() is async so the count briefly exceeds 1 in debug builds.
   // This is safe — no queries run on the old instance after DEK change.
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+  print('[DRIFT] dontWarnAboutMultipleDatabases = ${driftRuntimeOptions.dontWarnAboutMultipleDatabases}');
 
   WidgetsFlutterBinding.ensureInitialized();
 

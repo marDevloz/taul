@@ -137,16 +137,24 @@ class _DatabaseManager {
   _DatabaseManager._();
 
   db.AppDatabase getDatabase(Uint8List? dek) {
+    print('[DB] getDatabase called, dek=${dek != null ? "present (${dek.length} bytes)" : "null"}, currentDek=${_currentDek != null ? "present (${_currentDek!.length} bytes)" : "null"}');
+
     // If DEK changed, close old synchronously before creating new
     if (_database != null && !_DEKEquals(_currentDek, dek)) {
+      print('[DB] DEK CHANGED — closing old instance');
       _database!.close();
       _database = null;
       _currentDek = null;
+      print('[DB] Old instance closed');
     }
 
     if (_database == null) {
+      print('[DB] Creating NEW AppDatabase(dek: ${dek != null ? "present" : "null"})');
       _database = db.AppDatabase(dek: dek);
       _currentDek = dek;
+      print('[DB] AppDatabase created successfully');
+    } else {
+      print('[DB] Reusing existing instance');
     }
 
     return _database!;
@@ -166,6 +174,7 @@ class _DatabaseManager {
 
 final databaseProvider = Provider<db.AppDatabase>((ref) {
   final dek = ref.watch(masterPasswordProvider);
+  print('[DB] databaseProvider invoked, dek=${dek != null ? "present" : "null"}');
   return _DatabaseManager.instance.getDatabase(dek);
 });
 
