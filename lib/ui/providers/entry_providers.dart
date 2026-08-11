@@ -125,11 +125,48 @@ final masterPasswordProvider =
 
 // --- Infrastructure providers ---
 
+/// Manages a single AppDatabase instance, closing the old one synchronously
+/// when the DEK changes. Prevents Drift's "multiple instances" warning.
+class _DatabaseManager {
+  static final _DatabaseManager _instance = _DatabaseManager._();
+  static _DatabaseManager get instance => _instance;
+
+  db.AppDatabase? _database;
+  Uint8List? _currentDek;
+
+  _DatabaseManager._();
+
+  db.AppDatabase getDatabase(Uint8List? dek) {
+    // If DEK changed, close old synchronously before creating new
+    if (_database != null && !_DEKEquals(_currentDek, dek)) {
+      _database!.close();
+      _database = null;
+      _currentDek = null;
+    }
+
+    if (_database == null) {
+      _database = db.AppDatabase(dek: dek);
+      _currentDek = dek;
+    }
+
+    return _database!;
+  }
+
+  /// Byte-level equality for Uint8List? (null-safe).
+  static bool _DEKEquals(Uint8List? a, Uint8List? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+}
+
 final databaseProvider = Provider<db.AppDatabase>((ref) {
   final dek = ref.watch(masterPasswordProvider);
-  final database = db.AppDatabase(dek: dek);
-  ref.onDispose(() => database.close());
-  return database;
+  return _DatabaseManager.instance.getDatabase(dek);
 });
 
 final daoProvider = Provider<EntryDao>((ref) => EntryDao(ref.watch(databaseProvider)));
