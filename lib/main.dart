@@ -1,5 +1,6 @@
 import 'dart:io' show Platform, exit;
 
+import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,12 @@ import 'package:taul/core/quick_capture_bus.dart';
 import 'package:window_manager/window_manager.dart';
 
 void main() {
+  // Drift warns about multiple AppDatabase instances during DEK rotation.
+  // Our _DatabaseManager ensures only one live instance at a time, but
+  // close() is async so the count briefly exceeds 1 in debug builds.
+  // This is safe — no queries run on the old instance after DEK change.
+  driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+
   WidgetsFlutterBinding.ensureInitialized();
 
   // Desktop tray — async init before app starts
