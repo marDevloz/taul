@@ -228,24 +228,27 @@ QueryExecutor _openConnection({Uint8List? dek}) {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File('${dbFolder.path}/${AppConstants.databaseName}');
+    if (dek != null) {
+      _migratePlaintextToEncrypted(file, dek);
+    }
     return NativeDatabase.createInBackground(
       file,
       setup: (rawDb) {
         if (dek != null) {
-          if (_debugCheckHasCipher(rawDb)) {
-            final keyHex = dek
-                .map((b) => b.toRadixString(16).padLeft(2, '0'))
-                .join();
+          try {
+            final hasCipher = _debugCheckHasCipher(rawDb);
+            if (!hasCipher) {
+              throw StateError(
+                'SQLCipher is not available in this build: the sqlite3mc build '
+                'hook did not produce an encrypted-capable library. '
+                'Run flutter pub get && flutter build windows to regenerate assets.',
+              );
+            }
+            final keyHex = _dekToHex(dek);
             rawDb.execute("PRAGMA key = \"x'$keyHex'\";");
-          } else {
-            // SQLCipher is not available in this build: sqlite3_flutter_libs
-            // (v2) compiles vanilla sqlite3 and ignores the pubspec
-            // `hooks.user_defines.sqlite3.source = sqlite3mc` (that mechanism
-            // requires sqlite3 v3 native assets). PRAGMA key would be a silent
-            // no-op. Entry-level AES-256-GCM encryption still protects the
-            // secrets, so we continue instead of crashing in debug builds.
-            print('[DB] WARNING: SQLCipher unavailable — DB file encryption '
-                'disabled (entry-level encryption still active)');
+          } catch (e) {
+            if (e is StateError) rethrow;
+            throw StateError('Failed to configure SQLCipher key: $e');
           }
         }
       },
@@ -253,6 +256,38 @@ QueryExecutor _openConnection({Uint8List? dek}) {
   });
 }
 
+/// Cifra la DB en texto plano in-place. No-op si ya está cifrada o no existe.
+void _migratePlaintextToEncrypted(File file, Uint8List dek) {
+  if (!file.existsSync() || file.lengthSync() == 0) return;
+  final header = _readDbHeader(file);
+  // "SQLite format 3\0" → texto plano
+  if (!header.startsWith('SQLite format 3')) return; // ya cifrada
+  final keyHex = _dekToHex(dek);
+  final db = sqlite3.open(file.path);
+  try {
+    db.execute("PRAGMA rekey = \"x'$keyHex'\";");
+  } finally {
+    db.close();
+  }
+}
+
+String _dekToHex(Uint8List dek) =>
+    dek.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+
+String _readDbHeader(File file) {
+  final raf = file.openSync(mode: FileMode.read);
+  try {
+    final bytes = raf.readSync(16);
+    return String.fromCharCodes(bytes);
+  } finally {
+    raf.closeSync();
+  }
+}
+
 bool _debugCheckHasCipher(Database database) {
-  return database.select('PRAGMA cipher;').isNotEmpty;
+  try {
+    return database.select('PRAGMA cipher;').isNotEmpty;
+  } catch (_) {
+    return false;
+  }
 }

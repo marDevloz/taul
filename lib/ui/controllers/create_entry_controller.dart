@@ -17,7 +17,7 @@ part 'create_entry_controller.freezed.dart';
 // ---------------------------------------------------------------------------
 
 @freezed
-class CreateEntryState with _$CreateEntryState {
+sealed class CreateEntryState with _$CreateEntryState {
   const CreateEntryState._();
 
   const factory CreateEntryState({
@@ -42,7 +42,7 @@ class CreateEntryState with _$CreateEntryState {
 // ---------------------------------------------------------------------------
 
 @freezed
-class ProcessedContent with _$ProcessedContent {
+sealed class ProcessedContent with _$ProcessedContent {
   const factory ProcessedContent({
     required String content,
     @Default(<String, String>{}) Map<String, String> metadata,

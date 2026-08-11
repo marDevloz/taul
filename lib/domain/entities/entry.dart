@@ -5,7 +5,7 @@ part 'entry.freezed.dart';
 part 'entry.g.dart';
 
 @freezed
-class Entry with _$Entry {
+sealed class Entry with _$Entry {
   const Entry._();
   const factory Entry({
     required String id,

@@ -18,17 +18,16 @@ dependencies:
   go_router: ^14.8.1
 
   # Database
-  drift: ^2.25.1
+  drift: ^2.34.3
   drift_sqflite: ^2.0.1
   sqflite: ^2.4.2
   path_provider: ^2.1.5
-  sqlite3: ^2.7.4
-  sqlite3_flutter_libs: ^0.5.28
+  sqlite3: ^3.5.1
   cryptography: ^2.7.0
 
   # Code generation
-  freezed_annotation: ^2.4.4
-  json_annotation: ^4.9.0
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.12.0
 
   # Utilities
   logger: ^2.5.0
@@ -64,11 +63,10 @@ dev_dependencies:
     sdk: flutter
 
   # Code generation
-  drift_dev: ^2.25.1
+  drift_dev: 2.34.0
   build_runner: ^2.4.14
-  freezed: ^2.5.8
-  json_serializable: ^6.9.4
-  riverpod_generator: ^2.6.3
+  freezed: 3.2.6-dev.1
+  json_serializable: 6.14.1
 
   # Testing
   mocktail: ^1.0.4

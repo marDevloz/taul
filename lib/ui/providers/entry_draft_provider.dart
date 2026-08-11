@@ -9,7 +9,7 @@ part 'entry_draft_provider.freezed.dart';
 // ---------------------------------------------------------------------------
 
 @freezed
-class EntryDraft with _$EntryDraft {
+sealed class EntryDraft with _$EntryDraft {
   const factory EntryDraft({
     required String title,
     required String content,

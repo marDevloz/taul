@@ -21,13 +21,19 @@ void main() {
 
   group('ErrorMapper.toUserMessage', () {
     test('should_return_search_unavailable_message_when_fts5_table_missing', () {
-      final error = SqliteException(1, 'no such table: entries_fts');
+      final error = SqliteException(
+        extendedResultCode: 1,
+        message: 'no such table: entries_fts',
+      );
 
       expect(mapper.toUserMessage(error), ErrorMapper.searchUnavailableMessage);
     });
 
     test('should_return_search_unavailable_message_when_fts5_module_missing', () {
-      final error = SqliteException(1, 'no such module: fts5');
+      final error = SqliteException(
+        extendedResultCode: 1,
+        message: 'no such module: fts5',
+      );
 
       expect(mapper.toUserMessage(error), ErrorMapper.searchUnavailableMessage);
     });
@@ -39,7 +45,10 @@ void main() {
     });
 
     test('should_return_database_message_when_sqlite_exception', () {
-      final error = SqliteException(1, 'database is locked');
+      final error = SqliteException(
+        extendedResultCode: 1,
+        message: 'database is locked',
+      );
 
       expect(mapper.toUserMessage(error), ErrorMapper.databaseMessage);
     });

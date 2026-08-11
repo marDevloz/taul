@@ -5,7 +5,7 @@ part 'sync_wire_format.freezed.dart';
 part 'sync_wire_format.g.dart';
 
 @freezed
-class SyncRequest with _$SyncRequest {
+sealed class SyncRequest with _$SyncRequest {
   const factory SyncRequest({
     required String deviceId,
     DateTime? lastSyncAt,
@@ -17,7 +17,7 @@ class SyncRequest with _$SyncRequest {
 }
 
 @freezed
-class SyncResponse with _$SyncResponse {
+sealed class SyncResponse with _$SyncResponse {
   const factory SyncResponse({
     required String deviceId,
     required int entriesReceived,
@@ -31,7 +31,7 @@ class SyncResponse with _$SyncResponse {
 }
 
 @freezed
-class SyncErrorResponse with _$SyncErrorResponse {
+sealed class SyncErrorResponse with _$SyncErrorResponse {
   const factory SyncErrorResponse({
     required int code,
     required String message,
@@ -42,7 +42,7 @@ class SyncErrorResponse with _$SyncErrorResponse {
 }
 
 @freezed
-class ProcessSyncResult with _$ProcessSyncResult {
+sealed class ProcessSyncResult with _$ProcessSyncResult {
   const factory ProcessSyncResult({
     required int entriesUpserted,
     required int conflictsCount,

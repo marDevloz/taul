@@ -6,7 +6,7 @@ part 'conflict.freezed.dart';
 part 'conflict.g.dart';
 
 @freezed
-class Conflict with _$Conflict {
+sealed class Conflict with _$Conflict {
   const Conflict._();
   @JsonSerializable(explicitToJson: true)
   const factory Conflict({
