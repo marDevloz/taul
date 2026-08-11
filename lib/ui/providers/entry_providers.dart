@@ -127,7 +127,9 @@ final masterPasswordProvider =
 
 final databaseProvider = Provider<db.AppDatabase>((ref) {
   final dek = ref.watch(masterPasswordProvider);
-  return db.AppDatabase(dek: dek);
+  final database = db.AppDatabase(dek: dek);
+  ref.onDispose(() => database.close());
+  return database;
 });
 
 final daoProvider = Provider<EntryDao>((ref) => EntryDao(ref.watch(databaseProvider)));
