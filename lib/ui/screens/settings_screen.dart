@@ -984,6 +984,7 @@ class SettingsScreen extends ConsumerWidget {
   void _showProgressDialog(BuildContext context, String message) {
     showDialog(
       context: context,
+      useRootNavigator: false,
       barrierDismissible: false,
       builder: (ctx) => Center(
         child: Card(

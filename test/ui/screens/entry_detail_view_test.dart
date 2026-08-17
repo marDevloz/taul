@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
@@ -484,6 +486,168 @@ void main() {
       expect(clipboardText, 'otra-cosa');
 
       await flushPendingTimers(tester);
+    });
+  });
+
+  /// Inserts a master password config row and returns the derived key.
+  Future<Uint8List> configureMasterPassword(String password) async {
+    final salt = Uint8List.fromList(List.generate(16, (i) => i + 1));
+    final hash = await auth.hashMasterPassword(password: password, salt: salt);
+    final now = DateTime.now();
+    await database.into(database.masterPasswordConfig).insert(
+      MasterPasswordConfigData(
+        id: 1,
+        passwordHashArgon2: hash,
+        saltHex: bytesToHex(salt),
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    return auth.deriveMasterKey(password: password, salt: salt);
+  }
+
+  /// Creates a protected credential whose secret is encrypted with [key].
+  Future<String> createProtectedEncryptedCredential(
+    Uint8List key, {
+    String plaintext = 'clave-secreta',
+  }) async {
+    final enc = await auth.encryptSecret(plaintext: plaintext, masterKey: key);
+    await createCredentialEntry(
+      requiresAuth: true,
+      encryptedSecret: enc.ciphertextHex,
+      cipherNonce: enc.nonceHex,
+      cipherTag: enc.tagHex,
+    );
+    return plaintext;
+  }
+
+  group('T-22: protected credential reveal gating', () {
+    testWidgets('should_not_auto_reveal_protected_secret_on_open',
+        (tester) async {
+      await createCredentialEntry(
+        requiresAuth: true,
+        encryptedSecret: 'dummy_ciphertext',
+        cipherNonce: 'dummy_nonce',
+        cipherTag: 'dummy_tag',
+      );
+
+      await tester.pumpWidget(createTestApp());
+      await pumpAndSettle(tester);
+
+      // No auto-reveal: no master-password prompt and no "not configured"
+      // snackbar; the secret stays hidden behind the explicit button.
+      expect(find.text('Contraseña Maestra'), findsNothing);
+      expect(find.textContaining('no configurada'), findsNothing);
+      expect(find.text('Revelar Secreto'), findsOneWidget);
+    });
+
+    testWidgets('should_hide_protected_secret_until_master_password_entered',
+        (tester) async {
+      final key = await configureMasterPassword('maestra123');
+      final plaintext = await createProtectedEncryptedCredential(key);
+
+      await tester.pumpWidget(createTestApp());
+      await pumpAndSettle(tester);
+
+      // Plaintext is never visible on open, and the password field is empty
+      // until reveal — so no copy affordance exists at all yet.
+      expect(find.text(plaintext), findsNothing);
+      expect(find.byTooltip('Copiar'), findsNothing);
+
+      // Eye tap on the obscured password triggers the master-password dialog.
+      final mostrar = find.byTooltip('Mostrar');
+      await tester.tap(mostrar);
+      await tester.pumpAndSettle();
+      expect(find.text('Contraseña Maestra'), findsOneWidget);
+
+      // Wrong password -> error, secret still hidden.
+      await tester.enterText(find.byType(TextField).last, 'incorrecta');
+      await tester.tap(find.text('Aceptar'));
+      await tester.pumpAndSettle();
+      expect(find.text(plaintext), findsNothing);
+      expect(find.text('Contraseña incorrecta'), findsOneWidget);
+
+      // Correct password -> secret revealed and copyable. The password
+      // field now has text, so its copy affordance appears (the username
+      // controller is not re-synced in tests where the entry loads async,
+      // so exactly one 'Copiar' tooltip is expected here).
+      await tester.enterText(find.byType(TextField).last, 'maestra123');
+      await tester.tap(find.text('Aceptar'));
+      await tester.pumpAndSettle();
+      expect(find.text(plaintext), findsOneWidget);
+      expect(find.byTooltip('Copiar'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+    });
+
+    testWidgets('should_not_crash_when_disposing_after_reveal',
+        (tester) async {
+      final key = await configureMasterPassword('maestra123');
+      await createProtectedEncryptedCredential(key);
+
+      await tester.pumpWidget(createTestApp());
+      await pumpAndSettle(tester);
+
+      await tester.tap(find.byTooltip('Mostrar'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, 'maestra123');
+      await tester.tap(find.text('Aceptar'));
+      await tester.pumpAndSettle();
+
+      // Unmount while a DEK is cached — must not throw the Riverpod
+      // "Cannot use ref after the widget was disposed" error.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('should_keep_cached_master_key_when_leaving_after_reveal',
+        (tester) async {
+      final key = await configureMasterPassword('maestra123');
+      await createProtectedEncryptedCredential(key);
+
+      final container = ProviderContainer(
+        overrides: [
+          databaseProvider.overrideWithValue(database),
+          entryAuthServiceProvider.overrideWithValue(auth),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            localizationsDelegates:
+                FlutterQuillLocalizations.localizationsDelegates,
+            supportedLocales: FlutterQuillLocalizations.supportedLocales,
+            home: EntryDetailView(entryId: testEntryId),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.tap(find.byTooltip('Mostrar'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, 'maestra123');
+      await tester.tap(find.text('Aceptar'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(masterPasswordProvider), isNotNull);
+
+      // Leave the view — DEK must persist for the session so the encrypted
+      // DB stays open. It is only cleared by explicit lock or auto-lock.
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const SizedBox(),
+        ),
+      );
+      await tester.pump();
+
+      expect(container.read(masterPasswordProvider), isNotNull);
     });
   });
 }

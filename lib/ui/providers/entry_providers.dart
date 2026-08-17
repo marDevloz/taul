@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logger/logger.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
 import 'package:taul/domain/entities/search_match.dart';
@@ -50,10 +51,9 @@ class AppLockNotifier extends StateNotifier<AppLockStatus> {
       final dbEncrypted = await EncryptedDbBootstrap.isEncrypted();
 
       if (dbEncrypted) {
-        // DB is encrypted — we can't read from it yet. Check prefs for lock state.
-        final prefs = await SharedPreferences.getInstance();
-        final appLockEnabled = prefs.getBool('app_lock_enabled') ?? false;
-        state = appLockEnabled ? AppLockStatus.locked : AppLockStatus.unlocked;
+        // DB is encrypted — we MUST have the DEK to read from it.
+        // Always require master password on startup regardless of app_lock_enabled.
+        state = AppLockStatus.locked;
         return;
       }
 
@@ -68,7 +68,9 @@ class AppLockNotifier extends StateNotifier<AppLockStatus> {
 
       state = (isConfigured && appLockEnabled) ? AppLockStatus.locked : AppLockStatus.unlocked;
     } catch (_) {
-      state = AppLockStatus.unlocked;
+      // DB read failed — likely encrypted without key (SharedPreferences
+      // flag lost or corrupted). Safe default: show lock screen.
+      state = AppLockStatus.locked;
     }
   }
 
@@ -108,9 +110,17 @@ final appLockEnabledProvider = StateNotifierProvider<AppLockEnabledNotifier, boo
 class MasterPasswordNotifier extends StateNotifier<Uint8List?> {
   MasterPasswordNotifier() : super(null);
 
+  final _log = Logger(printer: PrettyPrinter(methodCount: 0));
+
   Uint8List? get cachedKey => state;
-  void setMasterPassword(Uint8List key) => state = key;
+  void setMasterPassword(Uint8List key) {
+    _log.i('[DEK] setMasterPassword — caching DEK (${key.length} bytes)');
+    _log.i('[DEK]   stack: ${StackTrace.current}');
+    state = key;
+  }
   void clearMasterPassword() {
+    _log.i('[DEK] clearMasterPassword — clearing DEK');
+    _log.i('[DEK]   stack: ${StackTrace.current}');
     // Zero the buffer before releasing to prevent key lingering in RAM
     state?.fillRange(0, state!.length, 0);
     state = null;
@@ -133,28 +143,28 @@ class _DatabaseManager {
 
   db.AppDatabase? _database;
   Uint8List? _currentDek;
+  final _log = Logger(printer: PrettyPrinter(methodCount: 0));
 
   _DatabaseManager._();
 
   db.AppDatabase getDatabase(Uint8List? dek) {
-    print('[DB] getDatabase called, dek=${dek != null ? "present (${dek.length} bytes)" : "null"}, currentDek=${_currentDek != null ? "present (${_currentDek!.length} bytes)" : "null"}');
+    final dekPresent = dek != null;
+    final currentDekPresent = _currentDek != null;
 
     // If DEK changed, close old synchronously before creating new
     if (_database != null && !_DEKEquals(_currentDek, dek)) {
-      print('[DB] DEK CHANGED — closing old instance');
+      _log.w('[DB] getDatabase — DEK CHANGED! Closing old DB, creating new. '
+          'old_dek=$currentDekPresent → new_dek=$dekPresent');
+      _log.w('[DB]   stack: ${StackTrace.current}');
       _database!.close();
       _database = null;
       _currentDek = null;
-      print('[DB] Old instance closed');
     }
 
     if (_database == null) {
-      print('[DB] Creating NEW AppDatabase(dek: ${dek != null ? "present" : "null"})');
+      _log.i('[DB] getDatabase — creating new AppDatabase(dek=$dekPresent)');
       _database = db.AppDatabase(dek: dek);
       _currentDek = dek;
-      print('[DB] AppDatabase created successfully');
-    } else {
-      print('[DB] Reusing existing instance');
     }
 
     return _database!;
@@ -174,7 +184,8 @@ class _DatabaseManager {
 
 final databaseProvider = Provider<db.AppDatabase>((ref) {
   final dek = ref.watch(masterPasswordProvider);
-  print('[DB] databaseProvider invoked, dek=${dek != null ? "present" : "null"}');
+  final log = Logger(printer: PrettyPrinter(methodCount: 0));
+  log.i('[DB] databaseProvider rebuild — dek=${dek != null}');
   return _DatabaseManager.instance.getDatabase(dek);
 });
 

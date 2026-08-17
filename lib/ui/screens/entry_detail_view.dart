@@ -18,6 +18,7 @@ import 'package:taul/core/constants.dart';
 import 'package:taul/core/errors/error_mapper.dart';
 import 'package:taul/domain/entities/entry.dart';
 import 'package:taul/domain/entities/entry_type.dart';
+import 'package:taul/domain/usecases/update_entry.dart';
 import 'package:taul/infrastructure/security/entry_auth_service.dart';
 import 'package:taul/core/rich_text_helper.dart';
 import 'package:taul/ui/providers/color_providers.dart';
@@ -88,29 +89,26 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
   Timer? _hideTimer;
   Timer? _clipboardClearTimer;
   String? _lastCopiedSecret;
+  // Captured in initState — never touch `ref` inside dispose (Riverpod
+  // throws "Cannot use ref after the widget was disposed").
+  late final EntryAuthService _authService;
+  late final UpdateEntry _updateEntry;
+  bool _disposing = false;
+  bool _suppressPasswordDirty = false;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _authService = ref.read(entryAuthServiceProvider);
+    _updateEntry = ref.read(updateEntryProvider);
     _initControllers();
-
-    final entry = _cachedEntry;
-    if (entry != null &&
-        entry.type == EntryType.credential &&
-        entry.requiresAuth &&
-        entry.encryptedSecret != null &&
-        entry.cipherNonce != null &&
-        entry.cipherTag != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _autoRevealOnOpen(entry);
-      });
-    }
   }
 
   @override
   void dispose() {
+    _disposing = true;
     WidgetsBinding.instance.removeObserver(this);
     _autoSave();
     _titleCtrl.dispose();
@@ -124,9 +122,9 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
     _quillCtrl.dispose();
     _hideTimer?.cancel();
     _clipboardClearTimer?.cancel();
-    if (_cachedDek != null) {
-      ref.read(masterPasswordProvider.notifier).clearMasterPassword();
-    }
+    // NOTE: Do NOT clear the master password / DEK here. The DEK must
+    // persist for the session so the encrypted DB stays open. It is
+    // only cleared by the auto-lock timeout or an explicit lock action.
     super.dispose();
   }
 
@@ -156,8 +154,14 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
     );
     _usernameCtrl.addListener(_markChanged);
 
-    _passwordCtrl = TextEditingController(text: entry?.secret ?? '');
-    _passwordCtrl.addListener(_markChanged);
+    // Protected credentials never load the plaintext secret into the field;
+    // it is only populated after an explicit master-password reveal.
+    final isProtected = entry?.requiresAuth ?? false;
+    final isCredential = entry?.type == EntryType.credential;
+    _passwordCtrl = TextEditingController(
+      text: isCredential && !isProtected ? entry?.secret ?? '' : '',
+    );
+    _passwordCtrl.addListener(_onPasswordChanged);
 
     _urlCtrl = TextEditingController(
       text: entry?.metadata['url'] ?? '',
@@ -182,6 +186,15 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
 
   void _markChanged() {
     _hasChanges = true;
+  }
+
+  void _onPasswordChanged() {
+    if (_suppressPasswordDirty) return;
+    _markChanged();
+    // Manual edits mean the user is actively working with the secret:
+    // stop the auto-hide so it never wipes their in-progress edits.
+    _hideTimer?.cancel();
+    _hideTimer = null;
   }
 
   // ── Auto-save ──────────────────────────────────────────────────────────
@@ -212,13 +225,13 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
           newSecret != originalSecret &&
           _cachedDek != null) {
         // Re-encrypt with cached DEK
-        final auth = ref.read(entryAuthServiceProvider);
+        final auth = _authService;
         final encrypted = await auth.encryptSecret(
           plaintext: newSecret,
           masterKey: _cachedDek!,
         );
         if (!mounted) return;
-        await ref.read(updateEntryProvider).call(
+        await _updateEntry.call(
               entry,
               title: _titleCtrl.text,
               content: contentJson,
@@ -232,7 +245,7 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
             );
       } else {
         if (!mounted) return;
-        await ref.read(updateEntryProvider).call(
+        await _updateEntry.call(
               entry,
               title: _titleCtrl.text,
               content: contentJson,
@@ -245,11 +258,12 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
 
       _hasChanges = false;
 
-      if (!mounted) return;
-      ref.invalidate(entryDetailProvider(widget.entryId));
-      ref.invalidate(entryListProvider);
-      ref.invalidate(tagSettingsListProvider);
-      ref.invalidate(tagSettingsMapProvider);
+      if (!_disposing && mounted) {
+        ref.invalidate(entryDetailProvider(widget.entryId));
+        ref.invalidate(entryListProvider);
+        ref.invalidate(tagSettingsListProvider);
+        ref.invalidate(tagSettingsMapProvider);
+      }
     } catch (e) {
       Logger().e('auto-save failed', error: e);
     } finally {
@@ -986,6 +1000,12 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
     TextEditingController controller, {
     required bool isSecret,
   }) {
+    // Protected credentials are copyable only after an explicit reveal.
+    if (isSecret &&
+        _cachedEntry?.requiresAuth == true &&
+        _revealedSecret == null) {
+      return;
+    }
     final text = controller.text;
     if (text.isEmpty) return;
     Clipboard.setData(ClipboardData(text: text));
@@ -1046,6 +1066,7 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
     String displayedSecret,
     Entry entry,
   ) {
+    final isProtected = entry.requiresAuth;
     final isObscured = !_showPassword && _revealedSecret == null;
     return _buildEditableField(
       icon: Icons.key,
@@ -1053,16 +1074,30 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
       controller: _passwordCtrl,
       obscure: isObscured,
       isSecret: true,
-      onToggleObscure: () =>
-          setState(() => _showPassword = !_showPassword),
+      onToggleObscure: isProtected && _revealedSecret == null
+          ? () => _revealProtectedSecret()
+          : () {
+              if (_revealedSecret != null) {
+                // Hide a revealed secret: clear the state and field so the
+                // placeholder appears. Cancel auto-hide since the user
+                // explicitly hid it.
+                _hideTimer?.cancel();
+                _hideTimer = null;
+                _suppressPasswordDirty = true;
+                _passwordCtrl.clear();
+                _suppressPasswordDirty = false;
+                setState(() {
+                  _revealedSecret = null;
+                  _showPassword = false;
+                });
+              } else {
+                setState(() => _showPassword = !_showPassword);
+              }
+            },
     );
   }
 
   // ── Protected credential reveal ────────────────────────────────────────
-  Future<void> _autoRevealOnOpen(Entry entry) async {
-    await _revealProtectedSecret();
-  }
-
   Future<void> _revealProtectedSecret() async {
     final entry = _cachedEntry;
     if (entry == null || !entry.requiresAuth) return;
@@ -1072,18 +1107,7 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
         entry.cipherNonce == null ||
         entry.cipherTag == null) {
       if (entry.secret != null) {
-        setState(() => _revealedSecret = entry.secret);
-        _passwordCtrl.text = entry.secret!;
-        _passwordCtrl.selection = TextSelection.collapsed(
-          offset: _passwordCtrl.text.length,
-        );
-        _hideTimer?.cancel();
-        _hideTimer = Timer(
-          const Duration(seconds: AppConstants.clipboardAutoClearSeconds),
-          () {
-            if (mounted) setState(() => _revealedSecret = null);
-          },
-        );
+        _applyRevealedSecret(entry.secret!);
       }
       return;
     }
@@ -1091,11 +1115,9 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
     final auth = ref.read(entryAuthServiceProvider);
     final masterKeyNotifier = ref.read(masterPasswordProvider.notifier);
     Uint8List? key = masterKeyNotifier.cachedKey;
-
     if (key == null) {
       final store = ref.read(masterPasswordStoreProvider);
       final config = await store.readFull();
-
       if (config == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1175,20 +1197,7 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
       );
 
       if (!mounted) return;
-      setState(() {
-        _revealedSecret = plaintext;
-        _showPassword = false;
-      });
-      _passwordCtrl.text = plaintext;
-
-      _hideTimer?.cancel();
-      _hideTimer = Timer(
-        const Duration(seconds: AppConstants.clipboardAutoClearSeconds),
-        () {
-          if (!mounted) return;
-          setState(() => _revealedSecret = null);
-        },
-      );
+      _applyRevealedSecret(plaintext);
     } catch (e, st) {
       Logger().e('Failed to decrypt credential secret', error: e, stackTrace: st);
       if (mounted) {
@@ -1206,11 +1215,48 @@ class _EntryDetailViewState extends ConsumerState<EntryDetailView>
     }
   }
 
+  /// Applies a revealed plaintext secret to the password field and schedules
+  /// the auto-hide window (coordinated with the clipboard clear timer).
+  void _applyRevealedSecret(String plaintext) {
+    _suppressPasswordDirty = true;
+    _passwordCtrl.text = plaintext;
+    _passwordCtrl.selection = TextSelection.collapsed(
+      offset: plaintext.length,
+    );
+    _suppressPasswordDirty = false;
+    setState(() {
+      _revealedSecret = plaintext;
+      _showPassword = false;
+    });
+    _hideTimer?.cancel();
+    _hideTimer = Timer(
+      const Duration(seconds: AppConstants.clipboardAutoClearSeconds),
+      _autoHideRevealedSecret,
+    );
+  }
+
+  /// Auto-hides the revealed secret: clears the field content so the
+  /// plaintext and the copy affordance disappear after the window.
+  void _autoHideRevealedSecret() {
+    _hideTimer = null;
+    if (!mounted) return;
+    setState(() {
+      _revealedSecret = null;
+      _showPassword = false;
+    });
+    _suppressPasswordDirty = true;
+    _passwordCtrl.clear();
+    _suppressPasswordDirty = false;
+  }
+
   Future<_RevealDialogResult?> _showMasterPasswordDialog({
     required Entry entry,
     required Future<bool> Function(String password) verify,
   }) async {
-    final hint = await ref.read(masterPasswordHintProvider.future);
+    // Read the hint directly instead of through masterPasswordHintProvider:
+    // that FutureProvider watches another FutureProvider and its `.future`
+    // hangs on a cold read (superseded first computation never completes).
+    final hint = await ref.read(masterPasswordStoreProvider).readHint();
     final ctrl = TextEditingController();
     String? error;
     var obscurePassword = true;

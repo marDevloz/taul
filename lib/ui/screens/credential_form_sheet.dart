@@ -68,18 +68,15 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
         .toList();
 
     try {
-      print('[SAVE] _save start');
       final passwordChanged =
           !_isEditing || !widget.entry!.requiresAuth || password.isNotEmpty;
       final effectivePassword = passwordChanged ? password : '';
 
-      print('[SAVE] Creating CredentialProtectionController');
       final controller = CredentialProtectionController(
         authService: ref.read(entryAuthServiceProvider),
         passwordStore: ref.read(masterPasswordStoreProvider),
         masterPasswordNotifier: ref.read(masterPasswordProvider.notifier),
       );
-      print('[SAVE] Calling resolveProtection');
       final protection = await controller.resolveProtection(
         context: context,
         protectEntry: _protectEntry,
@@ -90,15 +87,12 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
         existingCipherNonce: widget.entry?.cipherNonce,
         existingCipherTag: widget.entry?.cipherTag,
       );
-      print('[SAVE] resolveProtection returned: ${protection != null ? "result" : "null"}');
 
       if (protection == null) {
-        print('[SAVE] Protection is null, aborting');
         setState(() => _isSaving = false);
         return;
       }
 
-      print('[SAVE] isEditing=$_isEditing, creating entry...');
       if (_isEditing) {
         final entry = widget.entry!;
         await ref.read(updateEntryProvider).call(
@@ -134,12 +128,9 @@ class _CredentialFormSheetState extends ConsumerState<CredentialFormSheet> {
           },
         );
       }
-      print('[SAVE] Entry created/updated successfully');
       ref.invalidate(entryListProvider);
       if (mounted) Navigator.pop(context);
-    } catch (e, st) {
-      print('[SAVE] ERROR: $e');
-      print('[SAVE] Stack trace: $st');
+    } catch (e) {
       setState(() => _isSaving = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

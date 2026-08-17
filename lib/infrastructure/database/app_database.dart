@@ -4,11 +4,13 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:drift_sqflite/drift_sqflite.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import 'package:taul/core/constants.dart';
 import 'package:taul/shared/tag_palette.dart';
+import 'package:logger/logger.dart';
 
 import 'conflicts_table.dart';
 import 'entries_table.dart';
@@ -215,9 +217,12 @@ class AppDatabase extends _$AppDatabase {
 }
 
 QueryExecutor _openConnection({Uint8List? dek}) {
-  print('[DB] _openConnection called, dek=${dek != null ? "present (${dek.length} bytes)" : "null"}');
+  final log = Logger(printer: PrettyPrinter(methodCount: 0));
+  log.i('[DB] _openConnection — dek=${dek != null ? '${dek.length} bytes' : 'null'}');
+
   // Android: use sqflite (system SQLite, no SQLCipher yet)
   if (Platform.isAndroid) {
+    log.i('[DB] _openConnection — Android path (sqflite, no SQLCipher)');
     return SqfliteQueryExecutor.inDatabaseFolder(
       path: AppConstants.databaseName,
       logStatements: false,
@@ -228,12 +233,40 @@ QueryExecutor _openConnection({Uint8List? dek}) {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File('${dbFolder.path}/${AppConstants.databaseName}');
+
+    // When no DEK is provided but an encrypted DB exists on disk, opening it
+    // without PRAGMA key triggers SqliteException(26).  Return an empty
+    // in-memory database so the app can still read the schema (lock-screen
+    // config check) without crashing.  Once the user authenticates and the DEK
+    // is supplied, databaseProvider rebuilds with the real key.
+    if (dek == null && file.existsSync()) {
+      final header = file.openSync(mode: FileMode.read);
+      try {
+        final magic = header.readSync(16);
+        // SQLite files always start with "SQLite format 3\000" (16 bytes).
+        const sqliteHeader = [0x53, 0x51, 0x4C, 0x69, 0x74, 0x65, 0x20, 0x66,
+          0x6F, 0x72, 0x6D, 0x61, 0x74, 0x20, 0x33, 0x00];
+        final isPlaintext = magic.length == 16 &&
+            !List.generate(16, (i) => magic[i] != sqliteHeader[i]).any((e) => e);
+        if (!isPlaintext) {
+          debugPrint('[DB] _openConnection — encrypted file on disk but no DEK '
+              'provided; returning in-memory DB to avoid SqliteException(26)');
+          return NativeDatabase.memory();
+        }
+      } finally {
+        header.close();
+      }
+    }
+
     if (dek != null) {
       _migratePlaintextToEncrypted(file, dek);
     }
     return NativeDatabase.createInBackground(
       file,
       setup: (rawDb) {
+        // NOTE: runs in background isolate — Logger is NOT sendable.
+        // Use debugPrint only.
+        debugPrint('[DB] _openConnection — setup: dek=${dek != null ? '${dek.length} bytes' : 'null'}');
         if (dek != null) {
           try {
             final hasCipher = _debugCheckHasCipher(rawDb);
@@ -246,10 +279,14 @@ QueryExecutor _openConnection({Uint8List? dek}) {
             }
             final keyHex = _dekToHex(dek);
             rawDb.execute("PRAGMA key = \"x'$keyHex'\";");
+            debugPrint('[DB] _openConnection — PRAGMA key OK');
           } catch (e) {
+            debugPrint('[DB] _openConnection — PRAGMA key FAILED: $e');
             if (e is StateError) rethrow;
             throw StateError('Failed to configure SQLCipher key: $e');
           }
+        } else {
+          debugPrint('[DB] _openConnection — NO DEK! Opening unencrypted file.');
         }
       },
     );
